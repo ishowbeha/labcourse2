@@ -1,13 +1,14 @@
-const User = require('../models/User');
-
 class UserRepository {
   constructor(db) {
-    this.userModel = new User(db);
+    this.db = db;
   }
 
   findAll() {
     try {
-      return this.userModel.findAll();
+      return this.db.prepare(`
+        SELECT id, first_name, last_name, email, is_active, created_at, updated_at
+        FROM users WHERE is_active = 1
+      `).all();
     } catch (error) {
       throw new Error(`Error fetching users: ${error.message}`);
     }
@@ -15,7 +16,10 @@ class UserRepository {
 
   findById(id) {
     try {
-      const user = this.userModel.findById(id);
+      const user = this.db.prepare(`
+        SELECT id, first_name, last_name, email, is_active, created_at, updated_at
+        FROM users WHERE id = ? AND is_active = 1
+      `).get(id);
       if (!user) {
         throw new Error('User not found');
       }
@@ -27,27 +31,40 @@ class UserRepository {
 
   findByEmail(email) {
     try {
-      return this.userModel.findByEmail(email);
+      return this.db.prepare(`
+        SELECT * FROM users WHERE email = ? AND is_active = 1
+      `).get(email);
     } catch (error) {
       throw new Error(`Error fetching user by email: ${error.message}`);
     }
   }
 
-  create(userData) {
+  create({ firstName, lastName, email, password }) {
     try {
-      return this.userModel.create(userData);
+      const stmt = this.db.prepare(`
+        INSERT INTO users (first_name, last_name, email, password_hash, is_active, created_by, updated_by)
+        VALUES (?, ?, ?, ?, 1, 1, 1)
+      `);
+      const result = stmt.run(firstName, lastName, email, password);
+      return this.findById(result.lastInsertRowid);
     } catch (error) {
       throw new Error(`Error creating user: ${error.message}`);
     }
   }
 
-  update(id, updateData) {
+  update(id, { firstName, lastName, email, is_active }) {
     try {
-      const user = this.userModel.update(id, updateData);
-      if (!user) {
-        throw new Error('User not found');
-      }
-      return user;
+      const stmt = this.db.prepare(`
+        UPDATE users SET 
+          first_name = COALESCE(?, first_name),
+          last_name = COALESCE(?, last_name),
+          email = COALESCE(?, email),
+          is_active = COALESCE(?, is_active),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+      stmt.run(firstName, lastName, email, is_active, id);
+      return this.findById(id);
     } catch (error) {
       throw new Error(`Error updating user: ${error.message}`);
     }
@@ -55,11 +72,12 @@ class UserRepository {
 
   delete(id) {
     try {
-      const user = this.userModel.delete(id);
-      if (!user) {
-        throw new Error('User not found');
-      }
-      return user;
+      const stmt = this.db.prepare(`
+        UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `);
+      stmt.run(id);
+      return this.findById(id);
     } catch (error) {
       throw new Error(`Error deleting user: ${error.message}`);
     }
@@ -67,11 +85,9 @@ class UserRepository {
 
   hardDelete(id) {
     try {
-      const result = this.userModel.hardDelete(id);
-      if (!result) {
-        throw new Error('User not found');
-      }
-      return result;
+      const stmt = this.db.prepare('DELETE FROM users WHERE id = ?');
+      stmt.run(id);
+      return true;
     } catch (error) {
       throw new Error(`Error hard deleting user: ${error.message}`);
     }

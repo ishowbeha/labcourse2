@@ -1,6 +1,6 @@
-# Layered Architecture - Full Stack Application
+# Stadium Ticket Management System
 
-A complete full-stack application demonstrating a **3-tier layered architecture** with React + Vite frontend and Node.js + Express backend, using **SQLite** (file-based database - no installation required!).
+A complete full-stack **stadium ticket management system** with React + Vite frontend and Node.js + Express backend, using **SQLite** (file-based database - no installation required!).
 
 ## 🏗️ Architecture Overview
 
@@ -11,15 +11,15 @@ This project implements a clean separation of concerns with the following layers
 ```
 backend/
 ├── src/
-│   ├── controllers/     # HTTP request handlers (no business logic)
-│   ├── services/        # Business logic and application rules
-│   ├── repositories/    # Data access layer (isolates SQL)
+│   ├── controllers/     # HTTP request handlers
+│   ├── services/        # Business logic
+│   ├── repositories/    # Data access layer
 │   ├── models/          # Data models
-│   ├── routes/          # API route definitions
+│   ├── routes/          # API routes
 │   ├── middleware/      # Express middleware
 │   └── server.js        # Application entry point
 ├── config/
-│   └── database.js      # SQLite database configuration & migrations
+│   └── database.js      # Database configuration & migrations
 └── package.json
 ```
 
@@ -28,33 +28,14 @@ backend/
 ```
 frontend/
 ├── src/
-│   ├── components/      # Reusable UI components (Controllers)
+│   ├── components/      # Reusable UI components
 │   ├── pages/           # Page components
-│   ├── services/        # Business logic layer
-│   ├── repositories/    # API data access layer
+│   ├── context/         # React Context (Auth)
+│   ├── services/        # API services
 │   ├── hooks/           # Custom React hooks
-│   ├── App.jsx          # Main application component
-│   └── main.jsx         # Application entry point
-├── index.html
+│   └── App.jsx          # Main application
 └── package.json
 ```
-
-## 🎯 Layer Responsibilities
-
-### 1. Controllers (API/Components)
-- **Backend**: Handle HTTP requests and return responses
-- **Frontend**: Handle UI interactions and display data
-- **No business logic** - only request/response handling
-
-### 2. Services
-- Contains all **business logic** and application rules
-- Orchestrates data flow between controllers and repositories
-- Performs validation and data transformation
-
-### 3. Repositories
-- Manages all **database communication**
-- Isolates SQL from business logic
-- Provides clean data access API
 
 ## 🚀 Getting Started
 
@@ -63,65 +44,85 @@ frontend/
 - Node.js (v18+)
 - npm or yarn
 
-**That's it!** No MySQL, MongoDB, or other database installation required. SQLite is file-based and automatically set up.
+### Installation & Running
 
-### Installation
+**Step 1: Clone and install dependencies**
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/ishowbeha/labcourse2.git
-   cd labcourse2
-   ```
+```bash
+git clone https://github.com/ishowbeha/labcourse2.git
+cd labcourse2
+```
 
-2. **Setup Backend**
-   ```bash
-   cd backend
-   npm install
-   cp .env.example .env
-   ```
+**Step 2: Start the Backend Server** (Terminal 1)
 
-3. **Start Backend Server**
-   ```bash
-   npm run dev
-   ```
+```bash
+cd backend
+cp .env.example .env    # Create environment file
+npm install
+npm run dev
+```
 
-4. **Setup Frontend** (in a new terminal)
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+You should see:
+```
+🚀 Server running on port 3000
+📡 API available at http://localhost:3000/api
+```
 
-That's it! The application will automatically create the SQLite database and run migrations on first startup.
+**Step 3: Start the Frontend** (Terminal 2 - open a NEW terminal)
 
-## 📡 API Endpoints
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-### Users
+You should see:
+```
+VITE ready in XXX ms
+Local: http://localhost:5173/
+```
+
+**Step 4: Open your browser**
+
+Go to: **http://localhost:5173**
+
+### 🔐 Demo Credentials
+
+| Role  | Email              | Password   |
+|-------|--------------------|------------|
+| Admin | admin@stadium.com  | admin123   |
+
+### 📡 API Endpoints
+
+#### Authentication
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile (requires auth)
+
+#### Users
 - `GET /api/users` - Get all users
 - `GET /api/users/:id` - Get user by ID
-- `POST /api/users` - Create new user
-- `PUT /api/users/:id` - Update user
-- `DELETE /api/users/:id` - Delete user
-- `POST /api/users/login` - User login
 
-### Categories
-- `GET /api/categories` - Get all categories
-- `GET /api/categories/:id` - Get category by ID
-- `POST /api/categories` - Create new category
-- `PUT /api/categories/:id` - Update category
-- `DELETE /api/categories/:id` - Delete category
-
-### Health Check
+#### Health Check
 - `GET /api/health` - Server health check
+
+## 🗄️ Database Schema
+
+The system includes tables for:
+- **Users & Authentication** - users, roles, user_roles, permissions, role_permissions, refresh_tokens
+- **Stadium Management** - stadiums, sections, matches
+- **Ticket System** - tickets, orders, order_items
+- **Payments** - payments
+- **System** - notifications, settings, audit_logs
 
 ## 🛠️ Technology Stack
 
 ### Backend
 - **Node.js** - Runtime environment
 - **Express** - Web framework
-- **SQLite (better-sqlite3)** - File-based database (no installation needed!)
+- **SQLite (better-sqlite3)** - File-based database
 - **bcryptjs** - Password hashing
-- **dotenv** - Environment variables
+- **jsonwebtoken** - JWT authentication
 
 ### Frontend
 - **React 18** - UI library
@@ -129,39 +130,43 @@ That's it! The application will automatically create the SQLite database and run
 - **React Router** - Client-side routing
 - **Axios** - HTTP client
 
-## 📝 Example Usage
+## 🔧 Troubleshooting
 
-### Creating a User
+### Login doesn't work / Nothing happens when I click Sign In
 
-```javascript
-// Frontend
-const userService = new UserService();
-const newUser = await userService.createUser({
-  username: 'john_doe',
-  email: 'john@example.com',
-  password: 'securepassword123'
-});
-```
+1. **Make sure the backend is running** - Open a terminal and check if you see:
+   ```
+   🚀 Server running on port 3000
+   ```
+   If not, run `cd backend && npm run dev`
 
-### Creating a Category
+2. **Check the browser console** - Press F12 and look at the Console tab for errors
 
-```javascript
-// Frontend
-const categoryService = new CategoryService();
-const newCategory = await categoryService.createCategory({
-  name: 'Electronics',
-  description: 'Electronic devices and gadgets'
-});
-```
+3. **Check Network tab** - Press F12, go to Network tab, try logging in again, and look for failed requests
 
-## 🏛️ Architecture Benefits
+4. **Verify backend is responding** - Open http://localhost:3000/api/health in your browser. You should see:
+   ```json
+   {"success":true,"message":"Server is running",...}
+   ```
 
-1. **Separation of Concerns** - Each layer has a specific responsibility
-2. **Maintainability** - Easy to modify one layer without affecting others
-3. **Testability** - Each layer can be tested independently
-4. **Scalability** - Easy to scale different layers independently
-5. **Reusability** - Services and repositories can be reused across controllers
-6. **No Database Setup** - SQLite is file-based, no installation required!
+### "Cannot find module" errors
+
+Run `npm install` in both `backend/` and `frontend/` directories.
+
+### Port already in use
+
+If port 3000 or 5173 is already in use, you can change them:
+- Backend: Set `PORT=3001` in `backend/.env`
+- Frontend: Change `port: 5173` to `port: 5174` in `frontend/vite.config.js`
+
+## 🏟️ Features
+
+- **Role-based Authentication** - Login/register with 10 different user roles
+- **Admin Dashboard** - Full admin panel for managing the system
+- **Ticket Management** - Purchase, view, and manage stadium tickets
+- **Match Scheduling** - Create and manage football matches
+- **Stadium Management** - Manage stadiums and seating sections
+- **Order Processing** - Handle ticket orders and payments
 
 ## 📄 License
 

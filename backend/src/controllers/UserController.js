@@ -84,22 +84,6 @@ class UserController {
       });
     }
   }
-
-  async login(req, res) {
-    try {
-      const { email, password } = req.body;
-      const user = await this.userService.authenticateUser(email, password);
-      res.json({
-        success: true,
-        data: user
-      });
-    } catch (error) {
-      res.status(401).json({
-        success: false,
-        message: error.message
-      });
-    }
-  }
 }
 
 module.exports = UserController;

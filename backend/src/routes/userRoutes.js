@@ -1,5 +1,6 @@
 const express = require('express');
 const UserController = require('../controllers/UserController');
+const { authenticate, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -7,8 +8,8 @@ const router = express.Router();
 const createUserRoutes = (db) => {
   const userController = new UserController(db);
 
-  // Public routes
-  router.post('/login', (req, res) => userController.login(req, res));
+  // All user routes require authentication
+  router.use(authenticate);
 
   // User management routes
   router.get('/', (req, res) => userController.getAllUsers(req, res));
