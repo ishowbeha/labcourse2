@@ -15,41 +15,51 @@ class UserService {
   }
 
   async createUser(userData) {
+    // Validate input
+    const { firstName, lastName, email, password } = userData;
+    if (!firstName || !lastName || !email || !password) {
+      throw new Error('First name, last name, email, and password are required');
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(userData.email)) {
+    if (!emailRegex.test(email)) {
       throw new Error('Invalid email format');
     }
 
     // Check if user already exists
-    const existingUser = this.userRepository.findByEmail(userData.email);
+    const existingUser = this.userRepository.findByEmail(email);
     if (existingUser) {
       throw new Error('Email already registered');
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
     const user = this.userRepository.create({
-      username: userData.username,
-      email: userData.email,
-      password: hashedPassword,
-      role: userData.role || 'user'
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword
     });
 
-    // Remove password from response
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return user;
   }
 
   async updateUser(id, updateData) {
     // If updating password, hash it
-    if (updateData.password) {
-      updateData.password = await bcrypt.hash(updateData.password, 10);
+    const data = { ...updateData };
+    if (data.password) {
+      data.password = await bcrypt.hash(data.password, 10);
     }
 
-    return this.userRepository.update(id, updateData);
+    return this.userRepository.update(id, {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      is_active: data.is_active
+    });
   }
 
   async deleteUser(id) {
@@ -62,12 +72,13 @@ class UserService {
       throw new Error('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       throw new Error('Invalid credentials');
     }
 
-    const { password: _, ...userWithoutPassword } = user;
+    // Return user without password
+    const { password_hash, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 }

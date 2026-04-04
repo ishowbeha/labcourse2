@@ -1,32 +1,31 @@
-# Stadium Ticket & Football Shop - Project Plan
+# Stadium Ticket Management System - Project Plan
 
 ## 📋 Project Overview
 
-A complete system for managing stadium tickets and an online football shop with 14 user roles, advanced features, and proper database design (3NF).
+A complete system for managing stadium tickets with 10 user roles, advanced features, and proper database design (3NF). **Focused only on ticket management - no e-commerce.**
 
 ## 🎯 Main Goals
 
 1. **Stadium Ticket Management** - Buy/sell tickets for football matches
-2. **Football Shop E-commerce** - Sell football shirts, boots, and accessories
-3. **User Management** - 14 different roles with specific permissions
-4. **Advanced Features** - Online payments, search, and reports
+2. **User Management** - 10 different roles with specific permissions
+3. **Advanced Features** - Online payments, search, and reports
 
 ## 📦 Module Breakdown (For Team Distribution)
 
-### **Module 1: Authentication & User Management** ⭐ START HERE
-**Assigned to:** [Friend 1]
+### **Module 1: Authentication & User Management** ⭐ DONE
+**Assigned to:** [Completed]
 **Priority:** HIGH
 **Estimated Time:** 3-4 days
 
 **Tasks:**
-- [ ] User registration/login with JWT tokens
-- [ ] Password hashing with bcrypt
-- [ ] Role-based access control (14 roles)
-- [ ] Permission system
-- [ ] Refresh token management
-- [ ] User profile management
+- [x] User registration/login with JWT tokens
+- [x] Password hashing with bcrypt
+- [x] Role-based access control (10 roles)
+- [x] Permission system
+- [x] Refresh token management
+- [x] User profile management
 
-**Files to create:**
+**Files created:**
 - `backend/src/controllers/AuthController.js`
 - `backend/src/services/AuthService.js`
 - `backend/src/repositories/AuthRepository.js`
@@ -36,7 +35,7 @@ A complete system for managing stadium tickets and an online football shop with 
 ---
 
 ### **Module 2: Stadium & Match Management**
-**Assigned to:** [Friend 2]
+**Assigned to:** [Friend 1]
 **Priority:** HIGH
 **Estimated Time:** 3-4 days
 
@@ -44,7 +43,7 @@ A complete system for managing stadium tickets and an online football shop with 
 - [ ] Stadium CRUD operations
 - [ ] Match scheduling and management
 - [ ] Section/seat management
-- [ ] Ticket generation with QR codes
+- [ ] Stadium capacity tracking
 - [ ] Match status tracking
 
 **Files to create:**
@@ -54,21 +53,23 @@ A complete system for managing stadium tickets and an online football shop with 
 - `backend/src/services/MatchService.js`
 - `backend/src/models/Stadium.js`
 - `backend/src/models/Match.js`
+- `backend/src/routes/stadiumRoutes.js`
+- `backend/src/routes/matchRoutes.js`
 
 ---
 
 ### **Module 3: Ticket Booking System**
-**Assigned to:** [Friend 3]
+**Assigned to:** [Friend 2]
 **Priority:** HIGH
 **Estimated Time:** 4-5 days
 
 **Tasks:**
 - [ ] Ticket search and selection
 - [ ] Seat availability checking
-- [ ] Shopping cart for tickets
-- [ ] Order creation and management
 - [ ] Ticket reservation system
+- [ ] Order creation and management
 - [ ] QR code generation
+- [ ] Ticket status management
 
 **Files to create:**
 - `backend/src/controllers/TicketController.js`
@@ -77,41 +78,19 @@ A complete system for managing stadium tickets and an online football shop with 
 - `backend/src/services/OrderService.js`
 - `backend/src/models/Ticket.js`
 - `backend/src/models/Order.js`
+- `backend/src/routes/ticketRoutes.js`
+- `backend/src/routes/orderRoutes.js`
 
 ---
 
-### **Module 4: E-commerce Shop**
-**Assigned to:** [Friend 4]
-**Priority:** MEDIUM
-**Estimated Time:** 4-5 days
-
-**Tasks:**
-- [ ] Product catalog management
-- [ ] Product variants (sizes, colors)
-- [ ] Shopping cart functionality
-- [ ] Product reviews and ratings
-- [ ] Inventory management
-- [ ] Category management
-
-**Files to create:**
-- `backend/src/controllers/ProductController.js`
-- `backend/src/controllers/ShopOrderController.js`
-- `backend/src/services/ProductService.js`
-- `backend/src/services/ShopOrderService.js`
-- `backend/src/models/Product.js`
-- `backend/src/models/ShopOrder.js`
-
----
-
-### **Module 5: Payment Integration**
-**Assigned to:** [Friend 5]
+### **Module 4: Payment Integration**
+**Assigned to:** [Friend 3]
 **Priority:** MEDIUM
 **Estimated Time:** 3-4 days
 
 **Tasks:**
 - [ ] Payment gateway integration (Stripe/PayPal)
 - [ ] Payment processing for tickets
-- [ ] Payment processing for shop orders
 - [ ] Refund management
 - [ ] Payment status tracking
 - [ ] Transaction logging
@@ -121,11 +100,12 @@ A complete system for managing stadium tickets and an online football shop with 
 - `backend/src/services/PaymentService.js`
 - `backend/src/middleware/payment.js`
 - `backend/src/models/Payment.js`
+- `backend/src/routes/paymentRoutes.js`
 
 ---
 
-### **Module 6: Advanced Search & Reports**
-**Assigned to:** [Friend 6]
+### **Module 5: Advanced Search & Reports**
+**Assigned to:** [Friend 4]
 **Priority:** LOW
 **Estimated Time:** 3-4 days
 
@@ -133,9 +113,9 @@ A complete system for managing stadium tickets and an online football shop with 
 - [ ] Advanced search with filters
 - [ ] Search analytics and logging
 - [ ] Dynamic report generation
-- [ ] Sales reports
-- [ ] Ticket sales analytics
-- [ ] User activity reports
+- [ ] Ticket sales reports
+- [ ] Match attendance reports
+- [ ] Revenue analytics
 
 **Files to create:**
 - `backend/src/controllers/SearchController.js`
@@ -143,18 +123,19 @@ A complete system for managing stadium tickets and an online football shop with 
 - `backend/src/services/SearchService.js`
 - `backend/src/services/ReportService.js`
 - `backend/src/models/Report.js`
+- `backend/src/routes/searchRoutes.js`
+- `backend/src/routes/reportRoutes.js`
 
 ---
 
-### **Module 7: Admin Dashboard & System Tools**
-**Assigned to:** [Friend 7]
+### **Module 6: Admin Dashboard & System Tools**
+**Assigned to:** [Friend 5]
 **Priority:** MEDIUM
 **Estimated Time:** 3-4 days
 
 **Tasks:**
 - [ ] Audit logging system
 - [ ] Notification system
-- [ ] File upload management
 - [ ] System settings management
 - [ ] Admin dashboard APIs
 - [ ] User activity tracking
@@ -164,19 +145,20 @@ A complete system for managing stadium tickets and an online football shop with 
 - `backend/src/services/AuditService.js`
 - `backend/src/services/NotificationService.js`
 - `backend/src/middleware/audit.js`
+- `backend/src/routes/adminRoutes.js`
 
 ---
 
-### **Module 8: Frontend Development**
-**Assigned to:** [Friend 8]
+### **Module 7: Frontend Development**
+**Assigned to:** [Friend 6]
 **Priority:** ONGOING
 **Estimated Time:** 7-10 days
 
 **Tasks:**
 - [ ] User authentication pages (login, register)
 - [ ] Ticket booking interface
-- [ ] Shop product catalog
-- [ ] Shopping cart UI
+- [ ] Seat selection UI
+- [ ] Shopping cart for tickets
 - [ ] User dashboard
 - [ ] Admin dashboard
 - [ ] Responsive design
@@ -189,30 +171,29 @@ A complete system for managing stadium tickets and an online football shop with 
 ## 🗓️ Timeline & Dependencies
 
 ### **Phase 1: Foundation (Week 1)**
-- Module 1: Authentication (MUST be done first)
+- Module 1: Authentication ✅ COMPLETED
 - Database schema setup
 - Basic project structure
 
 ### **Phase 2: Core Features (Week 2)**
 - Module 2: Stadium & Match Management
 - Module 3: Ticket Booking System
-- Module 4: E-commerce Shop
 
 ### **Phase 3: Advanced Features (Week 3)**
-- Module 5: Payment Integration
-- Module 6: Advanced Search & Reports
-- Module 7: Admin Dashboard
+- Module 4: Payment Integration
+- Module 5: Advanced Search & Reports
+- Module 6: Admin Dashboard
 
 ### **Phase 4: Frontend & Integration (Week 4)**
-- Module 8: Frontend Development
+- Module 7: Frontend Development
 - API integration
 - Testing and bug fixes
 
-## 📊 Database Tables (24 Total)
+## 📊 Database Tables (18 Total)
 
 ### **Core Tables (Module 1)**
 1. `users` - User accounts
-2. `roles` - User roles (14 roles)
+2. `roles` - User roles (10 roles)
 3. `user_roles` - User-role assignments
 4. `permissions` - System permissions
 5. `role_permissions` - Role-permission assignments
@@ -229,20 +210,10 @@ A complete system for managing stadium tickets and an online football shop with 
 12. `orders` - Ticket orders
 13. `order_items` - Order line items
 
-### **Shop Tables (Module 4)**
-14. `products` - Shop products
-15. `product_variants` - Product options
-16. `shop_orders` - Shop orders
-17. `shop_order_items` - Shop order items
-18. `reviews` - Product reviews
-
-### **System Tables (Modules 5-7)**
-19. `payments` - Payment transactions
-20. `reports` - Generated reports
-21. `search_logs` - Search analytics
-22. `notifications` - User notifications
-23. `settings` - System settings
-24. `files` - File uploads
+### **System Tables (Modules 4-6)**
+14. `payments` - Payment transactions
+15. `notifications` - User notifications
+16. `settings` - System settings
 
 ## 🚀 Getting Started
 
@@ -273,29 +244,25 @@ The database will be automatically created with SQLite. No manual setup needed!
 
 ## 💡 Tips for Success
 
-1. **Start with Module 1** - Authentication is required for everything else
+1. **Start with Module 2** - Stadium and match management are the foundation
 2. **Use Git branches** - Each friend should work on their own branch
 3. **Commit often** - Small, frequent commits are better
 4. **Test as you go** - Don't wait until the end to test
 5. **Communicate** - Use a group chat to coordinate
 6. **Follow the layered architecture** - Controllers → Services → Repositories
 
-## 📝 14 Required Roles
+## 📝 10 Required Roles
 
 1. **Admin** - Full system access
 2. **User** - Basic user access
 3. **Manager** - Stadium/operations manager
 4. **Ticket Agent** - Sells tickets
-5. **Shop Manager** - Manages the shop
-6. **Finance** - Handles payments/finances
-7. **Support** - Customer support
-8. **Content Manager** - Manages website content
-9. **Analyst** - Views reports and analytics
-10. **Moderator** - Moderates reviews/content
-11. **VIP** - Special customer privileges
-12. **Staff** - Stadium staff
-13. **Security** - Security personnel
-14. **Vendor** - Product vendor/supplier
+5. **Finance** - Handles payments/finances
+6. **Support** - Customer support
+7. **Analyst** - Views reports and analytics
+8. **Moderator** - Moderates content
+9. **VIP** - Special customer privileges
+10. **Staff** - Stadium staff
 
 ## 🎯 3 Additional Features
 
@@ -313,4 +280,4 @@ The database will be automatically created with SQLite. No manual setup needed!
 
 ---
 
-**Ready to start? Begin with Module 1 (Authentication) and follow the plan!** 🚀
+**Ready to continue? Start with Module 2 (Stadium & Match Management)!** 🚀

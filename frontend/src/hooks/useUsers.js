@@ -11,11 +11,13 @@ const useUsers = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const data = await userService.getAllUsers();
-      setUsers(data);
       setError(null);
+      const data = await userService.getAllUsers();
+      setUsers(data || []);
     } catch (err) {
-      setError(err.message);
+      console.error('Failed to fetch users:', err);
+      setError(err.message || 'Failed to fetch users');
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -31,20 +33,10 @@ const useUsers = () => {
     }
   };
 
-  const updateUser = async (id, userData) => {
-    try {
-      const updatedUser = await userService.updateUser(id, userData);
-      setUsers(users.map(user => user._id === id ? updatedUser : user));
-      return updatedUser;
-    } catch (err) {
-      throw new Error(err.message);
-    }
-  };
-
   const removeUser = async (id) => {
     try {
       await userService.deleteUser(id);
-      setUsers(users.filter(user => user._id !== id));
+      setUsers(users.filter(user => user.id !== id));
     } catch (err) {
       throw new Error(err.message);
     }
@@ -59,7 +51,6 @@ const useUsers = () => {
     loading,
     error,
     addUser,
-    updateUser,
     removeUser,
     refetch: fetchUsers
   };

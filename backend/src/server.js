@@ -3,8 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const DatabaseConfig = require('../config/database');
 const errorHandler = require('./middleware/errorHandler');
+const createAuthRoutes = require('./routes/authRoutes');
 const createUserRoutes = require('./routes/userRoutes');
-const createCategoryRoutes = require('./routes/categoryRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,10 +26,14 @@ const startServer = () => {
     // Initialize SQLite database with migrations
     const db = DatabaseConfig.init();
     DatabaseConfig.runMigrations(db);
+    DatabaseConfig.seedData(db);
+
+    // Make database available to routes
+    app.set('db', db);
 
     // Routes
+    app.use('/api/auth', createAuthRoutes(db));
     app.use('/api/users', createUserRoutes(db));
-    app.use('/api/categories', createCategoryRoutes(db));
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {
@@ -48,6 +52,10 @@ const startServer = () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 API available at http://localhost:${PORT}/api`);
       console.log(`💾 Database: SQLite (file-based, no installation needed)`);
+      console.log(`🔐 Auth endpoints:`);
+      console.log(`   POST /api/auth/register - Register new user`);
+      console.log(`   POST /api/auth/login - User login`);
+      console.log(`   GET /api/auth/profile - Get user profile (requires auth)`);
       console.log(`💡 Visit http://localhost:${PORT}/api/health to check status`);
     });
   } catch (error) {
