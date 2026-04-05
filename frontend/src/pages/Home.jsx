@@ -1,9 +1,12 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import UserList from '../components/UserList';
+import NotificationBell from '../components/NotificationBell';
 
 const Home = () => {
   const { user, isAdmin, logout } = useAuth();
+  const { connected, onlineCount } = useSocket();
 
   const handleLogout = () => {
     logout();
@@ -26,6 +29,7 @@ const Home = () => {
                 Admin
               </a>
             )}
+            <NotificationBell />
             <span style={styles.userName}>{user?.firstName || user?.first_name}</span>
             <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
           </div>
@@ -36,6 +40,12 @@ const Home = () => {
         <div style={styles.welcome}>
           <h1>🏟️ Welcome, {user?.firstName || user?.first_name}!</h1>
           <p style={styles.subtitle}>Stadium Ticket Management System</p>
+          {connected && (
+            <p style={styles.onlineStatus}>
+              <span style={styles.onlineDot}></span>
+              {onlineCount} user{onlineCount !== 1 ? 's' : ''} online
+            </p>
+          )}
         </div>
 
         <div style={styles.dashboard}>
@@ -58,10 +68,12 @@ const Home = () => {
           </div>
         </div>
 
-        <div style={styles.section}>
-          <h2 style={styles.sectionTitle}>User Management</h2>
-          <UserList />
-        </div>
+        {isAdmin() && (
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>👥 User Management (Admin Only)</h2>
+            <UserList />
+          </div>
+        )}
       </main>
     </div>
   );
@@ -126,6 +138,21 @@ const styles = {
     color: '#7f8c8d',
     fontSize: '18px',
     marginTop: '10px',
+  },
+  onlineStatus: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '14px',
+    color: '#27ae60',
+    marginTop: '10px',
+  },
+  onlineDot: {
+    width: '8px',
+    height: '8px',
+    backgroundColor: '#27ae60',
+    borderRadius: '50%',
+    animation: 'pulse 2s infinite',
   },
   dashboard: {
     display: 'grid',

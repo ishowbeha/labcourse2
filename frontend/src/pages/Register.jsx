@@ -40,8 +40,8 @@ const Register = () => {
     setLoading(true);
 
     const result = await register({
-      first_name: formData.first_name,
-      last_name: formData.last_name,
+      firstName: formData.first_name,
+      lastName: formData.last_name,
       email: formData.email,
       password: formData.password,
     });
@@ -175,9 +175,10 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '12px',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    padding: '40px',
+    padding: '32px',
     width: '100%',
-    maxWidth: '450px',
+    maxWidth: '420px',
+    boxSizing: 'border-box',
   },
   header: {
     textAlign: 'center',
@@ -201,7 +202,7 @@ const styles = {
   formRow: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
+    gap: '12px',
   },
   formGroup: {
     display: 'flex',
@@ -214,12 +215,14 @@ const styles = {
     color: '#2c3e50',
   },
   input: {
-    padding: '12px 16px',
+    padding: '10px 14px',
     border: '1px solid #ddd',
     borderRadius: '8px',
-    fontSize: '16px',
+    fontSize: '14px',
     outline: 'none',
     transition: 'border-color 0.2s',
+    width: '100%',
+    boxSizing: 'border-box',
   },
   button: {
     padding: '14px 24px',

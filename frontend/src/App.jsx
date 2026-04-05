@@ -1,10 +1,15 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SocketProvider } from './context/SocketContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
 import AdminDashboard from './pages/AdminDashboard';
+import Matches from './pages/Matches';
+import Tickets from './pages/Tickets';
+import Stadiums from './pages/Stadiums';
+import Orders from './pages/Orders';
 
 // Protected Route component - redirects to login if not authenticated
 const ProtectedRoute = ({ children }) => {
@@ -192,12 +197,12 @@ function AppRoutes() {
         } 
       />
 
-      {/* User pages */}
+      {/* User pages - now with real content */}
       <Route 
         path="/matches" 
         element={
           <ProtectedRoute>
-            <UserPage title="⚽ Match Management" description="Browse and manage football matches." />
+            <Matches />
           </ProtectedRoute>
         } 
       />
@@ -205,7 +210,7 @@ function AppRoutes() {
         path="/tickets" 
         element={
           <ProtectedRoute>
-            <UserPage title="🎫 Ticket Management" description="Purchase, view, and manage your stadium tickets." />
+            <Tickets />
           </ProtectedRoute>
         } 
       />
@@ -213,7 +218,7 @@ function AppRoutes() {
         path="/stadiums" 
         element={
           <ProtectedRoute>
-            <UserPage title="🏟️ Stadium Management" description="View stadium information and seating charts." />
+            <Stadiums />
           </ProtectedRoute>
         } 
       />
@@ -221,7 +226,7 @@ function AppRoutes() {
         path="/orders" 
         element={
           <ProtectedRoute>
-            <UserPage title="📋 My Orders" description="View your ticket order history." />
+            <Orders />
           </ProtectedRoute>
         } 
       />
@@ -432,7 +437,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <SocketProvider>
+          <AppRoutes />
+        </SocketProvider>
       </AuthProvider>
     </Router>
   );

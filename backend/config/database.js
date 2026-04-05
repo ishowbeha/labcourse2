@@ -383,7 +383,9 @@ class DatabaseConfig {
   static seedData(db) {
     // Check if data already exists
     const roleCount = db.prepare('SELECT COUNT(*) as count FROM roles').get();
-    if (roleCount.count > 0) {
+    const matchCount = db.prepare('SELECT COUNT(*) as count FROM matches').get();
+    
+    if (roleCount.count > 0 && matchCount.count > 0) {
       console.log('✅ Seed data already exists (skipping)');
       return;
     }
@@ -473,11 +475,57 @@ class DatabaseConfig {
       assignPermission.run(roleIdMap.admin, permId);
     });
 
-    // Create sample stadium
-    db.prepare(`
+    // Create stadiums for Albania and Kosova
+    const stadiums = [
+      ['National Stadium (Air Albania Stadium)', 'Tirana', 'Albania', 22500, 'Rruga e Elbasanit', 'Home stadium of the Albania national team'],
+      ['Fadil Vokrri Stadium', 'Pristina', 'Kosova', 13500, 'Bulevardi Bill Clinton', 'Home stadium of the Kosova national team'],
+      ['Loro Boriçi Stadium', 'Shkodër', 'Albania', 16000, 'Rruga Skenderbeu', 'Historic stadium in northern Albania'],
+      ['Selman Stërmasi Stadium', 'Tirana', 'Albania', 9500, 'Rruga e Kavajës', 'Home of KF Tirana'],
+      ['Partizani Stadium', 'Tirana', 'Albania', 8500, 'Parku i Liqenit', 'Home of FK Partizani'],
+      ['Gjirokastër Stadium', 'Gjirokastër', 'Albania', 8000, 'Rruga Eqrem Çabej', 'Stadium in the historic city'],
+      ['Korçë Stadium', 'Korçë', 'Albania', 12000, 'Bulevardi Fan Noli', 'Home of Skënderbeu'],
+      ['Mitrovica Stadium', 'Mitrovica', 'Kosova', 8500, 'Rruga Adem Jashari', 'Stadium in northern Kosova'],
+      ['Ferizaj Stadium', 'Ferizaj', 'Kosova', 6000, 'Bulevardi Dëshmorët e Kombit', 'Home of Ferizaj'],
+      ['Peja Stadium', 'Peja', 'Kosova', 7000, 'Rruga UÇK', 'Stadium in western Kosova']
+    ];
+
+    const insertStadium = db.prepare(`
       INSERT INTO stadiums (name, city, country, capacity, address, description, created_by, updated_by)
       VALUES (?, ?, ?, ?, ?, ?, 1, 1)
-    `).run('National Stadium', 'Tirana', 'Albania', 22500, 'Rruga e Elbasanit', 'Home stadium of the national team');
+    `);
+
+    stadiums.forEach(stadium => {
+      insertStadium.run(...stadium);
+    });
+
+    // Create matches for 2026
+    const matches = [
+      // Albania vs Kosova - Friendly
+      ['Albania', 'Kosova', 1, '2026-04-11', '20:45', 'Friendly Match', 'International Friendly', 30],
+      ['Kosova', 'Albania', 2, '2026-04-18', '20:45', 'Friendly Match', 'International Friendly', 25],
+      // UEFA Nations League
+      ['Albania', 'Serbia', 1, '2026-04-25', '20:45', 'UEFA Nations League', 'Group Stage', 35],
+      ['Kosova', 'North Macedonia', 2, '2026-05-02', '18:00', 'UEFA Nations League', 'Group Stage', 20],
+      ['Albania', 'Montenegro', 1, '2026-05-09', '20:45', 'UEFA Nations League', 'Group Stage', 28],
+      ['Kosova', 'Bosnia', 2, '2026-05-16', '20:45', 'Friendly Match', 'International Friendly', 22],
+      // Euro 2028 Qualifiers
+      ['Albania', 'Greece', 1, '2026-05-23', '20:45', 'Euro 2028 Qualifiers', 'Group Stage', 40],
+      ['Kosova', 'Turkey', 2, '2026-05-30', '20:45', 'Euro 2028 Qualifiers', 'Group Stage', 35],
+      // Local derbies
+      ['Tirana', 'Partizani', 4, '2026-06-06', '18:00', 'Kategoria Superiore', 'Tirana Derby', 15],
+      ['Skënderbeu', 'Vllaznia', 7, '2026-06-13', '19:30', 'Kategoria Superiore', 'Top of the Table', 12],
+      ['Prishtina', 'Drita', 2, '2026-06-20', '20:00', 'Football Superleague of Kosova', 'Title Race', 18],
+      ['Albania U21', 'Kosova U21', 3, '2026-06-27', '17:00', 'U21 Championship', 'Youth Derby', 10]
+    ];
+
+    const insertMatch = db.prepare(`
+      INSERT INTO matches (home_team, away_team, stadium_id, match_date, match_time, competition, round, base_price, status, created_by, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 1, 1)
+    `);
+
+    matches.forEach(match => {
+      insertMatch.run(...match);
+    });
 
     // Create system settings
     const settings = [

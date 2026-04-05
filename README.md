@@ -120,6 +120,7 @@ The system includes tables for:
 ### Backend
 - **Node.js** - Runtime environment
 - **Express** - Web framework
+- **Socket.IO** - Real-time WebSocket communication
 - **SQLite (better-sqlite3)** - File-based database
 - **bcryptjs** - Password hashing
 - **jsonwebtoken** - JWT authentication
@@ -129,6 +130,63 @@ The system includes tables for:
 - **Vite** - Build tool
 - **React Router** - Client-side routing
 - **Axios** - HTTP client
+- **Socket.IO Client** - Real-time WebSocket communication
+
+## 🔌 Real-Time Features (Socket.IO)
+
+This project implements **real-time communication** using Socket.IO WebSockets, as required for the course.
+
+### Features Implemented:
+
+#### 1. Real-Time Notifications
+- **Order Updates**: Users receive instant notifications when their order status changes
+- **Ticket Purchases**: Confirmation notifications when tickets are bought
+- **System Alerts**: Important system-wide announcements
+- **Broadcast Messages**: Admin can send messages to all connected users
+
+#### 2. Live Online Status
+- Shows number of currently online users
+- Real-time updates when users connect/disconnect
+- Green dot indicator in the UI
+
+#### 3. Internal Messaging (Chat)
+- Send messages to specific users in real-time
+- Typing indicators
+- Message delivery confirmations
+- Messages saved to database
+
+#### 4. Browser Notifications
+- Desktop notifications for important events
+- Permission-based (user must allow)
+
+### How It Works:
+
+1. **WebSocket Connection**: When a user logs in, the frontend establishes a WebSocket connection to the server using Socket.IO
+2. **Authentication**: The JWT token is sent during the WebSocket handshake for secure authentication
+3. **Real-Time Events**: The server can push notifications to specific users or broadcast to all users
+4. **Automatic Reconnection**: Socket.IO automatically handles reconnection if the connection drops
+
+### Testing Real-Time Features:
+
+1. Start both backend and frontend servers
+2. Log in with admin@stadium.com / admin123
+3. Open another browser window/tab and log in with a different user
+4. You should see the online count update in real-time
+5. The notification bell (🔔) will show real-time notifications
+
+### API Events:
+
+**Client → Server:**
+- `send-message` - Send a chat message to another user
+- `typing` / `stop-typing` - Typing indicators
+- `mark-notification-read` - Mark notification as read
+
+**Server → Client:**
+- `notification` - Real-time notification
+- `broadcast` - Broadcast message to all users
+- `receive-message` - Incoming chat message
+- `online-users` - Online user count update
+- `user-typing` - Typing indicator from another user
 
 ## 🔧 Troubleshooting
 
