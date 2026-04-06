@@ -17,11 +17,9 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
 
   // Fetch user profile to get roles
-  const fetchUserProfile = async (authToken) => {
+  const fetchUserProfile = async () => {
     try {
-      const response = await api.get('/auth/profile', {
-        headers: { Authorization: `Bearer ${authToken}` }
-      });
+      const response = await api.get('/auth/profile');
       return response.data;
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
@@ -37,9 +35,9 @@ export const AuthProvider = ({ children }) => {
       if (storedUser && storedToken) {
         const parsedUser = JSON.parse(storedUser);
         // Verify the token is still valid by fetching profile
-        const profile = await fetchUserProfile(storedToken);
+        const profile = await fetchUserProfile();
         if (profile) {
-          setUser(profile);
+          setUser(profile.data || profile);
           setToken(storedToken);
         } else {
           // Token is invalid, clear storage
@@ -56,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
+      // The API interceptor already unwraps response.data, so we access response.data directly
       const { user: basicUserData, accessToken } = response.data;
       
       // Store token
@@ -63,7 +62,8 @@ export const AuthProvider = ({ children }) => {
       setToken(accessToken);
       
       // Fetch full user profile with roles
-      const fullUserProfile = await fetchUserProfile(accessToken);
+      const profileResponse = await fetchUserProfile();
+      const fullUserProfile = profileResponse?.data || profileResponse;
       
       if (fullUserProfile) {
         localStorage.setItem('user', JSON.stringify(fullUserProfile));

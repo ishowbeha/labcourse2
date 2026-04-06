@@ -60,6 +60,17 @@ const requireRole = (roles) => {
       const userId = req.user.userId;
       const db = req.app.get('db');
       
+      console.log('requireRole: Checking roles for userId:', userId);
+      console.log('requireRole: Required roles:', roles);
+      
+      if (!db) {
+        console.error('requireRole: Database not available on req.app');
+        return res.status(500).json({
+          success: false,
+          message: 'Database not available'
+        });
+      }
+      
       // Get user roles from database
       const userRoles = db.prepare(`
         SELECT r.name FROM roles r
@@ -68,9 +79,11 @@ const requireRole = (roles) => {
       `).all(userId);
 
       const roleNames = userRoles.map(r => r.name);
+      console.log('requireRole: User roles:', roleNames);
       
       // Check if user has required role
       const hasRole = roles.some(role => roleNames.includes(role));
+      console.log('requireRole: Has required role:', hasRole);
       
       if (!hasRole) {
         return res.status(403).json({
@@ -81,9 +94,10 @@ const requireRole = (roles) => {
 
       next();
     } catch (error) {
+      console.error('requireRole: Error:', error);
       return res.status(500).json({
         success: false,
-        message: 'Authorization error.'
+        message: 'Authorization error: ' + error.message
       });
     }
   };

@@ -6,6 +6,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminUsers from './pages/AdminUsers';
+import AdminReports from './pages/AdminReports';
 import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
 import Stadiums from './pages/Stadiums';
@@ -131,12 +133,12 @@ function AppRoutes() {
         } 
       />
 
-      {/* Admin sub-pages (placeholders) */}
+      {/* Admin sub-pages */}
       <Route 
         path="/admin/users" 
         element={
           <AdminRoute>
-            <AdminPlaceholder title="User Management" />
+            <AdminUsers />
           </AdminRoute>
         } 
       />
@@ -184,7 +186,7 @@ function AppRoutes() {
         path="/admin/reports" 
         element={
           <AdminRoute>
-            <AdminPlaceholder title="Reports & Analytics" />
+            <AdminReports />
           </AdminRoute>
         } 
       />
