@@ -91,3 +91,91 @@ code {
   border-radius: 4px;
   margin-bottom: 20px;
 }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+
+  /* Grid layouts - stack vertically on mobile */
+  .dashboard,
+  .offers-grid,
+  .quick-actions,
+  .matches-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Cards - full width on mobile */
+  .card {
+    padding: 16px;
+  }
+
+  /* Buttons - full width on mobile */
+  .btn {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+  /* Form inputs - full width */
+  .form-group input,
+  .form-group textarea {
+    width: 100%;
+  }
+
+  /* Tables - horizontal scroll */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal - full screen on mobile */
+  .modal {
+    width: 95% !important;
+    max-height: 95vh !important;
+    padding: 16px !important;
+  }
+
+  /* Navigation - handled by Navbar component */
+}
+
+@media (max-width: 480px) {
+  /* Extra small screens */
+  html {
+    font-size: 14px;
+  }
+
+  .container {
+    padding: 8px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+}
+
+/* Pulse animation for online indicator */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar for mobile menu but allow scrolling */
+.mobile-menu::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-menu {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

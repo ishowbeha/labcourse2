@@ -76,7 +76,7 @@ class AdminRepository {
     return {
       users: users.map(u => ({
         ...u,
-        roles: u.roles ? u.roles.split(',') : []
+        roles: u.roles ? u.roles.split(',').filter(r => r && r.trim()) : []
       })),
       total,
       page,
@@ -97,7 +97,7 @@ class AdminRepository {
     `).get(id);
 
     if (user) {
-      user.roles = user.roles ? user.roles.split(',') : [];
+      user.roles = user.roles ? user.roles.split(',').filter(r => r && r.trim()) : [];
     }
 
     return user;
@@ -114,14 +114,18 @@ class AdminRepository {
 
     const userId = result.lastInsertRowid;
 
-    // Assign roles
-    if (roleIds.length > 0) {
+    // Assign roles with validation
+    if (Array.isArray(roleIds) && roleIds.length > 0) {
+      const getRole = this.db.prepare('SELECT id FROM roles WHERE id = ?');
       const insertRole = this.db.prepare(`
         INSERT INTO user_roles (user_id, role_id, assigned_by)
         VALUES (?, ?, ?)
       `);
       roleIds.forEach(roleId => {
-        insertRole.run(userId, roleId, createdBy);
+        const role = getRole.get(roleId);
+        if (role) {
+          insertRole.run(userId, roleId, createdBy);
+        }
       });
     }
 
@@ -131,35 +135,44 @@ class AdminRepository {
   updateUser(id, data, updatedBy) {
     const { firstName, lastName, email, isActive, roleIds } = data;
 
-    // Update user
-    this.db.prepare(`
-      UPDATE users SET 
-        first_name = COALESCE(?, first_name),
-        last_name = COALESCE(?, last_name),
-        email = COALESCE(?, email),
-        is_active = COALESCE(?, is_active),
-        updated_by = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(firstName, lastName, email, isActive, updatedBy, id);
+    // Use transaction for atomic updates
+    const updateUserTx = this.db.transaction(() => {
+      // Update user
+      this.db.prepare(`
+        UPDATE users SET 
+          first_name = COALESCE(?, first_name),
+          last_name = COALESCE(?, last_name),
+          email = COALESCE(?, email),
+          is_active = COALESCE(?, is_active),
+          updated_by = ?,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(firstName, lastName, email, isActive, updatedBy, id);
 
-    // Update roles if provided
-    if (roleIds) {
-      // Delete existing roles
-      this.db.prepare('DELETE FROM user_roles WHERE user_id = ?').run(id);
+      // Update roles if provided
+      if (roleIds !== undefined) {
+        // Delete existing roles
+        this.db.prepare('DELETE FROM user_roles WHERE user_id = ?').run(id);
 
-      // Insert new roles
-      if (roleIds.length > 0) {
-        const insertRole = this.db.prepare(`
-          INSERT INTO user_roles (user_id, role_id, assigned_by)
-          VALUES (?, ?, ?)
-        `);
-        roleIds.forEach(roleId => {
-          insertRole.run(id, roleId, updatedBy);
-        });
+        // Insert new roles
+        if (Array.isArray(roleIds) && roleIds.length > 0) {
+          // Validate role IDs exist
+          const getRole = this.db.prepare('SELECT id FROM roles WHERE id = ?');
+          const insertRole = this.db.prepare(`
+            INSERT INTO user_roles (user_id, role_id, assigned_by)
+            VALUES (?, ?, ?)
+          `);
+          roleIds.forEach(roleId => {
+            const role = getRole.get(roleId);
+            if (role) {
+              insertRole.run(id, roleId, updatedBy);
+            }
+          });
+        }
       }
-    }
+    });
 
+    updateUserTx();
     return this.getUserById(id);
   }
 

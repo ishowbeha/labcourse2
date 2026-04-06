@@ -5,6 +5,9 @@ class Match {
     this.homeTeam = data.home_team;
     this.awayTeam = data.away_team;
     this.stadiumId = data.stadium_id;
+    this.stadiumName = data.stadium_name;
+    this.stadiumCity = data.stadium_city;
+    this.stadiumCapacity = data.stadium_capacity;
     this.matchDate = data.match_date;
     this.matchTime = data.match_time;
     this.competition = data.competition;

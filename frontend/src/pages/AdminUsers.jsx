@@ -14,6 +14,7 @@ const AdminUsers = () => {
   const [selectedRole, setSelectedRole] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [rolesLoaded, setRolesLoaded] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -69,6 +70,7 @@ const AdminUsers = () => {
       const response = await AdminService.getRoles();
       if (response.success) {
         setRoles(response.data);
+        setRolesLoaded(true);
       }
     } catch (err) {
       console.error('Failed to fetch roles:', err);
@@ -105,13 +107,25 @@ const AdminUsers = () => {
   };
 
   const openEditModal = (userItem) => {
+    if (!rolesLoaded) {
+      setError('Roles are still loading. Please try again in a moment.');
+      return;
+    }
     setEditingUser(userItem);
+    // Map role names to role IDs using the fetched roles list
+    const userRoleNames = userItem.roles || [];
+    const mappedRoleIds = userRoleNames
+      .map(roleName => {
+        const role = roles.find(r => r.name === roleName);
+        return role ? role.id : null;
+      })
+      .filter(id => id !== null);
     setFormData({
       firstName: userItem.first_name,
       lastName: userItem.last_name,
       email: userItem.email,
       password: '',
-      roleIds: userItem.roles?.map(r => r.id || r) || [],
+      roleIds: mappedRoleIds,
       isActive: userItem.is_active
     });
     setShowModal(true);
