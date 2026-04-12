@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
@@ -12,6 +12,30 @@ import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
 import Stadiums from './pages/Stadiums';
 import Orders from './pages/Orders';
+
+// Custom hook for responsive styles
+const useResponsiveStyles = () => {
+  const [screenSize, setScreenSize] = useState('desktop');
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width <= 768) {
+        setScreenSize('mobile');
+      } else if (width <= 1024) {
+        setScreenSize('tablet');
+      } else {
+        setScreenSize('desktop');
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return screenSize;
+};
 
 // Protected Route component - redirects to login if not authenticated
 const ProtectedRoute = ({ children }) => {
@@ -252,25 +276,44 @@ function AppRoutes() {
 const AdminPlaceholder = ({ title }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const currentHeaderContentStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.adminHeaderContent 
+    : adminStyles.headerContent;
+  
+  const currentUserInfoStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.adminUserInfo 
+    : adminStyles.userInfo;
+  
+  const currentMainStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.adminMain 
+    : screenSize === 'tablet'
+    ? responsiveStyles.tablet.adminMain
+    : adminStyles.main;
+
+  const currentPlaceholderStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.adminPlaceholder 
+    : adminStyles.placeholder;
+
   return (
     <div style={adminStyles.container}>
       <header style={adminStyles.header}>
-        <div style={adminStyles.headerContent}>
+        <div style={currentHeaderContentStyle}>
           <h1 style={{ margin: 0, fontSize: '24px' }}>{title}</h1>
-          <div style={adminStyles.userInfo}>
+          <div style={currentUserInfoStyle}>
             <span>{user?.first_name} {user?.last_name}</span>
             <button onClick={handleLogout} style={adminStyles.logoutBtn}>Logout</button>
           </div>
         </div>
       </header>
-      <main style={adminStyles.main}>
-        <div style={adminStyles.placeholder}>
+      <main style={currentMainStyle}>
+        <div style={currentPlaceholderStyle}>
           <p style={{ fontSize: '48px', marginBottom: '20px' }}>🚧</p>
           <h2>{title}</h2>
           <p>This page is under development.</p>
@@ -284,18 +327,33 @@ const AdminPlaceholder = ({ title }) => {
 const UserPage = ({ title, description }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const currentNavContentStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.navContentStyle 
+    : navContentStyle;
+  
+  const currentNavRightStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.navRightStyle 
+    : navRightStyle;
+  
+  const currentContentStyle = screenSize === 'mobile' 
+    ? responsiveStyles.mobile.contentStyle 
+    : screenSize === 'tablet'
+    ? responsiveStyles.tablet.contentStyle
+    : contentStyle;
+
   return (
     <div style={userPageStyles.container}>
       <nav style={navStyle}>
-        <div style={navContentStyle}>
+        <div style={currentNavContentStyle}>
           <span style={navTitleStyle}>🏟️ Stadium Tickets</span>
-          <div style={navRightStyle}>
+          <div style={currentNavRightStyle}>
             <a href="/home" style={navLinkStyle}>Home</a>
             <a href="/matches" style={navLinkStyle}>Matches</a>
             <a href="/tickets" style={navLinkStyle}>Tickets</a>
@@ -306,7 +364,7 @@ const UserPage = ({ title, description }) => {
           </div>
         </div>
       </nav>
-      <div style={contentStyle}>
+      <div style={currentContentStyle}>
         <h1>{title}</h1>
         <p>{description}</p>
         <div style={placeholderStyle}>
@@ -433,6 +491,72 @@ const adminStyles = {
     textAlign: 'center',
     boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  // Mobile styles (max-width: 768px)
+  mobile: {
+    navContentStyle: {
+      ...navContentStyle,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: '10px',
+    },
+    navRightStyle: {
+      ...navRightStyle,
+      width: '100%',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+    },
+    contentStyle: {
+      ...contentStyle,
+      padding: '20px 15px',
+    },
+    placeholderStyle: {
+      ...placeholderStyle,
+      padding: '40px 20px',
+    },
+    adminHeaderContent: {
+      ...adminStyles.headerContent,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: '15px',
+    },
+    adminUserInfo: {
+      ...adminStyles.userInfo,
+      width: '100%',
+      justifyContent: 'space-between',
+    },
+    adminMain: {
+      ...adminStyles.main,
+      padding: '20px 15px',
+    },
+    adminPlaceholder: {
+      ...adminStyles.placeholder,
+      padding: '40px 20px',
+    },
+  },
+  
+  // Tablet styles (max-width: 1024px)
+  tablet: {
+    navContentStyle: {
+      ...navContentStyle,
+      padding: '0 15px',
+    },
+    contentStyle: {
+      ...contentStyle,
+      padding: '30px 15px',
+    },
+    adminHeaderContent: {
+      ...adminStyles.headerContent,
+      padding: '0 15px',
+    },
+    adminMain: {
+      ...adminStyles.main,
+      padding: '30px 15px',
+    },
+  }
 };
 
 function App() {

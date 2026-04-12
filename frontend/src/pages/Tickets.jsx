@@ -1,10 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
+import Navbar from '../components/Navbar';
 
 const Tickets = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
 
   const handleLogout = () => {
     logout();
@@ -68,33 +71,15 @@ const Tickets = () => {
 
   return (
     <div style={styles.container}>
-      <nav style={styles.nav}>
-        <div style={styles.navContent}>
-          <span style={styles.navTitle}>🏟️ Stadium Tickets</span>
-          <div style={styles.navLinks}>
-            <a href="/home" style={styles.navLink}>Home</a>
-            <a href="/matches" style={styles.navLink}>Matches</a>
-            <a href="/tickets" style={{...styles.navLink, fontWeight: 'bold'}}>Tickets</a>
-            <a href="/stadiums" style={styles.navLink}>Stadiums</a>
-            <a href="/orders" style={styles.navLink}>My Orders</a>
-            {isAdmin() && (
-              <a href="/admin/dashboard" style={{ ...styles.navLink, fontWeight: 'bold', color: '#f39c12' }}>
-                Admin
-              </a>
-            )}
-            <span style={styles.userName}>{user?.firstName || user?.first_name}</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      <main style={styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         <div style={styles.header}>
           <h1>🎫 My Tickets</h1>
           <p>Your purchased tickets with QR codes for easy entry</p>
         </div>
 
-        <div style={styles.stats}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.stats : screenSize === 'tablet' ? responsiveStyles.tablet.stats : styles.stats}>
           <div style={styles.statCard}>
             <span style={styles.statNumber}>{myTickets.length}</span>
             <span style={styles.statLabel}>Total Tickets</span>
@@ -109,7 +94,7 @@ const Tickets = () => {
           </div>
         </div>
 
-        <div style={styles.ticketList}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.ticketList : screenSize === 'tablet' ? responsiveStyles.tablet.ticketList : styles.ticketList}>
           {myTickets.map(ticket => (
             <div key={ticket.id} style={styles.ticketCard}>
               <div style={styles.ticketLeft}>
@@ -174,47 +159,6 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f5f5f5',
-  },
-  nav: {
-    backgroundColor: '#2c3e50',
-    padding: '15px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  navContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  navTitle: {
-    color: 'white',
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  navLinks: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  navLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '14px',
-  },
-  userName: {
-    color: '#bdc3c7',
-    fontSize: '14px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '13px',
   },
   main: {
     maxWidth: '1200px',
@@ -363,6 +307,59 @@ const styles = {
     color: '#2c3e50',
     fontSize: '14px',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    stats: {
+      ...styles.stats,
+      gridTemplateColumns: '1fr',
+    },
+    ticketList: {
+      ...styles.ticketList,
+      flexDirection: 'column',
+    },
+    ticketCard: {
+      ...styles.ticketCard,
+      flexDirection: 'column',
+    },
+    ticketDivider: {
+      ...styles.ticketDivider,
+      width: '100%',
+      height: '2px',
+      borderLeft: 'none',
+      borderTop: '2px dashed #ddd',
+    },
+    ticketRight: {
+      ...styles.ticketRight,
+      minWidth: 'auto',
+      width: '100%',
+      borderTop: '1px solid #eee',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    stats: {
+      ...styles.stats,
+      gridTemplateColumns: 'repeat(3, 1fr)',
+    },
+    ticketList: {
+      ...styles.ticketList,
+      flexDirection: 'column',
+    },
+    ticketCard: {
+      ...styles.ticketCard,
+      flexDirection: 'row',
+    },
+  }
 };
 
 export default Tickets;

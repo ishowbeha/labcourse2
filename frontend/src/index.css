@@ -93,6 +93,22 @@ code {
 }
 
 /* Responsive Design */
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .container {
+    padding: 15px;
+  }
+
+  .dashboard,
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .card {
+    padding: 18px;
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 10px;
@@ -102,7 +118,8 @@ code {
   .dashboard,
   .offers-grid,
   .quick-actions,
-  .matches-grid {
+  .matches-grid,
+  .stats-grid {
     grid-template-columns: 1fr !important;
   }
 
@@ -138,6 +155,25 @@ code {
   }
 
   /* Navigation - handled by Navbar component */
+  
+  /* Flex layouts - stack vertically */
+  .flex-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  /* Reduce font sizes for mobile */
+  h1 {
+    font-size: 24px !important;
+  }
+  
+  h2 {
+    font-size: 20px !important;
+  }
+  
+  h3 {
+    font-size: 16px !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -152,6 +188,42 @@ code {
 
   .card {
     padding: 12px;
+  }
+  
+  /* Smaller headings on very small screens */
+  h1 {
+    font-size: 20px !important;
+  }
+  
+  h2 {
+    font-size: 18px !important;
+  }
+  
+  /* Stack filter elements vertically */
+  .filters {
+    flex-direction: column !important;
+  }
+  
+  .filters input,
+  .filters select,
+  .filters button {
+    width: 100% !important;
+  }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .card-link {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input,
+  select,
+  textarea {
+    min-height: 44px;
   }
 }
 

@@ -1,10 +1,36 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
+
+// Custom hook for responsive styles
+const useResponsiveStyles = () => {
+  const [screenSize, setScreenSize] = useState('desktop');
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width <= 768) {
+        setScreenSize('mobile');
+      } else if (width <= 1024) {
+        setScreenSize('tablet');
+      } else {
+        setScreenSize('desktop');
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return screenSize;
+};
 
 const Stadiums = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
 
   const handleLogout = () => {
     logout();
@@ -70,33 +96,15 @@ const Stadiums = () => {
 
   return (
     <div style={styles.container}>
-      <nav style={styles.nav}>
-        <div style={styles.navContent}>
-          <span style={styles.navTitle}>🏟️ Stadium Tickets</span>
-          <div style={styles.navLinks}>
-            <a href="/home" style={styles.navLink}>Home</a>
-            <a href="/matches" style={styles.navLink}>Matches</a>
-            <a href="/tickets" style={styles.navLink}>Tickets</a>
-            <a href="/stadiums" style={{...styles.navLink, fontWeight: 'bold'}}>Stadiums</a>
-            <a href="/orders" style={styles.navLink}>My Orders</a>
-            {isAdmin() && (
-              <a href="/admin/dashboard" style={{ ...styles.navLink, fontWeight: 'bold', color: '#f39c12' }}>
-                Admin
-              </a>
-            )}
-            <span style={styles.userName}>{user?.firstName || user?.first_name}</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      <main style={styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         <div style={styles.header}>
           <h1>🏟️ Stadiums</h1>
           <p>Explore our partner stadiums and their seating arrangements</p>
         </div>
 
-        <div style={styles.grid}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.grid : screenSize === 'tablet' ? responsiveStyles.tablet.grid : styles.grid}>
           {stadiums.map(stadium => (
             <div key={stadium.id} style={styles.card}>
               <div style={styles.cardHeader}>
@@ -142,47 +150,6 @@ const styles = {
     minHeight: '100vh',
     backgroundColor: '#f5f5f5',
   },
-  nav: {
-    backgroundColor: '#2c3e50',
-    padding: '15px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  navContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  navTitle: {
-    color: 'white',
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  navLinks: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  navLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '14px',
-  },
-  userName: {
-    color: '#bdc3c7',
-    fontSize: '14px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '13px',
-  },
   main: {
     maxWidth: '1200px',
     margin: '0 auto',
@@ -202,6 +169,8 @@ const styles = {
     borderRadius: '12px',
     padding: '24px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    display: 'flex',
+    flexDirection: 'column',
   },
   cardHeader: {
     display: 'flex',
@@ -286,7 +255,34 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
+    marginTop: 'auto',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    grid: {
+      ...styles.grid,
+      gridTemplateColumns: '1fr',
+      gap: '16px',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    grid: {
+      ...styles.grid,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '20px',
+    },
+  }
 };
 
 export default Stadiums;

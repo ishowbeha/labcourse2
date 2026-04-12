@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const AdminUsers = () => {
+  const screenSize = useResponsiveStyles();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
@@ -80,6 +83,15 @@ const AdminUsers = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    setMobileMenuOpen(false);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
   };
 
   const handleSearch = (e) => {
@@ -227,16 +239,50 @@ const AdminUsers = () => {
             <button onClick={handleLogout} style={styles.logoutBtn}>
               Logout
             </button>
+            
+            {/* Hamburger Menu Button for Mobile */}
+            <button 
+              className={`hamburger-btn ${mobileMenuOpen ? 'open' : ''}`} 
+              onClick={toggleMobileMenu}
+              style={screenSize === 'mobile' ? styles.hamburgerBtn : { display: 'none' }}
+              aria-label="Toggle admin menu"
+            >
+              <span style={styles.hamburgerLine}></span>
+              <span style={styles.hamburgerLine}></span>
+              <span style={styles.hamburgerLine}></span>
+            </button>
           </div>
         </div>
       </header>
 
-      <main style={styles.main}>
+      {/* Mobile Admin Menu Overlay */}
+      {mobileMenuOpen && (
+        <div style={styles.mobileOverlay} onClick={closeMobileMenu}>
+          <div style={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.mobileMenuHeader}>
+              <span style={styles.mobileUserName}>{user?.first_name} {user?.last_name}</span>
+              <button onClick={handleLogout} style={styles.mobileLogoutBtn}>Logout</button>
+            </div>
+            <nav style={styles.mobileNav}>
+              <Link to="/admin/users" style={styles.mobileNavLink} onClick={closeMobileMenu}>👥 User Management</Link>
+              <Link to="/admin/stadiums" style={styles.mobileNavLink} onClick={closeMobileMenu}>🏟️ Stadium Management</Link>
+              <Link to="/admin/matches" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚽ Match Management</Link>
+              <Link to="/admin/tickets" style={styles.mobileNavLink} onClick={closeMobileMenu}>🎫 Ticket Management</Link>
+              <Link to="/admin/orders" style={styles.mobileNavLink} onClick={closeMobileMenu}>📋 Order Management</Link>
+              <Link to="/admin/payments" style={styles.mobileNavLink} onClick={closeMobileMenu}>💳 Payment Management</Link>
+              <Link to="/admin/reports" style={styles.mobileNavLink} onClick={closeMobileMenu}>📊 Reports & Analytics</Link>
+              <Link to="/admin/settings" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚙️ System Settings</Link>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         {error && <div style={styles.alertError}>{error}</div>}
         {success && <div style={styles.alertSuccess}>{success}</div>}
 
         {/* Filters */}
-        <div style={styles.filters}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : screenSize === 'tablet' ? responsiveStyles.tablet.filters : styles.filters}>
           <form onSubmit={handleSearch} style={styles.searchForm}>
             <input
               type="text"
@@ -267,7 +313,8 @@ const AdminUsers = () => {
           <div style={styles.loading}>Loading users...</div>
         ) : (
           <>
-            <table style={styles.table}>
+            <div style={screenSize === 'mobile' ? responsiveStyles.mobile.tableContainer : {}}>
+              <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>ID</th>
@@ -317,6 +364,7 @@ const AdminUsers = () => {
                 ))}
               </tbody>
             </table>
+            </div>
 
             {/* Pagination */}
             <div style={styles.pagination}>
@@ -494,6 +542,80 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '14px',
+  },
+  hamburgerBtn: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: '5px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '5px',
+    zIndex: 1001,
+  },
+  hamburgerLine: {
+    width: '25px',
+    height: '3px',
+    backgroundColor: 'white',
+    borderRadius: '2px',
+    transition: 'transform 0.3s, opacity 0.3s',
+  },
+  mobileOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  mobileMenu: {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    width: '280px',
+    height: '100%',
+    backgroundColor: '#2c3e50',
+    zIndex: 1000,
+    padding: '20px',
+    boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)',
+    overflowY: 'auto',
+  },
+  mobileMenuHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '30px',
+    paddingBottom: '20px',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  },
+  mobileUserName: {
+    color: 'white',
+    fontSize: '16px',
+    fontWeight: '600',
+  },
+  mobileLogoutBtn: {
+    backgroundColor: 'transparent',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    color: 'white',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+  },
+  mobileNav: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  mobileNavLink: {
+    color: 'white',
+    textDecoration: 'none',
+    fontSize: '16px',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
   },
   main: {
     maxWidth: '1200px',
@@ -719,6 +841,38 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    filters: {
+      ...styles.filters,
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    },
+    searchForm: {
+      ...styles.searchForm,
+      minWidth: 'auto',
+    },
+    tableContainer: {
+      overflowX: 'auto',
+      WebkitOverflowScrolling: 'touch',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    filters: {
+      ...styles.filters,
+    },
+  }
 };
 
 export default AdminUsers;

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const Register = () => {
+  const screenSize = useResponsiveStyles();
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -56,8 +58,8 @@ const Register = () => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+    <div style={screenSize === 'mobile' ? responsiveStyles.mobile.container : styles.container}>
+      <div style={screenSize === 'mobile' ? responsiveStyles.mobile.card : styles.card}>
         <div style={styles.header}>
           <h1 style={styles.title}>🏟️ Stadium Tickets</h1>
           <p style={styles.subtitle}>Create your account</p>
@@ -70,7 +72,7 @@ const Register = () => {
         )}
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formRow}>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.formRow : styles.formRow}>
             <div style={styles.formGroup}>
               <label style={styles.label} htmlFor="first_name">First Name</label>
               <input
@@ -255,6 +257,25 @@ const styles = {
     color: '#2c3e50',
     fontWeight: '600',
     textDecoration: 'none',
+  },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    container: {
+      ...styles.container,
+      padding: '15px',
+    },
+    card: {
+      ...styles.card,
+      padding: '24px',
+      maxWidth: '100%',
+    },
+    formRow: {
+      ...styles.formRow,
+      gridTemplateColumns: '1fr',
+    },
   },
 };
 

@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const AdminDashboard = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -32,6 +35,15 @@ const AdminDashboard = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+    setMobileMenuOpen(false);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
   };
 
   if (!isAdmin()) {
@@ -133,11 +145,45 @@ const AdminDashboard = () => {
             <button onClick={handleLogout} style={styles.logoutBtn}>
               Logout
             </button>
+            
+            {/* Hamburger Menu Button for Mobile */}
+            <button 
+              className={`hamburger-btn ${mobileMenuOpen ? 'open' : ''}`} 
+              onClick={toggleMobileMenu}
+              style={styles.hamburgerBtn}
+              aria-label="Toggle admin menu"
+            >
+              <span style={styles.hamburgerLine}></span>
+              <span style={styles.hamburgerLine}></span>
+              <span style={styles.hamburgerLine}></span>
+            </button>
           </div>
         </div>
+
+        {/* Mobile Admin Menu Overlay */}
+        {mobileMenuOpen && (
+          <div style={styles.mobileOverlay} onClick={closeMobileMenu}>
+            <div style={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.mobileMenuHeader}>
+                <span style={styles.mobileUserName}>{user?.first_name} {user?.last_name}</span>
+                <button onClick={handleLogout} style={styles.mobileLogoutBtn}>Logout</button>
+              </div>
+              <nav style={styles.mobileNav}>
+                <Link to="/admin/users" style={styles.mobileNavLink} onClick={closeMobileMenu}>👥 User Management</Link>
+                <Link to="/admin/stadiums" style={styles.mobileNavLink} onClick={closeMobileMenu}>🏟️ Stadium Management</Link>
+                <Link to="/admin/matches" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚽ Match Management</Link>
+                <Link to="/admin/tickets" style={styles.mobileNavLink} onClick={closeMobileMenu}>🎫 Ticket Management</Link>
+                <Link to="/admin/orders" style={styles.mobileNavLink} onClick={closeMobileMenu}>📋 Order Management</Link>
+                <Link to="/admin/payments" style={styles.mobileNavLink} onClick={closeMobileMenu}>💳 Payment Management</Link>
+                <Link to="/admin/reports" style={styles.mobileNavLink} onClick={closeMobileMenu}>📊 Reports & Analytics</Link>
+                <Link to="/admin/settings" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚙️ System Settings</Link>
+              </nav>
+            </div>
+          </div>
+        )}
       </header>
 
-      <main style={styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         {error && (
           <div style={styles.errorBanner}>
             {error}
@@ -145,7 +191,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        <div style={styles.stats}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.stats : screenSize === 'tablet' ? responsiveStyles.tablet.stats : styles.stats}>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #3498db' }}>
             <span style={styles.statNumber}>{formatNumber(stats?.totalUsers)}</span>
             <span style={styles.statLabel}>Registered Users</span>
@@ -165,9 +211,9 @@ const AdminDashboard = () => {
         </div>
 
         {/* Quick Stats Summary */}
-        <div style={styles.quickStats}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStats : screenSize === 'tablet' ? responsiveStyles.tablet.quickStats : styles.quickStats}>
           <h2 style={styles.sectionTitle}>📈 Quick Overview</h2>
-          <div style={styles.quickStatsGrid}>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStatsGrid : styles.quickStatsGrid}>
             <div style={styles.quickStatItem}>
               <span style={styles.quickStatLabel}>Recent Orders (7 days)</span>
               <span style={styles.quickStatValue}>{stats?.recentOrders || 0}</span>
@@ -191,7 +237,7 @@ const AdminDashboard = () => {
 
         <h2 style={styles.sectionTitle}>Management</h2>
         
-        <div style={styles.grid}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.grid : screenSize === 'tablet' ? responsiveStyles.tablet.grid : styles.grid}>
           {dashboardItems.map((item, index) => (
             <Link to={item.link} key={index} style={styles.cardLink}>
               <div style={{ ...styles.card, borderLeft: `4px solid ${item.color}` }}>
@@ -296,6 +342,84 @@ const styles = {
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '14px',
+  },
+  hamburgerBtn: {
+    display: screenSize === 'mobile' ? 'flex' : 'none',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    gap: '5px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '5px',
+    zIndex: 1001,
+  },
+  hamburgerLine: {
+    width: '25px',
+    height: '3px',
+    backgroundColor: 'white',
+    borderRadius: '2px',
+    transition: 'transform 0.3s, opacity 0.3s',
+  },
+  mobileOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+    opacity: 1,
+    visibility: 'visible',
+    transition: 'opacity 0.3s, visibility 0.3s',
+  },
+  mobileMenu: {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    width: '280px',
+    height: '100%',
+    backgroundColor: '#2c3e50',
+    zIndex: 1000,
+    padding: '20px',
+    boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)',
+    transition: 'right 0.3s ease-in-out',
+    overflowY: 'auto',
+  },
+  mobileMenuHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '30px',
+    paddingBottom: '20px',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  },
+  mobileUserName: {
+    color: 'white',
+    fontSize: '16px',
+    fontWeight: '600',
+  },
+  mobileLogoutBtn: {
+    backgroundColor: 'transparent',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    color: 'white',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '12px',
+  },
+  mobileNav: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  mobileNavLink: {
+    color: 'white',
+    textDecoration: 'none',
+    fontSize: '16px',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
   },
   main: {
     maxWidth: '1200px',
@@ -419,6 +543,60 @@ const styles = {
     fontSize: '14px',
     color: '#7f8c8d',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    stats: {
+      ...styles.stats,
+      gridTemplateColumns: '1fr',
+    },
+    quickStats: {
+      ...styles.quickStats,
+      padding: '16px',
+    },
+    quickStatsGrid: {
+      ...styles.quickStatsGrid,
+      gridTemplateColumns: '1fr',
+    },
+    grid: {
+      ...styles.grid,
+      gridTemplateColumns: '1fr',
+    },
+    hamburgerBtn: {
+      display: 'flex',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    stats: {
+      ...styles.stats,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+    },
+    quickStats: {
+      ...styles.quickStats,
+      padding: '20px',
+    },
+    quickStatsGrid: {
+      ...styles.quickStatsGrid,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+    },
+    grid: {
+      ...styles.grid,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+    },
+    hamburgerBtn: {
+      display: 'none',
+    },
+  }
 };
 
 export default AdminDashboard;

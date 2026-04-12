@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const Login = () => {
+  const screenSize = useResponsiveStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -32,8 +34,8 @@ const Login = () => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
+    <div style={screenSize === 'mobile' ? responsiveStyles.mobile.container : styles.container}>
+      <div style={screenSize === 'mobile' ? responsiveStyles.mobile.card : styles.card}>
         <div style={styles.header}>
           <h1 style={styles.title}>🏟️ Stadium Tickets</h1>
           <p style={styles.subtitle}>Sign in to your account</p>
@@ -201,6 +203,21 @@ const styles = {
     fontSize: '13px',
     color: '#6c757d',
     fontFamily: 'monospace',
+  },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    container: {
+      ...styles.container,
+      padding: '15px',
+    },
+    card: {
+      ...styles.card,
+      padding: '24px',
+      maxWidth: '100%',
+    },
   },
 };
 

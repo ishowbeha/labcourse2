@@ -1,10 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
+import Navbar from '../components/Navbar';
 
 const Orders = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
 
   const handleLogout = () => {
     logout();
@@ -89,33 +92,15 @@ const Orders = () => {
 
   return (
     <div style={styles.container}>
-      <nav style={styles.nav}>
-        <div style={styles.navContent}>
-          <span style={styles.navTitle}>🏟️ Stadium Tickets</span>
-          <div style={styles.navLinks}>
-            <a href="/home" style={styles.navLink}>Home</a>
-            <a href="/matches" style={styles.navLink}>Matches</a>
-            <a href="/tickets" style={styles.navLink}>Tickets</a>
-            <a href="/stadiums" style={styles.navLink}>Stadiums</a>
-            <a href="/orders" style={{...styles.navLink, fontWeight: 'bold'}}>My Orders</a>
-            {isAdmin() && (
-              <a href="/admin/dashboard" style={{ ...styles.navLink, fontWeight: 'bold', color: '#f39c12' }}>
-                Admin
-              </a>
-            )}
-            <span style={styles.userName}>{user?.firstName || user?.first_name}</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      <main style={styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         <div style={styles.header}>
           <h1>📋 My Orders</h1>
           <p>View your order history and track your purchases</p>
         </div>
 
-        <div style={styles.stats}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.stats : screenSize === 'tablet' ? responsiveStyles.tablet.stats : styles.stats}>
           <div style={styles.statCard}>
             <span style={styles.statNumber}>{orders.length}</span>
             <span style={styles.statLabel}>Total Orders</span>
@@ -130,7 +115,7 @@ const Orders = () => {
           </div>
         </div>
 
-        <div style={styles.orderList}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.orderList : screenSize === 'tablet' ? responsiveStyles.tablet.orderList : styles.orderList}>
           {orders.map(order => (
             <div key={order.id} style={styles.orderCard}>
               <div style={styles.orderHeader}>
@@ -193,47 +178,6 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f5f5f5',
-  },
-  nav: {
-    backgroundColor: '#2c3e50',
-    padding: '15px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  navContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  navTitle: {
-    color: 'white',
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  navLinks: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  navLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '14px',
-  },
-  userName: {
-    color: '#bdc3c7',
-    fontSize: '14px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '13px',
   },
   main: {
     maxWidth: '1200px',
@@ -400,6 +344,58 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    stats: {
+      ...styles.stats,
+      gridTemplateColumns: '1fr',
+    },
+    orderList: {
+      ...styles.orderList,
+      flexDirection: 'column',
+    },
+    orderContent: {
+      ...styles.orderContent,
+      flexDirection: 'column',
+      gap: '16px',
+    },
+    orderSummary: {
+      ...styles.orderSummary,
+      minWidth: 'auto',
+      width: '100%',
+    },
+    orderActions: {
+      ...styles.orderActions,
+      flexDirection: 'column',
+      gap: '8px',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    stats: {
+      ...styles.stats,
+      gridTemplateColumns: 'repeat(3, 1fr)',
+    },
+    orderList: {
+      ...styles.orderList,
+      flexDirection: 'column',
+    },
+    orderContent: {
+      ...styles.orderContent,
+      flexDirection: 'row',
+      gap: '24px',
+    },
+  }
 };
 
 export default Orders;

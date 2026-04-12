@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import MatchService from '../services/MatchService';
+import useResponsiveStyles from '../hooks/useResponsiveStyles';
+import Navbar from '../components/Navbar';
 
 const Matches = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const screenSize = useResponsiveStyles();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({});
@@ -62,33 +65,15 @@ const Matches = () => {
 
   return (
     <div style={styles.container}>
-      <nav style={styles.nav}>
-        <div style={styles.navContent}>
-          <span style={styles.navTitle}>🏟️ Stadium Tickets</span>
-          <div style={styles.navLinks}>
-            <a href="/home" style={styles.navLink}>Home</a>
-            <a href="/matches" style={{...styles.navLink, fontWeight: 'bold'}}>Matches</a>
-            <a href="/tickets" style={styles.navLink}>Tickets</a>
-            <a href="/stadiums" style={styles.navLink}>Stadiums</a>
-            <a href="/orders" style={styles.navLink}>My Orders</a>
-            {isAdmin() && (
-              <a href="/admin/dashboard" style={{ ...styles.navLink, fontWeight: 'bold', color: '#f39c12' }}>
-                Admin
-              </a>
-            )}
-            <span style={styles.userName}>{user?.firstName || user?.first_name}</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      <main style={styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         <div style={styles.header}>
           <h1>⚽ Upcoming Matches</h1>
           <p>Select a match to view available tickets and seat options</p>
         </div>
 
-        <div style={styles.filters}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : styles.filters}>
           <select 
             style={styles.select} 
             value={filters.competition || ''}
@@ -121,7 +106,7 @@ const Matches = () => {
             <p>No upcoming matches found</p>
           </div>
         ) : (
-          <div style={styles.grid}>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.grid : screenSize === 'tablet' ? responsiveStyles.tablet.grid : styles.grid}>
             {matches.map(match => (
               <div key={match.id} style={styles.card}>
                 <div style={styles.matchHeader}>
@@ -157,47 +142,6 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f5f5f5',
-  },
-  nav: {
-    backgroundColor: '#2c3e50',
-    padding: '15px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  navContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  navTitle: {
-    color: 'white',
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  navLinks: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  navLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '14px',
-  },
-  userName: {
-    color: '#bdc3c7',
-    fontSize: '14px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '13px',
   },
   main: {
     maxWidth: '1200px',
@@ -322,6 +266,37 @@ const styles = {
     padding: '60px 20px',
     color: '#7f8c8d',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    filters: {
+      ...styles.filters,
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    },
+    grid: {
+      ...styles.grid,
+      gridTemplateColumns: '1fr',
+      gap: '16px',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    grid: {
+      ...styles.grid,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '20px',
+    },
+  }
 };
 
 export default Matches;

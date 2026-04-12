@@ -4,11 +4,36 @@ import { useSocket } from '../context/SocketContext';
 import Navbar from '../components/Navbar';
 import MatchService from '../services/MatchService';
 
+// Custom hook for responsive styles
+const useResponsiveStyles = () => {
+  const [screenSize, setScreenSize] = useState('desktop');
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width <= 768) {
+        setScreenSize('mobile');
+      } else if (width <= 1024) {
+        setScreenSize('tablet');
+      } else {
+        setScreenSize('desktop');
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return screenSize;
+};
+
 const Home = () => {
   const { user, isAdmin, logout } = useAuth();
   const { connected, onlineCount } = useSocket();
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
+  const screenSize = useResponsiveStyles();
 
   const handleLogout = () => {
     logout();
@@ -44,7 +69,7 @@ const Home = () => {
     <div style={styles.container}>
       <Navbar />
 
-      <main style={styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         <div style={styles.welcome}>
           <h1>🏟️ Welcome, {user?.firstName || user?.first_name}!</h1>
           <p style={styles.subtitle}>Stadium Ticket Management System</p>
@@ -56,7 +81,7 @@ const Home = () => {
           )}
         </div>
 
-        <div style={styles.dashboard}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.dashboard : screenSize === 'tablet' ? responsiveStyles.tablet.dashboard : styles.dashboard}>
           <div style={styles.card}>
             <h3 style={styles.cardTitle}>⚽ Matches</h3>
             <p>Browse upcoming football matches and purchase tickets.</p>
@@ -77,8 +102,8 @@ const Home = () => {
         </div>
 
         {/* Upcoming Featured Matches */}
-        <div style={styles.section}>
-          <div style={styles.sectionHeader}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.section : screenSize === 'tablet' ? responsiveStyles.tablet.section : styles.section}>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.sectionHeader : styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>🔥 Upcoming Featured Matches</h2>
             <a href="/matches" style={styles.viewAllLink}>View All Matches →</a>
           </div>
@@ -86,7 +111,7 @@ const Home = () => {
           {loadingMatches ? (
             <div style={styles.loadingText}>Loading matches...</div>
           ) : upcomingMatches.length > 0 ? (
-            <div style={styles.matchesGrid}>
+            <div style={screenSize === 'mobile' ? responsiveStyles.mobile.matchesGrid : screenSize === 'tablet' ? responsiveStyles.tablet.matchesGrid : styles.matchesGrid}>
               {upcomingMatches.map(match => (
                 <div key={match.id} style={styles.matchCard}>
                   <div style={styles.matchTeams}>
@@ -113,9 +138,9 @@ const Home = () => {
         </div>
 
         {/* Special Offers */}
-        <div style={styles.section}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.section : screenSize === 'tablet' ? responsiveStyles.tablet.section : styles.section}>
           <h2 style={styles.sectionTitle}>🎁 Special Offers & Promotions</h2>
-          <div style={styles.offersGrid}>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.offersGrid : screenSize === 'tablet' ? responsiveStyles.tablet.offersGrid : styles.offersGrid}>
             {/* Yearly Stadium Pass */}
             <div style={styles.offerCard}>
               <div style={styles.offerBadge}>BEST VALUE</div>
@@ -200,9 +225,9 @@ const Home = () => {
         </div>
 
         {/* Quick Actions */}
-        <div style={styles.section}>
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.section : screenSize === 'tablet' ? responsiveStyles.tablet.section : styles.section}>
           <h2 style={styles.sectionTitle}>⚡ Quick Actions</h2>
-          <div style={styles.quickActions}>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickActions : screenSize === 'tablet' ? responsiveStyles.tablet.quickActions : styles.quickActions}>
             <a href="/matches" style={styles.quickActionBtn}>
               <span style={styles.quickActionIcon}>⚽</span>
               <span>Browse Matches</span>
@@ -575,6 +600,76 @@ const styles = {
     fontSize: '14px',
     transition: 'background-color 0.2s',
   },
+};
+
+// Responsive styles
+const responsiveStyles = {
+  mobile: {
+    main: {
+      ...styles.main,
+      padding: '20px 15px',
+    },
+    dashboard: {
+      ...styles.dashboard,
+      gridTemplateColumns: '1fr',
+      gap: '15px',
+    },
+    section: {
+      ...styles.section,
+      padding: '16px',
+    },
+    sectionHeader: {
+      ...styles.sectionHeader,
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: '10px',
+    },
+    matchesGrid: {
+      ...styles.matchesGrid,
+      gridTemplateColumns: '1fr',
+      gap: '12px',
+    },
+    offersGrid: {
+      ...styles.offersGrid,
+      gridTemplateColumns: '1fr',
+      gap: '16px',
+    },
+    quickActions: {
+      ...styles.quickActions,
+      gridTemplateColumns: '1fr',
+      gap: '12px',
+    },
+  },
+  tablet: {
+    main: {
+      ...styles.main,
+      padding: '30px 15px',
+    },
+    dashboard: {
+      ...styles.dashboard,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '16px',
+    },
+    section: {
+      ...styles.section,
+      padding: '20px',
+    },
+    matchesGrid: {
+      ...styles.matchesGrid,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '14px',
+    },
+    offersGrid: {
+      ...styles.offersGrid,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '16px',
+    },
+    quickActions: {
+      ...styles.quickActions,
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '14px',
+    },
+  }
 };
 
 export default Home;
