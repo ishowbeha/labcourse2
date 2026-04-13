@@ -150,7 +150,7 @@ const AdminDashboard = () => {
             <button 
               className={`hamburger-btn ${mobileMenuOpen ? 'open' : ''}`} 
               onClick={toggleMobileMenu}
-              style={styles.hamburgerBtn}
+              style={screenSize === 'mobile' ? responsiveStyles.mobile.hamburgerBtn : screenSize === 'tablet' ? responsiveStyles.tablet.hamburgerBtn : styles.hamburgerBtn}
               aria-label="Toggle admin menu"
             >
               <span style={styles.hamburgerLine}></span>
@@ -344,7 +344,7 @@ const styles = {
     fontSize: '14px',
   },
   hamburgerBtn: {
-    display: screenSize === 'mobile' ? 'flex' : 'none',
+    display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
     gap: '5px',

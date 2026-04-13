@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
@@ -30,8 +31,17 @@ const io = new Server(server, {
 // Make io available to routes
 app.set('io', io);
 
+// CORS Configuration - Allow credentials for cookies
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

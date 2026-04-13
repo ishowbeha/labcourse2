@@ -16,6 +16,37 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
+  // Function to refresh the access token using the cookie
+  const refreshAccessToken = async () => {
+    try {
+      // Use raw axios without interceptor to avoid circular dependency
+      const axios = (await import('axios')).default;
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`,
+        {},
+        { withCredentials: true }
+      );
+      const newAccessToken = response.data?.data?.accessToken;
+      if (newAccessToken) {
+        localStorage.setItem('token', newAccessToken);
+        setToken(newAccessToken);
+        return true;
+      }
+    } catch (error) {
+      // If error is 401, it means the cookie is missing or invalid
+      if (error.response?.status === 401) {
+        // No valid refresh token cookie, force logout
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+        setToken(null);
+      }
+      console.error('Failed to refresh token:', error);
+    }
+    return false;
+  };
+
+
   // Fetch user profile to get roles
   const fetchUserProfile = async () => {
     try {
@@ -33,31 +64,103 @@ export const AuthProvider = ({ children }) => {
       const storedToken = localStorage.getItem('token');
       
       if (storedUser && storedToken) {
-        const parsedUser = JSON.parse(storedUser);
         // Verify the token is still valid by fetching profile
         const profile = await fetchUserProfile();
         if (profile) {
           setUser(profile.data || profile);
           setToken(storedToken);
         } else {
-          // Token is invalid, clear storage
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+          // Token might be expired, try to refresh it
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            // Fetch profile with new token
+            const newProfile = await fetchUserProfile();
+            if (newProfile) {
+              setUser(newProfile.data || newProfile);
+            } else {
+              // Still can't get profile, clear storage
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+            }
+          } else {
+            // Refresh failed, clear storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
         }
       }
       setLoading(false);
     };
     
     initAuth();
+
+    // Listen for storage events (when token is deleted manually)
+    const handleStorageChange = async (e) => {
+      if (e.key === 'token' && !e.newValue && localStorage.getItem('user')) {
+        // Token was deleted but user data still exists - try to refresh
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          // Refresh failed, clear user data
+          localStorage.removeItem('user');
+          setUser(null);
+          setToken(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically if token is missing but user exists
+    const checkTokenInterval = setInterval(async () => {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      
+      if (!storedToken && storedUser) {
+        // Token missing but user exists - try to refresh
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          // Refresh failed, clear user data
+          localStorage.removeItem('user');
+          setUser(null);
+          setToken(null);
+        }
+      } else if (storedToken && storedUser) {
+        // Token exists but check if cookie is missing
+        try {
+          // Try to make a refresh call to test if cookie exists
+          const axios = (await import('axios')).default;
+          await axios.post(
+            `${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`,
+            {},
+            { withCredentials: true }
+          );
+          // Cookie exists, all good
+        } catch (error) {
+          // If refresh fails with 401, cookie is missing
+          if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+            setToken(null);
+          }
+        }
+      }
+    }, 3000); // Check every 3 seconds
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(checkTokenInterval);
+    };
   }, []);
 
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      // The API interceptor already unwraps response.data, so we access response.data directly
-      const { user: basicUserData, accessToken } = response.data;
+      // The API interceptor unwraps one level, so response.data has: { success, message, data: { user, accessToken } }
+      // Note: refreshToken is now in httpOnly cookie, not in response body
+      const { user: basicUserData, accessToken } = response.data.data || response.data;
       
-      // Store token
+      // Store access token only (refreshToken is in httpOnly cookie)
       localStorage.setItem('token', accessToken);
       setToken(accessToken);
       
