@@ -478,7 +478,7 @@ class DatabaseConfig {
     // Create stadiums for Albania and Kosova
     const stadiums = [
       ['National Stadium (Air Albania Stadium)', 'Tirana', 'Albania', 22500, 'Rruga e Elbasanit', 'Home stadium of the Albania national team'],
-      ['Fadil Vokrri Stadium', 'Pristina', 'Kosova', 13500, 'Bulevardi Bill Clinton', 'Home stadium of the Kosova national team'],
+      ['Fadil Vokrri Stadium', 'Prishtina', 'Kosova', 13500, 'Bulevardi Bill Clinton', 'Home stadium of the Kosova national team'],
       ['Loro Boriçi Stadium', 'Shkodër', 'Albania', 16000, 'Rruga Skenderbeu', 'Historic stadium in northern Albania'],
       ['Selman Stërmasi Stadium', 'Tirana', 'Albania', 9500, 'Rruga e Kavajës', 'Home of KF Tirana'],
       ['Partizani Stadium', 'Tirana', 'Albania', 8500, 'Parku i Liqenit', 'Home of FK Partizani'],

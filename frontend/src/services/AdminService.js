@@ -74,6 +74,80 @@ const AdminService = {
   updateOrderStatus: async (id, status) => {
     const response = await api.patch(`/admin/orders/${id}/status`, { status });
     return response;
+  },
+
+  // ==================== STADIUM MANAGEMENT ====================
+
+  // Stadium operations
+  getStadiums: async (params = {}) => {
+    const response = await api.get('/stadiums', { params });
+    return response;
+  },
+
+  getStadium: async (id) => {
+    const response = await api.get(`/stadiums/${id}`);
+    return response;
+  },
+
+  getStadiumWithSections: async (id) => {
+    const response = await api.get(`/stadiums/${id}/sections`);
+    return response;
+  },
+
+  getStadiumSummary: async (id) => {
+    const response = await api.get(`/stadiums/${id}/summary`);
+    return response;
+  },
+
+  createStadium: async (stadiumData) => {
+    const response = await api.post('/stadiums', stadiumData);
+    return response;
+  },
+
+  updateStadium: async (id, stadiumData) => {
+    const response = await api.put(`/stadiums/${id}`, stadiumData);
+    return response;
+  },
+
+  deleteStadium: async (id) => {
+    const response = await api.delete(`/stadiums/${id}`);
+    return response;
+  },
+
+  hardDeleteStadium: async (id) => {
+    const response = await api.delete(`/stadiums/${id}/permanent`);
+    return response;
+  },
+
+  getStadiumCities: async () => {
+    const response = await api.get('/stadiums/meta/cities');
+    return response;
+  },
+
+  // Section operations
+  getSections: async (stadiumId) => {
+    const response = await api.get(`/stadiums/${stadiumId}/sections`);
+    return response;
+  },
+
+  getSection: async (stadiumId, sectionId) => {
+    const response = await api.get(`/stadiums/${stadiumId}/sections/${sectionId}`);
+    return response;
+  },
+
+  createSection: async (stadiumId, sectionData) => {
+    const response = await api.post(`/stadiums/${stadiumId}/sections`, sectionData);
+    return response;
+  },
+
+  updateSection: async (stadiumId, sectionId, sectionData) => {
+    const response = await api.put(`/stadiums/${stadiumId}/sections/${sectionId}`, sectionData);
+    return response;
+  },
+
+  deleteSection: async (stadiumId, sectionId) => {
+    const response = await api.delete(`/stadiums/${stadiumId}/sections/${sectionId}`);
+    return response;
   }
 };
 

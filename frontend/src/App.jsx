@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Home from './pages/Home';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
+import AdminStadiums from './pages/AdminStadiums';
 import AdminReports from './pages/AdminReports';
 import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
@@ -170,7 +171,7 @@ function AppRoutes() {
         path="/admin/stadiums" 
         element={
           <AdminRoute>
-            <AdminPlaceholder title="Stadium Management" />
+            <AdminStadiums />
           </AdminRoute>
         } 
       />

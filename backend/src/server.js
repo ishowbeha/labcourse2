@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
@@ -12,6 +13,7 @@ const createAuthRoutes = require('./routes/authRoutes');
 const createUserRoutes = require('./routes/userRoutes');
 const createMatchRoutes = require('./routes/matchRoutes');
 const createAdminRoutes = require('./routes/adminRoutes');
+const createStadiumRoutes = require('./routes/stadiumRoutes');
 const { setupWebSocket } = require('./websocket/websocket');
 
 const app = express();
@@ -30,8 +32,17 @@ const io = new Server(server, {
 // Make io available to routes
 app.set('io', io);
 
+// CORS Configuration - Allow credentials for cookies
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -67,6 +78,7 @@ const startServer = async () => {
     app.use('/api/users', createUserRoutes(db));
     app.use('/api/matches', createMatchRoutes(db));
     app.use('/api/admin', createAdminRoutes(db));
+    app.use('/api/stadiums', createStadiumRoutes(db));
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {
@@ -104,6 +116,14 @@ const startServer = async () => {
       console.log(`   GET /api/admin/users - User management`);
       console.log(`   GET /api/admin/reports/ticket-sales - Ticket sales by match`);
       console.log(`   GET /api/admin/orders - Order management`);
+      console.log(`🏟️ Stadium endpoints (requires admin role):`);
+      console.log(`   GET /api/stadiums - Get all stadiums`);
+      console.log(`   POST /api/stadiums - Create stadium`);
+      console.log(`   PUT /api/stadiums/:id - Update stadium`);
+      console.log(`   DELETE /api/stadiums/:id - Delete stadium`);
+      console.log(`   POST /api/stadiums/:stadiumId/sections - Create section`);
+      console.log(`   PUT /api/stadiums/:stadiumId/sections/:sectionId - Update section`);
+      console.log(`   DELETE /api/stadiums/:stadiumId/sections/:sectionId - Delete section`);
       console.log(`💡 Visit http://localhost:${PORT}/api/health to check status`);
     });
   } catch (error) {
