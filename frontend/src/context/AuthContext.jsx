@@ -156,9 +156,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-      // The API interceptor unwraps one level, so response.data has: { success, message, data: { user, accessToken } }
+      // The API interceptor unwraps one level, so response has: { success, message, data: { user, accessToken } }
       // Note: refreshToken is now in httpOnly cookie, not in response body
-      const { user: basicUserData, accessToken } = response.data.data || response.data;
+      const { user: basicUserData, accessToken } = response.data || response;
       
       // Store access token only (refreshToken is in httpOnly cookie)
       localStorage.setItem('token', accessToken);

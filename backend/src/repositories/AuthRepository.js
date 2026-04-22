@@ -1,112 +1,124 @@
 const bcrypt = require('bcryptjs');
+const { User, Role, Permission, UserRole, RolePermission, RefreshToken, AuditLog, sequelize } = require('../models/mysql');
 
 class AuthRepository {
-  constructor(db) {
-    this.db = db;
+  constructor(sequelize) {
+    this.sequelize = sequelize;
   }
 
   // User management
-  createUser({ firstName, lastName, email, password }) {
+  async createUser({ firstName, lastName, email, password }) {
     const passwordHash = bcrypt.hashSync(password, 10);
-    const stmt = this.db.prepare(`
-      INSERT INTO users (first_name, last_name, email, password_hash, is_active, created_by, updated_by)
-      VALUES (?, ?, ?, ?, 1, 1, 1)
-    `);
-    const result = stmt.run(firstName, lastName, email, passwordHash);
-    return this.getUserById(result.lastInsertRowid);
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      passwordHash,
+      isActive: true
+    });
+    return this.getUserById(user.id);
   }
 
-  getUserById(id) {
-    return this.db.prepare(`
-      SELECT id, first_name, last_name, email, is_active, created_at, updated_at
-      FROM users WHERE id = ? AND is_active = 1
-    `).get(id);
+  async getUserById(id) {
+    return User.findOne({
+      where: { id, isActive: true },
+      attributes: ['id', 'firstName', 'lastName', 'email', 'isActive', 'createdAt', 'updatedAt']
+    });
   }
 
-  getUserByEmail(email) {
-    return this.db.prepare(`
-      SELECT * FROM users WHERE email = ? AND is_active = 1
-    `).get(email);
+  async getUserByEmail(email) {
+    return User.findOne({
+      where: { email, isActive: true },
+      attributes: ['id', 'firstName', 'lastName', 'email', 'passwordHash', 'isActive', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt']
+    });
   }
 
-  updateUser(id, data) {
-    const stmt = this.db.prepare(`
-      UPDATE users SET 
-        first_name = COALESCE(?, first_name),
-        last_name = COALESCE(?, last_name),
-        email = COALESCE(?, email),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    stmt.run(data.firstName, data.lastName, data.email, id);
+  async updateUser(id, data) {
+    const user = await User.findByPk(id);
+    if (!user) return null;
+    
+    await user.update({
+      firstName: data.firstName || user.firstName,
+      lastName: data.lastName || user.lastName,
+      email: data.email || user.email
+    });
+    
     return this.getUserById(id);
   }
 
   // Role management
-  getRoles() {
-    return this.db.prepare('SELECT * FROM roles ORDER BY name').all();
+  async getRoles() {
+    return Role.findAll({ order: [['name', 'ASC']] });
   }
 
-  getRoleById(id) {
-    return this.db.prepare('SELECT * FROM roles WHERE id = ?').get(id);
+  async getRoleById(id) {
+    return Role.findByPk(id);
   }
 
-  getRoleByName(name) {
-    return this.db.prepare('SELECT * FROM roles WHERE name = ?').get(name);
+  async getRoleByName(name) {
+    return Role.findOne({ where: { name } });
   }
 
-  assignRoleToUser(userId, roleId, assignedBy = 1) {
+  async assignRoleToUser(userId, roleId, assignedBy = 1) {
     try {
-      const stmt = this.db.prepare(`
-        INSERT INTO user_roles (user_id, role_id, assigned_by)
-        VALUES (?, ?, ?)
-      `);
-      stmt.run(userId, roleId, assignedBy);
+      await UserRole.findOrCreate({
+        where: { userId, roleId },
+        defaults: { assignedBy }
+      });
       return true;
     } catch (error) {
-      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      if (error.name === 'SequelizeUniqueConstraintError') {
         return false; // Role already assigned
       }
       throw error;
     }
   }
 
-  getUserRoles(userId) {
-    return this.db.prepare(`
-      SELECT r.* FROM roles r
-      INNER JOIN user_roles ur ON r.id = ur.role_id
-      WHERE ur.user_id = ?
-    `).all(userId);
+  async getUserRoles(userId) {
+    const user = await User.findByPk(userId, {
+      include: [{ model: Role }]
+    });
+    return user ? user.Roles : [];
   }
 
   // Permission management
-  getPermissions() {
-    return this.db.prepare('SELECT * FROM permissions ORDER BY resource, action').all();
+  async getPermissions() {
+    return Permission.findAll({ order: [['resource', 'ASC'], ['action', 'ASC']] });
   }
 
-  getPermissionByName(name) {
-    return this.db.prepare('SELECT * FROM permissions WHERE name = ?').get(name);
+  async getPermissionByName(name) {
+    return Permission.findOne({ where: { name } });
   }
 
-  getUserPermissions(userId) {
-    return this.db.prepare(`
-      SELECT DISTINCT p.* FROM permissions p
-      INNER JOIN role_permissions rp ON p.id = rp.permission_id
-      INNER JOIN user_roles ur ON rp.role_id = ur.role_id
-      WHERE ur.user_id = ?
-    `).all(userId);
+  async getUserPermissions(userId) {
+    const user = await User.findByPk(userId, {
+      include: [{
+        model: Role,
+        include: [{ model: Permission }]
+      }]
+    });
+    
+    if (!user || !user.Roles) return [];
+    
+    const permissions = new Set();
+    user.Roles.forEach(role => {
+      if (role.Permissions) {
+        role.Permissions.forEach(perm => permissions.add(perm));
+      }
+    });
+    
+    return Array.from(permissions);
   }
 
-  assignPermissionToRole(roleId, permissionId, grantedBy = 1) {
+  async assignPermissionToRole(roleId, permissionId, grantedBy = 1) {
     try {
-      const stmt = this.db.prepare(`
-        INSERT INTO role_permissions (role_id, permission_id, granted_by)
-        VALUES (?, ?, ?)
-      `);
-      stmt.run(roleId, permissionId, grantedBy);
+      await RolePermission.findOrCreate({
+        where: { roleId, permissionId },
+        defaults: { grantedBy }
+      });
       return true;
     } catch (error) {
-      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      if (error.name === 'SequelizeUniqueConstraintError') {
         return false; // Permission already assigned
       }
       throw error;
@@ -114,50 +126,52 @@ class AuthRepository {
   }
 
   // Refresh token management
-  createRefreshToken(userId, tokenHash, expiresAt) {
-    const stmt = this.db.prepare(`
-      INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-      VALUES (?, ?, ?)
-    `);
-    const result = stmt.run(userId, tokenHash, expiresAt);
-    return result.lastInsertRowid;
+  async createRefreshToken(userId, tokenHash, expiresAt) {
+    const refreshToken = await RefreshToken.create({
+      userId,
+      tokenHash,
+      expiresAt
+    });
+    return refreshToken.id;
   }
 
-  getRefreshToken(tokenHash) {
-    return this.db.prepare(`
-      SELECT * FROM refresh_tokens 
-      WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
-    `).get(tokenHash);
+  async getRefreshToken(tokenHash) {
+    return RefreshToken.findOne({
+      where: {
+        tokenHash,
+        revokedAt: null
+      }
+    });
   }
 
-  revokeRefreshToken(tokenHash) {
-    const stmt = this.db.prepare(`
-      UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP
-      WHERE token_hash = ?
-    `);
-    stmt.run(tokenHash);
-    return true;
+  async revokeRefreshToken(tokenHash) {
+    const result = await RefreshToken.update(
+      { revokedAt: new Date() },
+      { where: { tokenHash } }
+    );
+    return result[0] > 0;
   }
 
-  revokeAllUserRefreshTokens(userId) {
-    const stmt = this.db.prepare(`
-      UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP
-      WHERE user_id = ? AND revoked_at IS NULL
-    `);
-    stmt.run(userId);
-    return true;
+  async revokeAllUserRefreshTokens(userId) {
+    const result = await RefreshToken.update(
+      { revokedAt: new Date() },
+      { where: { userId, revokedAt: null } }
+    );
+    return result[0] > 0;
   }
 
   // Audit logging
-  logAudit(userId, action, entity, entityId, oldValue, newValue, ipAddress, userAgent) {
-    const stmt = this.db.prepare(`
-      INSERT INTO audit_logs (user_id, action, entity, entity_id, old_value, new_value, ip_address, user_agent)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(userId, action, entity, entityId, 
-      oldValue ? JSON.stringify(oldValue) : null,
-      newValue ? JSON.stringify(newValue) : null,
-      ipAddress, userAgent);
+  async logAudit(userId, action, entity, entityId, oldValue, newValue, ipAddress, userAgent) {
+    await AuditLog.create({
+      userId,
+      action,
+      entity,
+      entityId,
+      oldValue,
+      newValue,
+      ipAddress,
+      userAgent
+    });
     return true;
   }
 }

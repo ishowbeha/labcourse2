@@ -73,19 +73,19 @@ class AuthService {
     }
 
     // Get user with password hash
-    const user = this.authRepository.getUserByEmail(email);
+    const user = await this.authRepository.getUserByEmail(email);
     if (!user) {
       throw new Error('Invalid credentials');
     }
 
     // Verify password
-    const isValid = require('bcryptjs').compareSync(password, user.password_hash);
+    const isValid = require('bcryptjs').compareSync(password, user.passwordHash);
     if (!isValid) {
       throw new Error('Invalid credentials');
     }
 
     // Check if user is active
-    if (!user.is_active) {
+    if (!user.isActive) {
       throw new Error('Account is deactivated');
     }
 
@@ -107,8 +107,8 @@ class AuthService {
     return {
       user: {
         id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email
       },
       ...tokens
@@ -158,24 +158,24 @@ class AuthService {
 
   // Get current user profile
   async getProfile(userId) {
-    const user = this.authRepository.getUserById(userId);
+    const user = await this.authRepository.getUserById(userId);
     if (!user) {
       throw new Error('User not found');
     }
 
     // Get user roles
-    const roles = this.authRepository.getUserRoles(userId);
+    const roles = await this.authRepository.getUserRoles(userId);
 
     // Get user permissions
-    const permissions = this.authRepository.getUserPermissions(userId);
+    const permissions = await this.authRepository.getUserPermissions(userId);
 
     return {
       id: user.id,
-      firstName: user.first_name,
-      lastName: user.last_name,
+      firstName: user.first_name || user.firstName,
+      lastName: user.last_name || user.lastName,
       email: user.email,
-      roles: roles.map(r => r.name),
-      permissions: permissions.map(p => p.name)
+      roles: Array.isArray(roles) ? roles.map(r => r.name) : [],
+      permissions: Array.isArray(permissions) ? permissions.map(p => p.name) : []
     };
   }
 

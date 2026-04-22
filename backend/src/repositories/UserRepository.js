@@ -1,25 +1,27 @@
+const { User } = require('../models/mysql');
+
 class UserRepository {
-  constructor(db) {
-    this.db = db;
+  constructor(sequelize) {
+    this.sequelize = sequelize;
   }
 
-  findAll() {
+  async findAll() {
     try {
-      return this.db.prepare(`
-        SELECT id, first_name, last_name, email, is_active, created_at, updated_at
-        FROM users WHERE is_active = 1
-      `).all();
+      return User.findAll({
+        where: { isActive: true },
+        attributes: ['id', 'firstName', 'lastName', 'email', 'isActive', 'createdAt', 'updatedAt']
+      });
     } catch (error) {
       throw new Error(`Error fetching users: ${error.message}`);
     }
   }
 
-  findById(id) {
+  async findById(id) {
     try {
-      const user = this.db.prepare(`
-        SELECT id, first_name, last_name, email, is_active, created_at, updated_at
-        FROM users WHERE id = ? AND is_active = 1
-      `).get(id);
+      const user = await User.findOne({
+        where: { id, isActive: true },
+        attributes: ['id', 'firstName', 'lastName', 'email', 'isActive', 'createdAt', 'updatedAt']
+      });
       if (!user) {
         throw new Error('User not found');
       }
@@ -29,65 +31,69 @@ class UserRepository {
     }
   }
 
-  findByEmail(email) {
+  async findByEmail(email) {
     try {
-      return this.db.prepare(`
-        SELECT * FROM users WHERE email = ? AND is_active = 1
-      `).get(email);
+      return User.findOne({
+        where: { email, isActive: true }
+      });
     } catch (error) {
       throw new Error(`Error fetching user by email: ${error.message}`);
     }
   }
 
-  create({ firstName, lastName, email, password }) {
+  async create({ firstName, lastName, email, password }) {
     try {
-      const stmt = this.db.prepare(`
-        INSERT INTO users (first_name, last_name, email, password_hash, is_active, created_by, updated_by)
-        VALUES (?, ?, ?, ?, 1, 1, 1)
-      `);
-      const result = stmt.run(firstName, lastName, email, password);
-      return this.findById(result.lastInsertRowid);
+      const user = await User.create({
+        firstName,
+        lastName,
+        email,
+        passwordHash: password,
+        isActive: true
+      });
+      return this.findById(user.id);
     } catch (error) {
       throw new Error(`Error creating user: ${error.message}`);
     }
   }
 
-  update(id, { firstName, lastName, email, is_active }) {
+  async update(id, { firstName, lastName, email, isActive }) {
     try {
-      const stmt = this.db.prepare(`
-        UPDATE users SET 
-          first_name = COALESCE(?, first_name),
-          last_name = COALESCE(?, last_name),
-          email = COALESCE(?, email),
-          is_active = COALESCE(?, is_active),
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `);
-      stmt.run(firstName, lastName, email, is_active, id);
+      const user = await User.findByPk(id);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      await user.update({
+        firstName: firstName !== undefined ? firstName : user.firstName,
+        lastName: lastName !== undefined ? lastName : user.lastName,
+        email: email !== undefined ? email : user.email,
+        isActive: isActive !== undefined ? isActive : user.isActive
+      });
+      
       return this.findById(id);
     } catch (error) {
       throw new Error(`Error updating user: ${error.message}`);
     }
   }
 
-  delete(id) {
+  async delete(id) {
     try {
-      const stmt = this.db.prepare(`
-        UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `);
-      stmt.run(id);
+      const user = await User.findByPk(id);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      await user.update({ isActive: false });
       return this.findById(id);
     } catch (error) {
       throw new Error(`Error deleting user: ${error.message}`);
     }
   }
 
-  hardDelete(id) {
+  async hardDelete(id) {
     try {
-      const stmt = this.db.prepare('DELETE FROM users WHERE id = ?');
-      stmt.run(id);
-      return true;
+      const deleted = await User.destroy({ where: { id } });
+      return deleted > 0;
     } catch (error) {
       throw new Error(`Error hard deleting user: ${error.message}`);
     }

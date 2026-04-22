@@ -1,83 +1,97 @@
+const { Op } = require('sequelize');
 const Match = require('../models/Match');
 
 class MatchRepository {
-  constructor(db) {
-    this.db = db;
+  constructor(sequelize) {
+    this.sequelize = sequelize;
+    this.Match = sequelize.models.Match;
+    this.Stadium = sequelize.models.Stadium;
   }
 
   // Get all matches with optional filters
-  findAll(filters = {}) {
+  async findAll(filters = {}) {
     try {
-      let query = `
-        SELECT m.*, s.name as stadium_name, s.city as stadium_city, s.capacity as stadium_capacity
-        FROM matches m
-        LEFT JOIN stadiums s ON m.stadium_id = s.id
-        WHERE 1=1
-      `;
-      const params = [];
-
+      const where = {};
+      
       // Filter by status
       if (filters.status) {
-        query += ' AND m.status = ?';
-        params.push(filters.status);
+        where.status = filters.status;
       }
 
       // Filter by competition
       if (filters.competition) {
-        query += ' AND m.competition = ?';
-        params.push(filters.competition);
+        where.competition = filters.competition;
       }
 
       // Filter by date range
       if (filters.startDate) {
-        query += ' AND m.match_date >= ?';
-        params.push(filters.startDate);
+        where.matchDate = { [Op.gte]: filters.startDate };
       }
 
       if (filters.endDate) {
-        query += ' AND m.match_date <= ?';
-        params.push(filters.endDate);
+        if (where.matchDate) {
+          where.matchDate[Op.lte] = filters.endDate;
+        } else {
+          where.matchDate = { [Op.lte]: filters.endDate };
+        }
       }
 
       // Filter by team (home or away)
       if (filters.team) {
-        query += ' AND (m.home_team LIKE ? OR m.away_team LIKE ?)';
-        const teamPattern = `%${filters.team}%`;
-        params.push(teamPattern, teamPattern);
+        where[Op.or] = [
+          { homeTeam: { [Op.like]: `%${filters.team}%` } },
+          { awayTeam: { [Op.like]: `%${filters.team}%` } }
+        ];
       }
 
       // Only upcoming matches by default
       if (!filters.includePast) {
-        query += " AND (m.match_date > date('now') OR (m.match_date = date('now') AND m.match_time >= time('now')))";
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        const currentTime = now.toTimeString().split(' ')[0];
+        
+        where[Op.or] = [
+          { matchDate: { [Op.gt]: today } },
+          {
+            [Op.and]: [
+              { matchDate: today },
+              { matchTime: { [Op.gte]: currentTime } }
+            ]
+          }
+        ];
       }
 
-      query += ' ORDER BY m.match_date ASC, m.match_time ASC';
+      const matches = await this.Match.findAll({
+        where,
+        include: [{
+          model: this.Stadium,
+          attributes: ['name', 'city', 'capacity']
+        }],
+        order: [['matchDate', 'ASC'], ['matchTime', 'ASC']]
+      });
 
-      const stmt = this.db.prepare(query);
-      const matches = stmt.all(...params);
-
-      return matches.map(match => new Match(match));
+      return matches;
     } catch (error) {
       throw new Error(`Error fetching matches: ${error.message}`);
     }
   }
 
   // Get match by ID
-  findById(id) {
+  async findById(id) {
     try {
-      const query = `
-        SELECT m.*, s.name as stadium_name, s.city as stadium_city, s.capacity as stadium_capacity
-        FROM matches m
-        LEFT JOIN stadiums s ON m.stadium_id = s.id
-        WHERE m.id = ?
-      `;
-      const match = this.db.prepare(query).get(id);
+      const match = await this.Match.findByPk(id, {
+        include: [{
+          model: this.Stadium,
+          as: 'stadium',
+          attributes: ['name', 'city', 'capacity']
+        }]
+      });
       
       if (!match) {
         throw new Error('Match not found');
       }
       
-      return new Match(match);
+      return match;
     } catch (error) {
       if (error.message === 'Match not found') {
         throw error;
@@ -87,103 +101,63 @@ class MatchRepository {
   }
 
   // Create new match
-  create(matchData) {
+  async create(matchData) {
     try {
-      const query = `
-        INSERT INTO matches (
-          home_team, away_team, stadium_id, match_date, match_time,
-          competition, round, base_price, status,
-          created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 1, 1)
-      `;
+      const match = await this.Match.create({
+        homeTeam: matchData.homeTeam,
+        awayTeam: matchData.awayTeam,
+        stadiumId: matchData.stadiumId,
+        matchDate: matchData.matchDate,
+        matchTime: matchData.matchTime,
+        competition: matchData.competition || 'Friendly',
+        round: matchData.round || 'Group Stage',
+        basePrice: matchData.basePrice,
+        status: 'scheduled',
+        createdBy: 1,
+        updatedBy: 1
+      });
       
-      const result = this.db.prepare(query).run(
-        matchData.homeTeam,
-        matchData.awayTeam,
-        matchData.stadiumId,
-        matchData.matchDate,
-        matchData.matchTime,
-        matchData.competition || 'Friendly',
-        matchData.round || 'Group Stage',
-        matchData.basePrice
-      );
-      
-      return this.findById(result.lastInsertRowid);
+      return await this.findById(match.id);
     } catch (error) {
       throw new Error(`Error creating match: ${error.message}`);
     }
   }
 
   // Update match
-  update(id, updateData) {
+  async update(id, updateData) {
     try {
-      const fields = [];
-      const values = [];
+      const updateFields = {};
+      
+      if (updateData.homeTeam !== undefined) updateFields.homeTeam = updateData.homeTeam;
+      if (updateData.awayTeam !== undefined) updateFields.awayTeam = updateData.awayTeam;
+      if (updateData.stadiumId !== undefined) updateFields.stadiumId = updateData.stadiumId;
+      if (updateData.matchDate !== undefined) updateFields.matchDate = updateData.matchDate;
+      if (updateData.matchTime !== undefined) updateFields.matchTime = updateData.matchTime;
+      if (updateData.competition !== undefined) updateFields.competition = updateData.competition;
+      if (updateData.status !== undefined) updateFields.status = updateData.status;
+      if (updateData.homeScore !== undefined) updateFields.homeScore = updateData.homeScore;
+      if (updateData.awayScore !== undefined) updateFields.awayScore = updateData.awayScore;
 
-      if (updateData.homeTeam !== undefined) {
-        fields.push('home_team = ?');
-        values.push(updateData.homeTeam);
-      }
-      if (updateData.awayTeam !== undefined) {
-        fields.push('away_team = ?');
-        values.push(updateData.awayTeam);
-      }
-      if (updateData.stadiumId !== undefined) {
-        fields.push('stadium_id = ?');
-        values.push(updateData.stadiumId);
-      }
-      if (updateData.matchDate !== undefined) {
-        fields.push('match_date = ?');
-        values.push(updateData.matchDate);
-      }
-      if (updateData.matchTime !== undefined) {
-        fields.push('match_time = ?');
-        values.push(updateData.matchTime);
-      }
-      if (updateData.competition !== undefined) {
-        fields.push('competition = ?');
-        values.push(updateData.competition);
-      }
-      if (updateData.status !== undefined) {
-        fields.push('status = ?');
-        values.push(updateData.status);
-      }
-      if (updateData.homeScore !== undefined) {
-        fields.push('home_score = ?');
-        values.push(updateData.homeScore);
-      }
-      if (updateData.awayScore !== undefined) {
-        fields.push('away_score = ?');
-        values.push(updateData.awayScore);
+      if (Object.keys(updateFields).length === 0) {
+        return await this.findById(id);
       }
 
-      if (fields.length === 0) {
-        return this.findById(id);
-      }
-
-      fields.push('updated_at = CURRENT_TIMESTAMP');
-      values.push(id);
-
-      const query = `UPDATE matches SET ${fields.join(', ')} WHERE id = ?`;
-      this.db.prepare(query).run(...values);
-
-      return this.findById(id);
+      await this.Match.update(updateFields, { where: { id } });
+      return await this.findById(id);
     } catch (error) {
       throw new Error(`Error updating match: ${error.message}`);
     }
   }
 
   // Delete match
-  delete(id) {
+  async delete(id) {
     try {
-      const match = this.findById(id);
+      const match = await this.findById(id);
       if (!match) {
         throw new Error('Match not found');
       }
 
-      const query = 'DELETE FROM matches WHERE id = ?';
-      this.db.prepare(query).run(id);
-
+      await this.Match.destroy({ where: { id } });
       return true;
     } catch (error) {
       throw new Error(`Error deleting match: ${error.message}`);
@@ -191,29 +165,31 @@ class MatchRepository {
   }
 
   // Get matches by stadium
-  findByStadium(stadiumId) {
+  async findByStadium(stadiumId) {
     try {
-      const query = `
-        SELECT * FROM matches 
-        WHERE stadium_id = ? 
-        ORDER BY match_date ASC, match_time ASC
-      `;
-      const matches = this.db.prepare(query).all(stadiumId);
-      return matches.map(match => new Match(match));
+      const matches = await this.Match.findAll({
+        where: { stadiumId },
+        include: [{
+          model: this.Stadium,
+          as: 'stadium',
+          attributes: ['name', 'city', 'capacity']
+        }],
+        order: [['matchDate', 'ASC'], ['matchTime', 'ASC']]
+      });
+      return matches;
     } catch (error) {
       throw new Error(`Error fetching matches by stadium: ${error.message}`);
     }
   }
 
   // Get available tickets count for a match
-  getAvailableTicketsCount(matchId) {
+  async getAvailableTicketsCount(matchId) {
     try {
-      const query = `
-        SELECT COUNT(*) as count FROM tickets 
-        WHERE match_id = ? AND status = 'available'
-      `;
-      const result = this.db.prepare(query).get(matchId);
-      return result ? result.count : 0;
+      const Ticket = this.sequelize.models.Ticket;
+      const count = await Ticket.count({
+        where: { matchId, status: 'available' }
+      });
+      return count;
     } catch (error) {
       throw new Error(`Error fetching available tickets: ${error.message}`);
     }

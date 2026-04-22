@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 // Store connected users
 const connectedUsers = new Map();
 
-const setupWebSocket = (io, db) => {
+const setupWebSocket = (io, sequelize) => {
   // Middleware to authenticate socket connections
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
@@ -26,7 +26,7 @@ const setupWebSocket = (io, db) => {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     console.log(`🔌 User connected: ${socket.userId} (Socket: ${socket.id})`);
 
     // Store user connection
@@ -35,11 +35,18 @@ const setupWebSocket = (io, db) => {
       connectedAt: new Date().toISOString()
     });
 
-    // Get user info from database
-    const user = db.prepare('SELECT id, first_name, last_name, email FROM users WHERE id = ?').get(socket.userId);
-    if (user) {
-      socket.userName = `${user.first_name} ${user.last_name}`;
-      socket.userEmail = user.email;
+    // Get user info from database using Sequelize
+    try {
+      const User = sequelize.models.User;
+      const user = await User.findByPk(socket.userId, {
+        attributes: ['id', 'firstName', 'lastName', 'email']
+      });
+      if (user) {
+        socket.userName = `${user.firstName} ${user.lastName}`;
+        socket.userEmail = user.email;
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error.message);
     }
 
     // Join user to their own room
@@ -55,7 +62,7 @@ const setupWebSocket = (io, db) => {
     });
 
     // Handle chat messages
-    socket.on('send-message', (data) => {
+    socket.on('send-message', async (data) => {
       const { to, message, type = 'text' } = data;
       
       const messageData = {
@@ -69,21 +76,20 @@ const setupWebSocket = (io, db) => {
         status: 'delivered'
       };
 
-      // Save message to database
+      // Save message to database using Sequelize
       try {
-        db.prepare(`
-          INSERT INTO notifications (user_id, type, title, message, data, read, created_at)
-          VALUES (?, ?, ?, ?, ?, 0, ?)
-        `).run(
-          to,
-          'message',
-          `New message from ${socket.userName}`,
-          message,
-          JSON.stringify(messageData),
-          new Date().toISOString()
-        );
+        const Notification = sequelize.models.Notification;
+        await Notification.create({
+          userId: to,
+          type: 'message',
+          title: `New message from ${socket.userName}`,
+          message: message,
+          data: JSON.stringify(messageData),
+          read: false,
+          createdAt: new Date()
+        });
       } catch (error) {
-        console.error('Error saving message:', error);
+        console.error('Error saving message:', error.message);
       }
 
       // Send to recipient
@@ -111,14 +117,16 @@ const setupWebSocket = (io, db) => {
     });
 
     // Handle notification read
-    socket.on('mark-notification-read', (data) => {
+    socket.on('mark-notification-read', async (data) => {
       const { notificationId } = data;
       try {
-        db.prepare(`
-          UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?
-        `).run(notificationId, socket.userId);
+        const Notification = sequelize.models.Notification;
+        await Notification.update(
+          { read: true },
+          { where: { id: notificationId, userId: socket.userId } }
+        );
       } catch (error) {
-        console.error('Error marking notification as read:', error);
+        console.error('Error marking notification as read:', error.message);
       }
     });
 
@@ -133,28 +141,27 @@ const setupWebSocket = (io, db) => {
   });
 
   // Helper function to send notification to specific user
-  const notifyUser = (userId, notification) => {
+  const notifyUser = async (userId, notification) => {
     const notificationData = {
       ...notification,
       id: Date.now(),
       timestamp: new Date().toISOString()
     };
 
-    // Save to database
+    // Save to database using Sequelize
     try {
-      db.prepare(`
-        INSERT INTO notifications (user_id, type, title, message, data, read, created_at)
-        VALUES (?, ?, ?, ?, ?, 0, ?)
-      `).run(
-        userId,
-        notification.type,
-        notification.title,
-        notification.message,
-        JSON.stringify(notificationData),
-        new Date().toISOString()
-      );
+      const Notification = sequelize.models.Notification;
+      await Notification.create({
+        userId: userId,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: JSON.stringify(notificationData),
+        read: false,
+        createdAt: new Date()
+      });
     } catch (error) {
-      console.error('Error saving notification:', error);
+      console.error('Error saving notification:', error.message);
     }
 
     // Send real-time notification
@@ -162,18 +169,28 @@ const setupWebSocket = (io, db) => {
   };
 
   // Helper function to broadcast to all admins
-  const notifyAdmins = (notification) => {
-    // Get all admin users
-    const admins = db.prepare(`
-      SELECT u.id FROM users u
-      INNER JOIN user_roles ur ON u.id = ur.user_id
-      INNER JOIN roles r ON ur.role_id = r.id
-      WHERE r.name = 'admin' AND u.is_active = 1
-    `).all();
+  const notifyAdmins = async (notification) => {
+    // Get all admin users using Sequelize
+    try {
+      const User = sequelize.models.User;
+      const Role = sequelize.models.Role;
+      const UserRole = sequelize.models.UserRole;
+      
+      const admins = await User.findAll({
+        include: [{
+          model: Role,
+          through: UserRole,
+          where: { name: 'admin' }
+        }],
+        where: { isActive: true }
+      });
 
-    admins.forEach(admin => {
-      notifyUser(admin.id, notification);
-    });
+      for (const admin of admins) {
+        await notifyUser(admin.id, notification);
+      }
+    } catch (error) {
+      console.error('Error notifying admins:', error.message);
+    }
   };
 
   // Helper function to broadcast to all users
