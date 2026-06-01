@@ -52,9 +52,9 @@ class StadiumRepository {
         u1.first_name || ' ' || u1.last_name as created_by_name,
         u2.first_name || ' ' || u2.last_name as updated_by_name
       FROM stadiums s
-      ${whereClause}
       LEFT JOIN users u1 ON s.created_by = u1.id
       LEFT JOIN users u2 ON s.updated_by = u2.id
+      ${whereClause}
       ORDER BY s.created_at DESC
       LIMIT ? OFFSET ?
     `;

@@ -59,7 +59,8 @@ class AuthService {
         id: user.id,
         firstName: user.first_name,
         lastName: user.last_name,
-        email: user.email
+        email: user.email,
+        isActive: user.is_active
       },
       ...tokens
     };
@@ -73,19 +74,19 @@ class AuthService {
     }
 
     // Get user with password hash
-    const user = await this.authRepository.getUserByEmail(email);
+    const user = this.authRepository.getUserByEmail(email);
     if (!user) {
       throw new Error('Invalid credentials');
     }
 
     // Verify password
-    const isValid = require('bcryptjs').compareSync(password, user.passwordHash);
+    const isValid = require('bcryptjs').compareSync(password, user.password_hash);
     if (!isValid) {
       throw new Error('Invalid credentials');
     }
 
     // Check if user is active
-    if (!user.isActive) {
+    if (!user.is_active) {
       throw new Error('Account is deactivated');
     }
 
@@ -107,9 +108,10 @@ class AuthService {
     return {
       user: {
         id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        isActive: user.is_active
       },
       ...tokens
     };
@@ -171,8 +173,8 @@ class AuthService {
 
     return {
       id: user.id,
-      firstName: user.first_name || user.firstName,
-      lastName: user.last_name || user.lastName,
+      firstName: user.first_name,
+      lastName: user.last_name,
       email: user.email,
       roles: Array.isArray(roles) ? roles.map(r => r.name) : [],
       permissions: Array.isArray(permissions) ? permissions.map(p => p.name) : []
@@ -235,7 +237,7 @@ class AuthService {
     expiresAt.setDate(expiresAt.getDate() + this.refreshTokenExpiresIn);
 
     // Store refresh token in database
-    this.authRepository.createRefreshToken(userId, refreshTokenHash, expiresAt.toISOString());
+      this.authRepository.createRefreshToken(userId, refreshTokenHash, expiresAt.toISOString());
 
     return {
       accessToken,

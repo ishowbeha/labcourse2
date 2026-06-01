@@ -1,27 +1,25 @@
-const { User } = require('../models/mysql');
-
 class UserRepository {
-  constructor(sequelize) {
-    this.sequelize = sequelize;
+  constructor(db) {
+    this.db = db;
   }
 
-  async findAll() {
+  findAll() {
     try {
-      return User.findAll({
-        where: { isActive: true },
-        attributes: ['id', 'firstName', 'lastName', 'email', 'isActive', 'createdAt', 'updatedAt']
-      });
+      return this.db.prepare(`
+        SELECT id, first_name, last_name, email, is_active, created_at, updated_at
+        FROM users WHERE is_active = 1
+      `).all();
     } catch (error) {
       throw new Error(`Error fetching users: ${error.message}`);
     }
   }
 
-  async findById(id) {
+  findById(id) {
     try {
-      const user = await User.findOne({
-        where: { id, isActive: true },
-        attributes: ['id', 'firstName', 'lastName', 'email', 'isActive', 'createdAt', 'updatedAt']
-      });
+      const user = this.db.prepare(`
+        SELECT id, first_name, last_name, email, is_active, created_at, updated_at
+        FROM users WHERE id = ? AND is_active = 1
+      `).get(id);
       if (!user) {
         throw new Error('User not found');
       }
@@ -31,44 +29,50 @@ class UserRepository {
     }
   }
 
-  async findByEmail(email) {
+  findByEmail(email) {
     try {
-      return User.findOne({
-        where: { email, isActive: true }
-      });
+      return this.db.prepare(`
+        SELECT id, first_name, last_name, email, password_hash, is_active, created_at, updated_at
+        FROM users WHERE email = ? AND is_active = 1
+      `).get(email) || null;
     } catch (error) {
       throw new Error(`Error fetching user by email: ${error.message}`);
     }
   }
 
-  async create({ firstName, lastName, email, password }) {
+  create({ firstName, lastName, email, password }) {
     try {
-      const user = await User.create({
-        firstName,
-        lastName,
-        email,
-        passwordHash: password,
-        isActive: true
-      });
-      return this.findById(user.id);
+      const result = this.db.prepare(`
+        INSERT INTO users (first_name, last_name, email, password_hash, is_active, created_by, updated_by)
+        VALUES (?, ?, ?, ?, 1, 1, 1)
+      `).run(firstName, lastName, email, password);
+      
+      return this.findById(result.lastInsertRowid);
     } catch (error) {
       throw new Error(`Error creating user: ${error.message}`);
     }
   }
 
-  async update(id, { firstName, lastName, email, isActive }) {
+  update(id, { firstName, lastName, email, isActive }) {
     try {
-      const user = await User.findByPk(id);
+      const user = this.db.prepare('SELECT * FROM users WHERE id = ?').get(id);
       if (!user) {
         throw new Error('User not found');
       }
+
+      const fields = [];
+      const params = [];
       
-      await user.update({
-        firstName: firstName !== undefined ? firstName : user.firstName,
-        lastName: lastName !== undefined ? lastName : user.lastName,
-        email: email !== undefined ? email : user.email,
-        isActive: isActive !== undefined ? isActive : user.isActive
-      });
+      if (firstName !== undefined) { fields.push('first_name = ?'); params.push(firstName); }
+      if (lastName !== undefined) { fields.push('last_name = ?'); params.push(lastName); }
+      if (email !== undefined) { fields.push('email = ?'); params.push(email); }
+      if (isActive !== undefined) { fields.push('is_active = ?'); params.push(isActive); }
+      
+      if (fields.length > 0) {
+        fields.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(id);
+        this.db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+      }
       
       return this.findById(id);
     } catch (error) {
@@ -76,24 +80,24 @@ class UserRepository {
     }
   }
 
-  async delete(id) {
+  delete(id) {
     try {
-      const user = await User.findByPk(id);
+      const user = this.db.prepare('SELECT id FROM users WHERE id = ?').get(id);
       if (!user) {
         throw new Error('User not found');
       }
       
-      await user.update({ isActive: false });
+      this.db.prepare('UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
       return this.findById(id);
     } catch (error) {
       throw new Error(`Error deleting user: ${error.message}`);
     }
   }
 
-  async hardDelete(id) {
+  hardDelete(id) {
     try {
-      const deleted = await User.destroy({ where: { id } });
-      return deleted > 0;
+      const result = this.db.prepare('DELETE FROM users WHERE id = ?').run(id);
+      return result.changes > 0;
     } catch (error) {
       throw new Error(`Error hard deleting user: ${error.message}`);
     }

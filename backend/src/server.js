@@ -5,8 +5,8 @@ const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
-const { initializeMySQL, sequelize } = require('../config/mysql');
-const { defineAssociations } = require('./models/mysql');
+const DatabaseConfig = require('../config/database');
+const { sequelize } = require('../config/mysql');
 const connectMongoDB = require('../config/mongodb');
 const errorHandler = require('./middleware/errorHandler');
 const createAuthRoutes = require('./routes/authRoutes');
@@ -56,27 +56,30 @@ app.use((req, res, next) => {
 // Initialize databases and start server
 const startServer = async () => {
   try {
-    // Initialize MySQL as primary database
-    const mysqlConnected = await initializeMySQL();
-    if (!mysqlConnected) {
-      console.error('❌ Failed to initialize MySQL. Server cannot start.');
-      process.exit(1);
-    }
+    // Initialize SQLite as primary database
+    console.log('🗄️ Initializing SQLite database...');
+    const db = DatabaseConfig.init();
+    DatabaseConfig.runMigrations(db);
+    DatabaseConfig.seedData(db);
     
-    // Note: Model associations are already defined in connectMySQL
+    // Make db available to auth middleware via req.app.get('db')
+    app.set('db', db);
+    
+    console.log('✅ SQLite database initialized successfully');
     
     // Initialize MongoDB (for flexible data - logs, analytics)
     await connectMongoDB();
 
-    // Setup WebSocket handlers
+    // Setup WebSocket handlers (pass sequelize for model-based operations)
     setupWebSocket(io, sequelize);
 
-    // Routes
-    app.use('/api/auth', createAuthRoutes(sequelize));
-    app.use('/api/users', createUserRoutes(sequelize));
-    app.use('/api/matches', createMatchRoutes(sequelize));
-    app.use('/api/admin', createAdminRoutes(sequelize));
-    app.use('/api/stadiums', createStadiumRoutes(sequelize));
+    // Routes - pass the SQLite database instance
+    app.use('/api/auth', createAuthRoutes(db));
+    app.use('/api/users', createUserRoutes(db));
+    app.use('/api/matches', createMatchRoutes(db));
+    app.use('/api/admin', createAdminRoutes(db));
+    app.use('/api/stadiums', createStadiumRoutes(db));
+    // Football routes still need Sequelize for sync service
     app.use('/api/football', createFootballRoutes(sequelize));
 
     // Health check endpoint
@@ -86,11 +89,11 @@ const startServer = async () => {
         message: 'Server is running',
         timestamp: new Date().toISOString(),
         databases: {
-          mysql: 'Connected (primary)',
+          sqlite: 'Connected (primary)',
           mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Not connected'
         },
         websocket: 'Socket.IO enabled',
-        stack: 'MERN (MongoDB + Express + React + Node.js + MySQL)'
+        stack: 'Express + SQLite + React + Node.js'
       });
     });
 
@@ -101,7 +104,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 API available at http://localhost:${PORT}/api`);
       console.log(`💾 Databases:`);
-      console.log(`   - MySQL (primary, relational data)`);
+      console.log(`   - SQLite (primary, relational data)`);
       console.log(`   - MongoDB (flexible data, logs, analytics)`);
       console.log(`🔌 WebSocket: Socket.IO enabled at http://localhost:${PORT}`);
       console.log(`🔐 Auth endpoints:`);

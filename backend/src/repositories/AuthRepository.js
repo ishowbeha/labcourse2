@@ -1,177 +1,171 @@
 const bcrypt = require('bcryptjs');
-const { User, Role, Permission, UserRole, RolePermission, RefreshToken, AuditLog, sequelize } = require('../models/mysql');
+const crypto = require('crypto');
 
 class AuthRepository {
-  constructor(sequelize) {
-    this.sequelize = sequelize;
+  constructor(db) {
+    this.db = db;
   }
 
   // User management
-  async createUser({ firstName, lastName, email, password }) {
+  createUser({ firstName, lastName, email, password }) {
     const passwordHash = bcrypt.hashSync(password, 10);
-    const user = await User.create({
-      firstName,
-      lastName,
-      email,
-      passwordHash,
-      isActive: true
-    });
-    return this.getUserById(user.id);
-  }
-
-  async getUserById(id) {
-    return User.findOne({
-      where: { id, isActive: true },
-      attributes: ['id', 'firstName', 'lastName', 'email', 'isActive', 'createdAt', 'updatedAt']
-    });
-  }
-
-  async getUserByEmail(email) {
-    return User.findOne({
-      where: { email, isActive: true },
-      attributes: ['id', 'firstName', 'lastName', 'email', 'passwordHash', 'isActive', 'createdBy', 'updatedBy', 'createdAt', 'updatedAt']
-    });
-  }
-
-  async updateUser(id, data) {
-    const user = await User.findByPk(id);
-    if (!user) return null;
+    const result = this.db.prepare(`
+      INSERT INTO users (first_name, last_name, email, password_hash, is_active, created_by, updated_by)
+      VALUES (?, ?, ?, ?, 1, 1, 1)
+    `).run(firstName, lastName, email, passwordHash);
     
-    await user.update({
-      firstName: data.firstName || user.firstName,
-      lastName: data.lastName || user.lastName,
-      email: data.email || user.email
-    });
+    return this.getUserById(result.lastInsertRowid);
+  }
+
+  getUserById(id) {
+    const user = this.db.prepare(`
+      SELECT id, first_name, last_name, email, is_active, created_at, updated_at
+      FROM users WHERE id = ? AND is_active = 1
+    `).get(id);
+    return user || null;
+  }
+
+  getUserByEmail(email) {
+    const user = this.db.prepare(`
+      SELECT id, first_name, last_name, email, password_hash, is_active, created_by, updated_by, created_at, updated_at
+      FROM users WHERE email = ? AND is_active = 1
+    `).get(email);
+    return user || null;
+  }
+
+  updateUser(id, data) {
+    const fields = [];
+    const params = [];
     
+    if (data.firstName !== undefined) { fields.push('first_name = ?'); params.push(data.firstName); }
+    if (data.lastName !== undefined) { fields.push('last_name = ?'); params.push(data.lastName); }
+    if (data.email !== undefined) { fields.push('email = ?'); params.push(data.email); }
+    
+    if (fields.length === 0) return this.getUserById(id);
+    
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    params.push(id);
+    
+    this.db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params);
     return this.getUserById(id);
   }
 
   // Role management
-  async getRoles() {
-    return Role.findAll({ order: [['name', 'ASC']] });
+  getRoles() {
+    return this.db.prepare('SELECT * FROM roles ORDER BY name ASC').all();
   }
 
-  async getRoleById(id) {
-    return Role.findByPk(id);
+  getRoleById(id) {
+    return this.db.prepare('SELECT * FROM roles WHERE id = ?').get(id);
   }
 
-  async getRoleByName(name) {
-    return Role.findOne({ where: { name } });
+  getRoleByName(name) {
+    return this.db.prepare('SELECT * FROM roles WHERE name = ?').get(name);
   }
 
-  async assignRoleToUser(userId, roleId, assignedBy = 1) {
+  assignRoleToUser(userId, roleId, assignedBy = 1) {
     try {
-      await UserRole.findOrCreate({
-        where: { userId, roleId },
-        defaults: { assignedBy }
-      });
+      this.db.prepare(`
+        INSERT INTO user_roles (user_id, role_id, assigned_by)
+        VALUES (?, ?, ?)
+      `).run(userId, roleId, assignedBy);
       return true;
     } catch (error) {
-      if (error.name === 'SequelizeUniqueConstraintError') {
+      if (error.message.includes('UNIQUE constraint')) {
         return false; // Role already assigned
       }
       throw error;
     }
   }
 
-  async getUserRoles(userId) {
-    const user = await User.findByPk(userId, {
-      include: [{ model: Role }]
-    });
-    return user ? user.Roles : [];
+  getUserRoles(userId) {
+    return this.db.prepare(`
+      SELECT r.* FROM roles r
+      INNER JOIN user_roles ur ON r.id = ur.role_id
+      WHERE ur.user_id = ?
+    `).all(userId);
   }
 
   // Permission management
-  async getPermissions() {
-    return Permission.findAll({ order: [['resource', 'ASC'], ['action', 'ASC']] });
+  getPermissions() {
+    return this.db.prepare('SELECT * FROM permissions ORDER BY resource, action').all();
   }
 
-  async getPermissionByName(name) {
-    return Permission.findOne({ where: { name } });
+  getPermissionByName(name) {
+    return this.db.prepare('SELECT * FROM permissions WHERE name = ?').get(name);
   }
 
-  async getUserPermissions(userId) {
-    const user = await User.findByPk(userId, {
-      include: [{
-        model: Role,
-        include: [{ model: Permission }]
-      }]
-    });
-    
-    if (!user || !user.Roles) return [];
-    
-    const permissions = new Set();
-    user.Roles.forEach(role => {
-      if (role.Permissions) {
-        role.Permissions.forEach(perm => permissions.add(perm));
-      }
-    });
-    
-    return Array.from(permissions);
+  getUserPermissions(userId) {
+    return this.db.prepare(`
+      SELECT DISTINCT p.* FROM permissions p
+      INNER JOIN role_permissions rp ON p.id = rp.permission_id
+      INNER JOIN user_roles ur ON rp.role_id = ur.role_id
+      WHERE ur.user_id = ?
+    `).all(userId);
   }
 
-  async assignPermissionToRole(roleId, permissionId, grantedBy = 1) {
+  assignPermissionToRole(roleId, permissionId, grantedBy = 1) {
     try {
-      await RolePermission.findOrCreate({
-        where: { roleId, permissionId },
-        defaults: { grantedBy }
-      });
+      this.db.prepare(`
+        INSERT INTO role_permissions (role_id, permission_id, granted_by)
+        VALUES (?, ?, ?)
+      `).run(roleId, permissionId, grantedBy);
       return true;
     } catch (error) {
-      if (error.name === 'SequelizeUniqueConstraintError') {
-        return false; // Permission already assigned
+      if (error.message.includes('UNIQUE constraint')) {
+        return false;
       }
       throw error;
     }
   }
 
   // Refresh token management
-  async createRefreshToken(userId, tokenHash, expiresAt) {
-    const refreshToken = await RefreshToken.create({
-      userId,
-      tokenHash,
-      expiresAt
-    });
-    return refreshToken.id;
+  createRefreshToken(userId, tokenHash, expiresAt) {
+    const result = this.db.prepare(`
+      INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+      VALUES (?, ?, ?)
+    `).run(userId, tokenHash, expiresAt);
+    return result.lastInsertRowid;
   }
 
-  async getRefreshToken(tokenHash) {
-    return RefreshToken.findOne({
-      where: {
-        tokenHash,
-        revokedAt: null
-      }
-    });
+  getRefreshToken(tokenHash) {
+    return this.db.prepare(`
+      SELECT * FROM refresh_tokens 
+      WHERE token_hash = ? AND revoked_at IS NULL
+    `).get(tokenHash);
   }
 
-  async revokeRefreshToken(tokenHash) {
-    const result = await RefreshToken.update(
-      { revokedAt: new Date() },
-      { where: { tokenHash } }
-    );
-    return result[0] > 0;
+  revokeRefreshToken(tokenHash) {
+    const result = this.db.prepare(`
+      UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP 
+      WHERE token_hash = ?
+    `).run(tokenHash);
+    return result.changes > 0;
   }
 
-  async revokeAllUserRefreshTokens(userId) {
-    const result = await RefreshToken.update(
-      { revokedAt: new Date() },
-      { where: { userId, revokedAt: null } }
-    );
-    return result[0] > 0;
+  revokeAllUserRefreshTokens(userId) {
+    const result = this.db.prepare(`
+      UPDATE refresh_tokens SET revoked_at = CURRENT_TIMESTAMP 
+      WHERE user_id = ? AND revoked_at IS NULL
+    `).run(userId);
+    return result.changes > 0;
   }
 
   // Audit logging
-  async logAudit(userId, action, entity, entityId, oldValue, newValue, ipAddress, userAgent) {
-    await AuditLog.create({
-      userId,
+  logAudit(userId, action, entity, entityId, oldValue, newValue, ipAddress, userAgent) {
+    this.db.prepare(`
+      INSERT INTO audit_logs (user_id, action, entity, entity_id, old_value, new_value, ip_address, user_agent)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      userId || null,
       action,
       entity,
-      entityId,
-      oldValue,
-      newValue,
-      ipAddress,
-      userAgent
-    });
+      entityId || null,
+      oldValue ? JSON.stringify(oldValue) : null,
+      newValue ? JSON.stringify(newValue) : null,
+      ipAddress || null,
+      userAgent || null
+    );
     return true;
   }
 }
