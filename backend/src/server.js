@@ -5,8 +5,8 @@ const cookieParser = require('cookie-parser');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
-const { initializeMySQL, sequelize } = require('../config/mysql');
-const { defineAssociations } = require('./models/mysql');
+const DatabaseConfig = require('../config/database');
+const { sequelize } = require('../config/mysql');
 const connectMongoDB = require('../config/mongodb');
 const errorHandler = require('./middleware/errorHandler');
 const createAuthRoutes = require('./routes/authRoutes');
@@ -14,6 +14,7 @@ const createUserRoutes = require('./routes/userRoutes');
 const createMatchRoutes = require('./routes/matchRoutes');
 const createAdminRoutes = require('./routes/adminRoutes');
 const createStadiumRoutes = require('./routes/stadiumRoutes');
+const createFootballRoutes = require('./routes/footballRoutes');
 const { setupWebSocket } = require('./websocket/websocket');
 
 const app = express();
@@ -55,27 +56,31 @@ app.use((req, res, next) => {
 // Initialize databases and start server
 const startServer = async () => {
   try {
-    // Initialize MySQL as primary database
-    const mysqlConnected = await initializeMySQL();
-    if (!mysqlConnected) {
-      console.error('❌ Failed to initialize MySQL. Server cannot start.');
-      process.exit(1);
-    }
+    // Initialize SQLite as primary database
+    console.log('🗄️ Initializing SQLite database...');
+    const db = DatabaseConfig.init();
+    DatabaseConfig.runMigrations(db);
+    DatabaseConfig.seedData(db);
     
-    // Note: Model associations are already defined in connectMySQL
+    // Make db available to auth middleware via req.app.get('db')
+    app.set('db', db);
+    
+    console.log('✅ SQLite database initialized successfully');
     
     // Initialize MongoDB (for flexible data - logs, analytics)
     await connectMongoDB();
 
-    // Setup WebSocket handlers
+    // Setup WebSocket handlers (pass sequelize for model-based operations)
     setupWebSocket(io, sequelize);
 
-    // Routes
-    app.use('/api/auth', createAuthRoutes(sequelize));
-    app.use('/api/users', createUserRoutes(sequelize));
-    app.use('/api/matches', createMatchRoutes(sequelize));
-    app.use('/api/admin', createAdminRoutes(sequelize));
-    app.use('/api/stadiums', createStadiumRoutes(sequelize));
+    // Routes - pass the SQLite database instance
+    app.use('/api/auth', createAuthRoutes(db));
+    app.use('/api/users', createUserRoutes(db));
+    app.use('/api/matches', createMatchRoutes(db));
+    app.use('/api/admin', createAdminRoutes(db));
+    app.use('/api/stadiums', createStadiumRoutes(db));
+    // Football routes still need Sequelize for sync service
+    app.use('/api/football', createFootballRoutes(sequelize));
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {
@@ -84,11 +89,11 @@ const startServer = async () => {
         message: 'Server is running',
         timestamp: new Date().toISOString(),
         databases: {
-          mysql: 'Connected (primary)',
+          sqlite: 'Connected (primary)',
           mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Not connected'
         },
         websocket: 'Socket.IO enabled',
-        stack: 'MERN (MongoDB + Express + React + Node.js + MySQL)'
+        stack: 'Express + SQLite + React + Node.js'
       });
     });
 
@@ -99,7 +104,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 API available at http://localhost:${PORT}/api`);
       console.log(`💾 Databases:`);
-      console.log(`   - MySQL (primary, relational data)`);
+      console.log(`   - SQLite (primary, relational data)`);
       console.log(`   - MongoDB (flexible data, logs, analytics)`);
       console.log(`🔌 WebSocket: Socket.IO enabled at http://localhost:${PORT}`);
       console.log(`🔐 Auth endpoints:`);
@@ -116,9 +121,21 @@ const startServer = async () => {
       console.log(`   POST /api/stadiums - Create stadium`);
       console.log(`   PUT /api/stadiums/:id - Update stadium`);
       console.log(`   DELETE /api/stadiums/:id - Delete stadium`);
-      console.log(`   POST /api/stadiums/:stadiumId/sections - Create section`);
-      console.log(`   PUT /api/stadiums/:stadiumId/sections/:sectionId - Update section`);
-      console.log(`   DELETE /api/stadiums/:stadiumId/sections/:sectionId - Delete section`);
+    console.log(`   POST /api/stadiums/:stadiumId/sections - Create section`);
+    console.log(`   PUT /api/stadiums/:stadiumId/sections/:sectionId - Update section`);
+    console.log(`   DELETE /api/stadiums/:stadiumId/sections/:sectionId - Delete section`);
+    console.log(`⚽ Football API endpoints (powered by API-Football):`);
+    console.log(`   GET /api/football/upcoming - Upcoming matches (Albania, Kosovo, Europe)`);
+    console.log(`   GET /api/football/live - Live matches`);
+    console.log(`   GET /api/football/team/:name - Search matches by team`);
+    console.log(`   GET /api/football/league/:id - Matches by league ID`);
+    console.log(`   GET /api/football/leagues - Available league IDs`);
+    console.log(`   POST /api/football/sync - Sync API matches into local database`);
+    if (!process.env.API_FOOTBALL_KEY) {
+      console.log(`   ⚠️  Set API_FOOTBALL_KEY in .env to enable (free at api-football.com)`);
+    } else {
+      console.log(`   ✅ API-Football is configured with key (${process.env.API_FOOTBALL_KEY.substring(0, 8)}...)`);
+    }
       console.log(`💡 Visit http://localhost:${PORT}/api/health to check status`);
     });
   } catch (error) {
