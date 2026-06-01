@@ -14,6 +14,7 @@ const createUserRoutes = require('./routes/userRoutes');
 const createMatchRoutes = require('./routes/matchRoutes');
 const createAdminRoutes = require('./routes/adminRoutes');
 const createStadiumRoutes = require('./routes/stadiumRoutes');
+const createFootballRoutes = require('./routes/footballRoutes');
 const { setupWebSocket } = require('./websocket/websocket');
 
 const app = express();
@@ -76,6 +77,7 @@ const startServer = async () => {
     app.use('/api/matches', createMatchRoutes(sequelize));
     app.use('/api/admin', createAdminRoutes(sequelize));
     app.use('/api/stadiums', createStadiumRoutes(sequelize));
+    app.use('/api/football', createFootballRoutes(sequelize));
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {
@@ -116,9 +118,21 @@ const startServer = async () => {
       console.log(`   POST /api/stadiums - Create stadium`);
       console.log(`   PUT /api/stadiums/:id - Update stadium`);
       console.log(`   DELETE /api/stadiums/:id - Delete stadium`);
-      console.log(`   POST /api/stadiums/:stadiumId/sections - Create section`);
-      console.log(`   PUT /api/stadiums/:stadiumId/sections/:sectionId - Update section`);
-      console.log(`   DELETE /api/stadiums/:stadiumId/sections/:sectionId - Delete section`);
+    console.log(`   POST /api/stadiums/:stadiumId/sections - Create section`);
+    console.log(`   PUT /api/stadiums/:stadiumId/sections/:sectionId - Update section`);
+    console.log(`   DELETE /api/stadiums/:stadiumId/sections/:sectionId - Delete section`);
+    console.log(`⚽ Football API endpoints (powered by API-Football):`);
+    console.log(`   GET /api/football/upcoming - Upcoming matches (Albania, Kosovo, Europe)`);
+    console.log(`   GET /api/football/live - Live matches`);
+    console.log(`   GET /api/football/team/:name - Search matches by team`);
+    console.log(`   GET /api/football/league/:id - Matches by league ID`);
+    console.log(`   GET /api/football/leagues - Available league IDs`);
+    console.log(`   POST /api/football/sync - Sync API matches into local database`);
+    if (!process.env.API_FOOTBALL_KEY) {
+      console.log(`   ⚠️  Set API_FOOTBALL_KEY in .env to enable (free at api-football.com)`);
+    } else {
+      console.log(`   ✅ API-Football is configured with key (${process.env.API_FOOTBALL_KEY.substring(0, 8)}...)`);
+    }
       console.log(`💡 Visit http://localhost:${PORT}/api/health to check status`);
     });
   } catch (error) {

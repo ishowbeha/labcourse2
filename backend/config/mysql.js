@@ -168,20 +168,53 @@ const initializeMySQL = async () => {
       updatedBy: adminUserId
     })));
 
-    // Create matches for 2026
+    // Create matches for 2026 (all dates after June 1, 2026 when seasons make sense)
+    // Summer: International friendlies, Euro/World Cup qualifiers
+    // Fall: UEFA Nations League, domestic seasons start
     const matches = [
-      ['Albania', 'Kosova', 1, '2026-04-11', '20:45', 'Friendly Match', 'International Friendly', 30],
-      ['Kosova', 'Albania', 2, '2026-04-18', '20:45', 'Friendly Match', 'International Friendly', 25],
-      ['Albania', 'Serbia', 1, '2026-04-25', '20:45', 'UEFA Nations League', 'Group Stage', 35],
-      ['Kosova', 'North Macedonia', 2, '2026-05-02', '18:00', 'UEFA Nations League', 'Group Stage', 20],
-      ['Albania', 'Montenegro', 1, '2026-05-09', '20:45', 'UEFA Nations League', 'Group Stage', 28],
-      ['Kosova', 'Bosnia', 2, '2026-05-16', '20:45', 'Friendly Match', 'International Friendly', 22],
-      ['Albania', 'Greece', 1, '2026-05-23', '20:45', 'Euro 2028 Qualifiers', 'Group Stage', 40],
-      ['Kosova', 'Turkey', 2, '2026-05-30', '20:45', 'Euro 2028 Qualifiers', 'Group Stage', 35],
-      ['Tirana', 'Partizani', 4, '2026-06-06', '18:00', 'Kategoria Superiore', 'Tirana Derby', 15],
-      ['Skënderbeu', 'Vllaznia', 7, '2026-06-13', '19:30', 'Kategoria Superiore', 'Top of the Table', 12],
-      ['Prishtina', 'Drita', 2, '2026-06-20', '20:00', 'Football Superleague of Kosova', 'Title Race', 18],
-      ['Albania U21', 'Kosova U21', 3, '2026-06-27', '17:00', 'U21 Championship', 'Youth Derby', 10]
+      // Summer International Friendlies (June-July)
+      ['Albania', 'Kosova', 1, '2026-06-12', '20:45', 'Friendly Match', 'International Friendly', 30],
+      ['Kosova', 'Albania', 2, '2026-06-19', '20:45', 'Friendly Match', 'International Friendly', 25],
+      ['Albania', 'Serbia', 1, '2026-06-26', '20:45', 'Friendly Match', 'International Friendly', 35],
+      
+      // Euro 2028 Qualifiers (start September - realistic)
+      ['Albania', 'Greece', 1, '2026-09-04', '20:45', 'Euro 2028 Qualifiers', 'Matchday 1', 40],
+      ['Kosova', 'Turkey', 2, '2026-09-05', '20:45', 'Euro 2028 Qualifiers', 'Matchday 1', 35],
+      ['Albania', 'Montenegro', 1, '2026-09-07', '20:45', 'Euro 2028 Qualifiers', 'Matchday 2', 28],
+      ['Kosova', 'North Macedonia', 2, '2026-09-08', '18:00', 'Euro 2028 Qualifiers', 'Matchday 2', 20],
+      
+      // UEFA Nations League (October-November)
+      ['Albania', 'Czech Republic', 1, '2026-10-10', '20:45', 'UEFA Nations League', 'Group Stage', 35],
+      ['Kosova', 'Bosnia', 2, '2026-10-11', '20:45', 'UEFA Nations League', 'Group Stage', 22],
+      ['Albania', 'Iceland', 1, '2026-10-14', '20:45', 'UEFA Nations League', 'Group Stage', 28],
+      ['Kosova', 'Slovenia', 2, '2026-10-15', '18:00', 'UEFA Nations League', 'Group Stage', 20],
+      
+      // Euro 2028 Qualifiers (November)
+      ['Albania', 'Wales', 1, '2026-11-14', '20:45', 'Euro 2028 Qualifiers', 'Matchday 5', 45],
+      ['Kosova', 'Sweden', 2, '2026-11-15', '20:45', 'Euro 2028 Qualifiers', 'Matchday 5', 38],
+
+      // Domestic league pre-season (August-September) + regular season
+      // Kategoria Superiore (Albanian league - starts late August)
+      ['Tirana', 'Partizani', 4, '2026-08-22', '18:00', 'Kategoria Superiore', 'Matchday 1', 15],
+      ['Skënderbeu', 'Tirana', 7, '2026-08-29', '19:30', 'Kategoria Superiore', 'Matchday 2', 12],
+      ['Partizani', 'Vllaznia', 6, '2026-09-12', '18:00', 'Kategoria Superiore', 'Matchday 3', 10],
+      ['Tirana', 'Skënderbeu', 4, '2026-09-19', '20:00', 'Kategoria Superiore', 'Matchday 4', 18],
+      ['Vllaznia', 'Partizani', 4, '2026-09-26', '18:00', 'Kategoria Superiore', 'Matchday 5', 12],
+      ['Tirana', 'Vllaznia', 4, '2026-10-17', '18:00', 'Kategoria Superiore', 'Matchday 6', 14],
+      ['Partizani', 'Skënderbeu', 6, '2026-10-24', '19:30', 'Kategoria Superiore', 'Matchday 7', 11],
+      
+      // Football Superleague of Kosova (starts late August)
+      ['Prishtina', 'Drita', 2, '2026-08-23', '20:00', 'Football Superleague of Kosova', 'Matchday 1', 18],
+      ['Balkan', 'Prishtina', 2, '2026-08-30', '18:00', 'Football Superleague of Kosova', 'Matchday 2', 15],
+      ['Drita', 'Gjilani', 2, '2026-09-13', '20:00', 'Football Superleague of Kosova', 'Matchday 3', 14],
+      ['Prishtina', 'Balkan', 2, '2026-09-20', '18:00', 'Football Superleague of Kosova', 'Matchday 4', 20],
+      ['Drita', 'Prishtina', 2, '2026-09-27', '20:00', 'Football Superleague of Kosova', 'Matchday 5', 18],
+      ['Gjilani', 'Balkan', 2, '2026-10-18', '18:00', 'Football Superleague of Kosova', 'Matchday 6', 12],
+      ['Prishtina', 'Gjilani', 2, '2026-10-25', '20:00', 'Football Superleague of Kosova', 'Matchday 7', 16],
+      
+      // U21 Championship
+      ['Albania U21', 'Kosova U21', 3, '2026-09-11', '17:00', 'U21 Championship', 'Group Stage', 10],
+      ['Kosova U21', 'Albania U21', 3, '2026-10-09', '17:00', 'U21 Championship', 'Group Stage', 10]
     ];
 
     await Match.bulkCreate(matches.map(match => ({
