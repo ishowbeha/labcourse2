@@ -1,74 +1,65 @@
-const { Op } = require('sequelize');
-const Match = require('../models/Match');
-
 class MatchRepository {
-  constructor(sequelize) {
-    this.sequelize = sequelize;
-    this.Match = sequelize.models.Match;
-    this.Stadium = sequelize.models.Stadium;
+  constructor(db) {
+    this.db = db;
   }
 
   // Get all matches with optional filters
-  async findAll(filters = {}) {
+  findAll(filters = {}) {
     try {
-      const where = {};
-      
+      let whereClause = 'WHERE 1=1';
+      const params = [];
+
       // Filter by status
       if (filters.status) {
-        where.status = filters.status;
+        whereClause += ' AND m.status = ?';
+        params.push(filters.status);
       }
 
       // Filter by competition
       if (filters.competition) {
-        where.competition = filters.competition;
+        whereClause += ' AND m.competition = ?';
+        params.push(filters.competition);
       }
 
       // Filter by date range
       if (filters.startDate) {
-        where.matchDate = { [Op.gte]: filters.startDate };
+        whereClause += ' AND m.match_date >= ?';
+        params.push(filters.startDate);
       }
 
       if (filters.endDate) {
-        if (where.matchDate) {
-          where.matchDate[Op.lte] = filters.endDate;
-        } else {
-          where.matchDate = { [Op.lte]: filters.endDate };
-        }
+        whereClause += ' AND m.match_date <= ?';
+        params.push(filters.endDate);
       }
 
       // Filter by team (home or away)
       if (filters.team) {
-        where[Op.or] = [
-          { homeTeam: { [Op.like]: `%${filters.team}%` } },
-          { awayTeam: { [Op.like]: `%${filters.team}%` } }
-        ];
+        whereClause += ' AND (m.home_team LIKE ? OR m.away_team LIKE ?)';
+        const searchParam = `%${filters.team}%`;
+        params.push(searchParam, searchParam);
       }
 
       // Only upcoming matches by default
       if (!filters.includePast) {
         const now = new Date();
         const today = now.toISOString().split('T')[0];
-        const currentTime = now.toTimeString().split(' ')[0];
+        const currentTime = now.toTimeString().split(' ')[0].substring(0, 5);
         
-        where[Op.or] = [
-          { matchDate: { [Op.gt]: today } },
-          {
-            [Op.and]: [
-              { matchDate: today },
-              { matchTime: { [Op.gte]: currentTime } }
-            ]
-          }
-        ];
+        whereClause += ' AND (m.match_date > ? OR (m.match_date = ? AND m.match_time >= ?))';
+        params.push(today, today, currentTime);
       }
 
-      const matches = await this.Match.findAll({
-        where,
-        include: [{
-          model: this.Stadium,
-          attributes: ['name', 'city', 'capacity']
-        }],
-        order: [['matchDate', 'ASC'], ['matchTime', 'ASC']]
-      });
+      const matches = this.db.prepare(`
+        SELECT 
+          m.*,
+          s.name as stadium_name,
+          s.city as stadium_city,
+          s.capacity as stadium_capacity
+        FROM matches m
+        LEFT JOIN stadiums s ON m.stadium_id = s.id
+        ${whereClause}
+        ORDER BY m.match_date ASC, m.match_time ASC
+      `).all(...params);
 
       return matches;
     } catch (error) {
@@ -77,20 +68,23 @@ class MatchRepository {
   }
 
   // Get match by ID
-  async findById(id) {
+  findById(id) {
     try {
-      const match = await this.Match.findByPk(id, {
-        include: [{
-          model: this.Stadium,
-          as: 'stadium',
-          attributes: ['name', 'city', 'capacity']
-        }]
-      });
-      
+      const match = this.db.prepare(`
+        SELECT 
+          m.*,
+          s.name as stadium_name,
+          s.city as stadium_city,
+          s.capacity as stadium_capacity
+        FROM matches m
+        LEFT JOIN stadiums s ON m.stadium_id = s.id
+        WHERE m.id = ?
+      `).get(id);
+
       if (!match) {
         throw new Error('Match not found');
       }
-      
+
       return match;
     } catch (error) {
       if (error.message === 'Match not found') {
@@ -101,63 +95,64 @@ class MatchRepository {
   }
 
   // Create new match
-  async create(matchData) {
+  create(matchData) {
     try {
-      const match = await this.Match.create({
-        homeTeam: matchData.homeTeam,
-        awayTeam: matchData.awayTeam,
-        stadiumId: matchData.stadiumId,
-        matchDate: matchData.matchDate,
-        matchTime: matchData.matchTime,
-        competition: matchData.competition || 'Friendly',
-        round: matchData.round || 'Group Stage',
-        basePrice: matchData.basePrice,
-        status: 'scheduled',
-        createdBy: 1,
-        updatedBy: 1
-      });
-      
-      return await this.findById(match.id);
+      const result = this.db.prepare(`
+        INSERT INTO matches (home_team, away_team, stadium_id, match_date, match_time, competition, round, base_price, status, created_by, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 1, 1)
+      `).run(
+        matchData.homeTeam,
+        matchData.awayTeam,
+        matchData.stadiumId,
+        matchData.matchDate,
+        matchData.matchTime,
+        matchData.competition || 'Friendly',
+        matchData.round || 'Group Stage',
+        matchData.basePrice
+      );
+
+      return this.findById(result.lastInsertRowid);
     } catch (error) {
       throw new Error(`Error creating match: ${error.message}`);
     }
   }
 
   // Update match
-  async update(id, updateData) {
+  update(id, updateData) {
     try {
-      const updateFields = {};
-      
-      if (updateData.homeTeam !== undefined) updateFields.homeTeam = updateData.homeTeam;
-      if (updateData.awayTeam !== undefined) updateFields.awayTeam = updateData.awayTeam;
-      if (updateData.stadiumId !== undefined) updateFields.stadiumId = updateData.stadiumId;
-      if (updateData.matchDate !== undefined) updateFields.matchDate = updateData.matchDate;
-      if (updateData.matchTime !== undefined) updateFields.matchTime = updateData.matchTime;
-      if (updateData.competition !== undefined) updateFields.competition = updateData.competition;
-      if (updateData.status !== undefined) updateFields.status = updateData.status;
-      if (updateData.homeScore !== undefined) updateFields.homeScore = updateData.homeScore;
-      if (updateData.awayScore !== undefined) updateFields.awayScore = updateData.awayScore;
+      const fields = [];
+      const params = [];
 
-      if (Object.keys(updateFields).length === 0) {
-        return await this.findById(id);
+      if (updateData.homeTeam !== undefined) { fields.push('home_team = ?'); params.push(updateData.homeTeam); }
+      if (updateData.awayTeam !== undefined) { fields.push('away_team = ?'); params.push(updateData.awayTeam); }
+      if (updateData.stadiumId !== undefined) { fields.push('stadium_id = ?'); params.push(updateData.stadiumId); }
+      if (updateData.matchDate !== undefined) { fields.push('match_date = ?'); params.push(updateData.matchDate); }
+      if (updateData.matchTime !== undefined) { fields.push('match_time = ?'); params.push(updateData.matchTime); }
+      if (updateData.competition !== undefined) { fields.push('competition = ?'); params.push(updateData.competition); }
+      if (updateData.status !== undefined) { fields.push('status = ?'); params.push(updateData.status); }
+      if (updateData.homeScore !== undefined) { fields.push('home_score = ?'); params.push(updateData.homeScore); }
+      if (updateData.awayScore !== undefined) { fields.push('away_score = ?'); params.push(updateData.awayScore); }
+      if (updateData.round !== undefined) { fields.push('round = ?'); params.push(updateData.round); }
+
+      if (fields.length === 0) {
+        return this.findById(id);
       }
 
-      await this.Match.update(updateFields, { where: { id } });
-      return await this.findById(id);
+      fields.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(id);
+
+      this.db.prepare(`UPDATE matches SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+      return this.findById(id);
     } catch (error) {
       throw new Error(`Error updating match: ${error.message}`);
     }
   }
 
   // Delete match
-  async delete(id) {
+  delete(id) {
     try {
-      const match = await this.findById(id);
-      if (!match) {
-        throw new Error('Match not found');
-      }
-
-      await this.Match.destroy({ where: { id } });
+      const match = this.findById(id);
+      this.db.prepare('DELETE FROM matches WHERE id = ?').run(id);
       return true;
     } catch (error) {
       throw new Error(`Error deleting match: ${error.message}`);
@@ -165,31 +160,32 @@ class MatchRepository {
   }
 
   // Get matches by stadium
-  async findByStadium(stadiumId) {
+  findByStadium(stadiumId) {
     try {
-      const matches = await this.Match.findAll({
-        where: { stadiumId },
-        include: [{
-          model: this.Stadium,
-          as: 'stadium',
-          attributes: ['name', 'city', 'capacity']
-        }],
-        order: [['matchDate', 'ASC'], ['matchTime', 'ASC']]
-      });
-      return matches;
+      return this.db.prepare(`
+        SELECT 
+          m.*,
+          s.name as stadium_name,
+          s.city as stadium_city,
+          s.capacity as stadium_capacity
+        FROM matches m
+        LEFT JOIN stadiums s ON m.stadium_id = s.id
+        WHERE m.stadium_id = ?
+        ORDER BY m.match_date ASC, m.match_time ASC
+      `).all(stadiumId);
     } catch (error) {
       throw new Error(`Error fetching matches by stadium: ${error.message}`);
     }
   }
 
   // Get available tickets count for a match
-  async getAvailableTicketsCount(matchId) {
+  getAvailableTicketsCount(matchId) {
     try {
-      const Ticket = this.sequelize.models.Ticket;
-      const count = await Ticket.count({
-        where: { matchId, status: 'available' }
-      });
-      return count;
+      const result = this.db.prepare(`
+        SELECT COUNT(*) as count FROM tickets 
+        WHERE match_id = ? AND status = 'available'
+      `).get(matchId);
+      return result.count;
     } catch (error) {
       throw new Error(`Error fetching available tickets: ${error.message}`);
     }
