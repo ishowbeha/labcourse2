@@ -58,13 +58,13 @@ const requireRole = (roles) => {
   return async (req, res, next) => {
     try {
       const userId = req.user.userId;
-      const db = req.app.get('db');
+      const pool = req.app.get('pool');
       
       console.log('requireRole: Checking roles for userId:', userId);
       console.log('requireRole: Required roles:', roles);
       
-      if (!db) {
-        console.error('requireRole: Database not available on req.app');
+      if (!pool) {
+        console.error('requireRole: Database pool not available on req.app');
         return res.status(500).json({
           success: false,
           message: 'Database not available'
@@ -72,11 +72,11 @@ const requireRole = (roles) => {
       }
       
       // Get user roles from database
-      const userRoles = db.prepare(`
+      const [userRoles] = await pool.query(`
         SELECT r.name FROM roles r
         INNER JOIN user_roles ur ON r.id = ur.role_id
         WHERE ur.user_id = ?
-      `).all(userId);
+      `, [userId]);
 
       const roleNames = userRoles.map(r => r.name);
       console.log('requireRole: User roles:', roleNames);
@@ -108,15 +108,15 @@ const requirePermission = (permission) => {
   return async (req, res, next) => {
     try {
       const userId = req.user.userId;
-      const db = req.app.get('db');
+      const pool = req.app.get('pool');
       
       // Get user permissions from database
-      const userPermissions = db.prepare(`
+      const [userPermissions] = await pool.query(`
         SELECT DISTINCT p.name FROM permissions p
         INNER JOIN role_permissions rp ON p.id = rp.permission_id
         INNER JOIN user_roles ur ON rp.role_id = ur.role_id
         WHERE ur.user_id = ?
-      `).all(userId);
+      `, [userId]);
 
       const permissionNames = userPermissions.map(p => p.name);
       

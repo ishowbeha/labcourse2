@@ -56,16 +56,14 @@ app.use((req, res, next) => {
 // Initialize databases and start server
 const startServer = async () => {
   try {
-    // Initialize SQLite as primary database
-    console.log('🗄️ Initializing SQLite database...');
-    const db = DatabaseConfig.init();
-    DatabaseConfig.runMigrations(db);
-    DatabaseConfig.seedData(db);
+    // Initialize MySQL pool (primary database via Laragon)
+    console.log('🗄️ Initializing MySQL database pool...');
+    const pool = await DatabaseConfig.createPool();
     
-    // Make db available to auth middleware via req.app.get('db')
-    app.set('db', db);
+    // Make pool available to routes via req.app.get('pool')
+    app.set('pool', pool);
     
-    console.log('✅ SQLite database initialized successfully');
+    console.log('✅ MySQL pool initialized successfully');
     
     // Initialize MongoDB (for flexible data - logs, analytics)
     await connectMongoDB();
@@ -73,12 +71,12 @@ const startServer = async () => {
     // Setup WebSocket handlers (pass sequelize for model-based operations)
     setupWebSocket(io, sequelize);
 
-    // Routes - pass the SQLite database instance
-    app.use('/api/auth', createAuthRoutes(db));
-    app.use('/api/users', createUserRoutes(db));
-    app.use('/api/matches', createMatchRoutes(db));
-    app.use('/api/admin', createAdminRoutes(db));
-    app.use('/api/stadiums', createStadiumRoutes(db));
+    // Routes - pass the MySQL pool
+    app.use('/api/auth', createAuthRoutes(pool));
+    app.use('/api/users', createUserRoutes(pool));
+    app.use('/api/matches', createMatchRoutes(pool));
+    app.use('/api/admin', createAdminRoutes(pool));
+    app.use('/api/stadiums', createStadiumRoutes(pool));
     // Football routes still need Sequelize for sync service
     app.use('/api/football', createFootballRoutes(sequelize));
 
@@ -89,11 +87,11 @@ const startServer = async () => {
         message: 'Server is running',
         timestamp: new Date().toISOString(),
         databases: {
-          sqlite: 'Connected (primary)',
+          mysql: 'Connected (primary via Laragon)',
           mongodb: mongoose.connection.readyState === 1 ? 'Connected' : 'Not connected'
         },
         websocket: 'Socket.IO enabled',
-        stack: 'Express + SQLite + React + Node.js'
+        stack: 'Express + MySQL + React + Node.js'
       });
     });
 
@@ -104,7 +102,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📡 API available at http://localhost:${PORT}/api`);
       console.log(`💾 Databases:`);
-      console.log(`   - SQLite (primary, relational data)`);
+      console.log(`   - MySQL (primary, relational data via Laragon)`);
       console.log(`   - MongoDB (flexible data, logs, analytics)`);
       console.log(`🔌 WebSocket: Socket.IO enabled at http://localhost:${PORT}`);
       console.log(`🔐 Auth endpoints:`);

@@ -1,10 +1,10 @@
 class MatchRepository {
-  constructor(db) {
-    this.db = db;
+  constructor(pool) {
+    this.pool = pool;
   }
 
   // Get all matches with optional filters
-  findAll(filters = {}) {
+  async findAll(filters = {}) {
     try {
       let whereClause = 'WHERE 1=1';
       const params = [];
@@ -44,12 +44,12 @@ class MatchRepository {
         const now = new Date();
         const today = now.toISOString().split('T')[0];
         const currentTime = now.toTimeString().split(' ')[0].substring(0, 5);
-        
+
         whereClause += ' AND (m.match_date > ? OR (m.match_date = ? AND m.match_time >= ?))';
         params.push(today, today, currentTime);
       }
 
-      const matches = this.db.prepare(`
+      const [rows] = await this.pool.query(`
         SELECT 
           m.*,
           s.name as stadium_name,
@@ -59,18 +59,18 @@ class MatchRepository {
         LEFT JOIN stadiums s ON m.stadium_id = s.id
         ${whereClause}
         ORDER BY m.match_date ASC, m.match_time ASC
-      `).all(...params);
+      `, params);
 
-      return matches;
+      return rows;
     } catch (error) {
       throw new Error(`Error fetching matches: ${error.message}`);
     }
   }
 
   // Get match by ID
-  findById(id) {
+  async findById(id) {
     try {
-      const match = this.db.prepare(`
+      const [rows] = await this.pool.query(`
         SELECT 
           m.*,
           s.name as stadium_name,
@@ -79,13 +79,13 @@ class MatchRepository {
         FROM matches m
         LEFT JOIN stadiums s ON m.stadium_id = s.id
         WHERE m.id = ?
-      `).get(id);
+      `, [id]);
 
-      if (!match) {
+      if (rows.length === 0) {
         throw new Error('Match not found');
       }
 
-      return match;
+      return rows[0];
     } catch (error) {
       if (error.message === 'Match not found') {
         throw error;
@@ -95,30 +95,31 @@ class MatchRepository {
   }
 
   // Create new match
-  create(matchData) {
+  async create(matchData) {
     try {
-      const result = this.db.prepare(`
-        INSERT INTO matches (home_team, away_team, stadium_id, match_date, match_time, competition, round, base_price, status, created_by, updated_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 1, 1)
-      `).run(
-        matchData.homeTeam,
-        matchData.awayTeam,
-        matchData.stadiumId,
-        matchData.matchDate,
-        matchData.matchTime,
-        matchData.competition || 'Friendly',
-        matchData.round || 'Group Stage',
-        matchData.basePrice
+      const [result] = await this.pool.query(
+        `INSERT INTO matches (home_team, away_team, stadium_id, match_date, match_time, competition, round, base_price, status, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', 1, 1)`,
+        [
+          matchData.homeTeam,
+          matchData.awayTeam,
+          matchData.stadiumId,
+          matchData.matchDate,
+          matchData.matchTime,
+          matchData.competition || 'Friendly',
+          matchData.round || 'Group Stage',
+          matchData.basePrice
+        ]
       );
 
-      return this.findById(result.lastInsertRowid);
+      return this.findById(result.insertId);
     } catch (error) {
       throw new Error(`Error creating match: ${error.message}`);
     }
   }
 
   // Update match
-  update(id, updateData) {
+  async update(id, updateData) {
     try {
       const fields = [];
       const params = [];
@@ -138,10 +139,10 @@ class MatchRepository {
         return this.findById(id);
       }
 
-      fields.push('updated_at = CURRENT_TIMESTAMP');
+      fields.push('updated_at = NOW()');
       params.push(id);
 
-      this.db.prepare(`UPDATE matches SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+      await this.pool.query(`UPDATE matches SET ${fields.join(', ')} WHERE id = ?`, params);
       return this.findById(id);
     } catch (error) {
       throw new Error(`Error updating match: ${error.message}`);
@@ -149,10 +150,10 @@ class MatchRepository {
   }
 
   // Delete match
-  delete(id) {
+  async delete(id) {
     try {
-      const match = this.findById(id);
-      this.db.prepare('DELETE FROM matches WHERE id = ?').run(id);
+      await this.findById(id);
+      await this.pool.query('DELETE FROM matches WHERE id = ?', [id]);
       return true;
     } catch (error) {
       throw new Error(`Error deleting match: ${error.message}`);
@@ -160,9 +161,9 @@ class MatchRepository {
   }
 
   // Get matches by stadium
-  findByStadium(stadiumId) {
+  async findByStadium(stadiumId) {
     try {
-      return this.db.prepare(`
+      const [rows] = await this.pool.query(`
         SELECT 
           m.*,
           s.name as stadium_name,
@@ -172,20 +173,21 @@ class MatchRepository {
         LEFT JOIN stadiums s ON m.stadium_id = s.id
         WHERE m.stadium_id = ?
         ORDER BY m.match_date ASC, m.match_time ASC
-      `).all(stadiumId);
+      `, [stadiumId]);
+      return rows;
     } catch (error) {
       throw new Error(`Error fetching matches by stadium: ${error.message}`);
     }
   }
 
   // Get available tickets count for a match
-  getAvailableTicketsCount(matchId) {
+  async getAvailableTicketsCount(matchId) {
     try {
-      const result = this.db.prepare(`
-        SELECT COUNT(*) as count FROM tickets 
-        WHERE match_id = ? AND status = 'available'
-      `).get(matchId);
-      return result.count;
+      const [rows] = await this.pool.query(
+        "SELECT COUNT(*) as count FROM tickets WHERE match_id = ? AND status = 'available'",
+        [matchId]
+      );
+      return rows[0].count;
     } catch (error) {
       throw new Error(`Error fetching available tickets: ${error.message}`);
     }

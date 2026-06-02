@@ -1,44 +1,41 @@
 class AdminRepository {
-  constructor(db) {
-    this.db = db;
+  constructor(pool) {
+    this.pool = pool;
   }
 
   // Dashboard Statistics
-  getDashboardStats() {
+  async getDashboardStats() {
     const stats = {};
 
     // Total users
-    stats.totalUsers = this.db.prepare('SELECT COUNT(*) as count FROM users WHERE is_active = 1').get().count;
+    const [userRows] = await this.pool.query('SELECT COUNT(*) as count FROM users WHERE is_active = 1');
+    stats.totalUsers = userRows[0].count;
 
     // Total matches
-    stats.totalMatches = this.db.prepare("SELECT COUNT(*) as count FROM matches WHERE status IN ('scheduled', 'live')").get().count;
+    const [matchRows] = await this.pool.query("SELECT COUNT(*) as count FROM matches WHERE status IN ('scheduled', 'live')");
+    stats.totalMatches = matchRows[0].count;
 
     // Total tickets sold
-    stats.totalTicketsSold = this.db.prepare("SELECT COUNT(*) as count FROM tickets WHERE status = 'sold'").get().count;
+    const [ticketRows] = await this.pool.query("SELECT COUNT(*) as count FROM tickets WHERE status = 'sold'");
+    stats.totalTicketsSold = ticketRows[0].count;
 
     // Total revenue
-    const revenue = this.db.prepare("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status = 'paid'").get();
-    stats.totalRevenue = revenue.total;
+    const [revenueRows] = await this.pool.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status = 'paid'");
+    stats.totalRevenue = revenueRows[0].total;
 
     // Tickets by status
-    stats.ticketsByStatus = this.db.prepare(`
-      SELECT status, COUNT(*) as count 
-      FROM tickets 
-      GROUP BY status
-    `).all();
+    const [ticketsByStatus] = await this.pool.query('SELECT status, COUNT(*) as count FROM tickets GROUP BY status');
+    stats.ticketsByStatus = ticketsByStatus;
 
     // Recent orders count
-    stats.recentOrders = this.db.prepare(`
-      SELECT COUNT(*) as count 
-      FROM orders 
-      WHERE created_at >= datetime('now', '-7 days')
-    `).get().count;
+    const [recentRows] = await this.pool.query("SELECT COUNT(*) as count FROM orders WHERE created_at >= NOW() - INTERVAL 7 DAY");
+    stats.recentOrders = recentRows[0].count;
 
     return stats;
   }
 
   // User Management
-  getAllUsers(page = 1, limit = 10, search = '', role = '') {
+  async getAllUsers(page = 1, limit = 10, search = '', role = '') {
     const offset = (page - 1) * limit;
     let whereClause = 'WHERE u.is_active = 1';
     const params = [];
@@ -54,146 +51,139 @@ class AdminRepository {
       params.push(role);
     }
 
-    const users = this.db.prepare(`
+    const [users] = await this.pool.query(`
       SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.is_active, u.created_at, u.updated_at,
-             GROUP_CONCAT(r.name) as roles
+             GROUP_CONCAT(DISTINCT r.name) as roles
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
       ${whereClause}
       GROUP BY u.id
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
+    `, [...params, parseInt(limit), parseInt(offset)]);
 
-    const total = this.db.prepare(`
+    const [totalRows] = await this.pool.query(`
       SELECT COUNT(DISTINCT u.id) as count
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
       ${whereClause}
-    `).get(...params).count;
+    `, params);
 
     return {
       users: users.map(u => ({
         ...u,
         roles: u.roles ? u.roles.split(',').filter(r => r && r.trim()) : []
       })),
-      total,
+      total: totalRows[0].count,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(totalRows[0].count / limit)
     };
   }
 
-  getUserById(id) {
-    const user = this.db.prepare(`
+  async getUserById(id) {
+    const [users] = await this.pool.query(`
       SELECT u.id, u.first_name, u.last_name, u.email, u.is_active, u.created_at, u.updated_at,
-             GROUP_CONCAT(r.name) as roles
+             GROUP_CONCAT(DISTINCT r.name) as roles
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.id
       WHERE u.id = ?
       GROUP BY u.id
-    `).get(id);
+    `, [id]);
 
-    if (user) {
-      user.roles = user.roles ? user.roles.split(',').filter(r => r && r.trim()) : [];
-    }
+    if (users.length === 0) return null;
 
+    const user = users[0];
+    user.roles = user.roles ? user.roles.split(',').filter(r => r && r.trim()) : [];
     return user;
   }
 
-  createUser(data, createdBy) {
+  async createUser(data, createdBy) {
     const { firstName, lastName, email, password, roleIds = [] } = data;
-    
-    // Insert user
-    const result = this.db.prepare(`
-      INSERT INTO users (first_name, last_name, email, password_hash, created_by, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(firstName, lastName, email, password, createdBy, createdBy);
 
-    const userId = result.lastInsertRowid;
+    // Insert user
+    const [result] = await this.pool.query(
+      'INSERT INTO users (first_name, last_name, email, password_hash, created_by, updated_by) VALUES (?, ?, ?, ?, ?, ?)',
+      [firstName, lastName, email, password, createdBy, createdBy]
+    );
+
+    const userId = result.insertId;
 
     // Assign roles with validation
     if (Array.isArray(roleIds) && roleIds.length > 0) {
-      const getRole = this.db.prepare('SELECT id FROM roles WHERE id = ?');
-      const insertRole = this.db.prepare(`
-        INSERT INTO user_roles (user_id, role_id, assigned_by)
-        VALUES (?, ?, ?)
-      `);
-      roleIds.forEach(roleId => {
-        const role = getRole.get(roleId);
-        if (role) {
-          insertRole.run(userId, roleId, createdBy);
+      for (const roleId of roleIds) {
+        const [roles] = await this.pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+        if (roles.length > 0) {
+          await this.pool.query(
+            'INSERT INTO user_roles (user_id, role_id, assigned_by) VALUES (?, ?, ?)',
+            [userId, roleId, createdBy]
+          );
         }
-      });
+      }
     }
 
     return this.getUserById(userId);
   }
 
-  updateUser(id, data, updatedBy) {
+  async updateUser(id, data, updatedBy) {
     const { firstName, lastName, email, isActive, roleIds } = data;
 
-    // Use transaction for atomic updates
-    const updateUserTx = this.db.transaction(() => {
-      // Update user
-      this.db.prepare(`
-        UPDATE users SET 
-          first_name = COALESCE(?, first_name),
-          last_name = COALESCE(?, last_name),
-          email = COALESCE(?, email),
-          is_active = COALESCE(?, is_active),
-          updated_by = ?,
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(firstName, lastName, email, isActive, updatedBy, id);
+    // Update user
+    await this.pool.query(
+      `UPDATE users SET 
+        first_name = COALESCE(?, first_name),
+        last_name = COALESCE(?, last_name),
+        email = COALESCE(?, email),
+        is_active = COALESCE(?, is_active),
+        updated_by = ?,
+        updated_at = NOW()
+      WHERE id = ?`,
+      [firstName, lastName, email, isActive, updatedBy, id]
+    );
 
-      // Update roles if provided
-      if (roleIds !== undefined) {
-        // Delete existing roles
-        this.db.prepare('DELETE FROM user_roles WHERE user_id = ?').run(id);
+    // Update roles if provided
+    if (roleIds !== undefined) {
+      // Delete existing roles
+      await this.pool.query('DELETE FROM user_roles WHERE user_id = ?', [id]);
 
-        // Insert new roles
-        if (Array.isArray(roleIds) && roleIds.length > 0) {
-          // Validate role IDs exist
-          const getRole = this.db.prepare('SELECT id FROM roles WHERE id = ?');
-          const insertRole = this.db.prepare(`
-            INSERT INTO user_roles (user_id, role_id, assigned_by)
-            VALUES (?, ?, ?)
-          `);
-          roleIds.forEach(roleId => {
-            const role = getRole.get(roleId);
-            if (role) {
-              insertRole.run(id, roleId, updatedBy);
-            }
-          });
+      // Insert new roles
+      if (Array.isArray(roleIds) && roleIds.length > 0) {
+        for (const roleId of roleIds) {
+          const [roles] = await this.pool.query('SELECT id FROM roles WHERE id = ?', [roleId]);
+          if (roles.length > 0) {
+            await this.pool.query(
+              'INSERT INTO user_roles (user_id, role_id, assigned_by) VALUES (?, ?, ?)',
+              [id, roleId, updatedBy]
+            );
+          }
         }
       }
-    });
+    }
 
-    updateUserTx();
     return this.getUserById(id);
   }
 
-  deleteUser(id) {
-    this.db.prepare('UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  async deleteUser(id) {
+    await this.pool.query('UPDATE users SET is_active = 0, updated_at = NOW() WHERE id = ?', [id]);
     return this.getUserById(id);
   }
 
-  hardDeleteUser(id) {
-    this.db.prepare('DELETE FROM users WHERE id = ?').run(id);
+  async hardDeleteUser(id) {
+    await this.pool.query('DELETE FROM users WHERE id = ?', [id]);
     return true;
   }
 
   // Get all roles
-  getAllRoles() {
-    return this.db.prepare('SELECT id, name, description FROM roles').all();
+  async getAllRoles() {
+    const [rows] = await this.pool.query('SELECT id, name, description FROM roles');
+    return rows;
   }
 
   // Reports - Ticket Sales by Match
-  getTicketSalesByMatch() {
-    return this.db.prepare(`
+  async getTicketSalesByMatch() {
+    const [rows] = await this.pool.query(`
       SELECT 
         m.id,
         m.home_team,
@@ -211,11 +201,12 @@ class AdminRepository {
       LEFT JOIN tickets t ON t.match_id = m.id
       GROUP BY m.id, m.home_team, m.away_team, m.match_date, m.stadium_id, s.name, m.base_price, m.status
       ORDER BY m.match_date DESC
-    `).all();
+    `);
+    return rows;
   }
 
   // Reports - Orders with User Details
-  getOrdersWithDetails(page = 1, limit = 10, status = '') {
+  async getOrdersWithDetails(page = 1, limit = 10, status = '') {
     const offset = (page - 1) * limit;
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -225,7 +216,7 @@ class AdminRepository {
       params.push(status);
     }
 
-    const orders = this.db.prepare(`
+    const [orders] = await this.pool.query(`
       SELECT 
         o.id,
         o.order_number,
@@ -246,40 +237,41 @@ class AdminRepository {
       GROUP BY o.id, o.order_number, o.user_id, o.total_amount, o.status, o.payment_status, o.payment_method, o.customer_email, o.created_at, u.first_name, u.last_name
       ORDER BY o.created_at DESC
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset);
+    `, [...params, parseInt(limit), parseInt(offset)]);
 
-    const total = this.db.prepare(`
-      SELECT COUNT(*) as count FROM orders o WHERE 1=1 ${status ? 'AND o.status = ?' : ''}
-    `).get(...(status ? [status] : [])).count;
+    const [totalRows] = await this.pool.query(
+      `SELECT COUNT(*) as count FROM orders o WHERE 1=1 ${status ? 'AND o.status = ?' : ''}`,
+      status ? [status] : []
+    );
 
     return {
       orders,
-      total,
+      total: totalRows[0].count,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(totalRows[0].count / limit)
     };
   }
 
   // Reports - Revenue Analytics
-  getRevenueAnalytics(period = 'monthly') {
-    let groupFormat;
+  async getRevenueAnalytics(period = 'monthly') {
+    let dateFormat;
     switch (period) {
       case 'daily':
-        groupFormat = '%Y-%m-%d';
+        dateFormat = '%Y-%m-%d';
         break;
       case 'weekly':
-        groupFormat = '%Y-%W';
+        dateFormat = '%Y-%u';
         break;
       case 'monthly':
       default:
-        groupFormat = '%Y-%m';
+        dateFormat = '%Y-%m';
         break;
     }
 
-    return this.db.prepare(`
+    const [rows] = await this.pool.query(`
       SELECT 
-        strftime('${groupFormat}', created_at) as period,
+        DATE_FORMAT(created_at, '${dateFormat}') as period,
         COUNT(*) as order_count,
         SUM(total_amount) as revenue,
         AVG(total_amount) as avg_order_value
@@ -288,12 +280,13 @@ class AdminRepository {
       GROUP BY period
       ORDER BY period DESC
       LIMIT 12
-    `).all();
+    `);
+    return rows;
   }
 
   // Reports - Top Selling Matches
-  getTopSellingMatches(limit = 10) {
-    return this.db.prepare(`
+  async getTopSellingMatches(limit = 10) {
+    const [rows] = await this.pool.query(`
       SELECT 
         m.id,
         m.home_team,
@@ -308,12 +301,13 @@ class AdminRepository {
       GROUP BY m.id, m.home_team, m.away_team, m.match_date, s.name
       ORDER BY tickets_sold DESC
       LIMIT ?
-    `).all(limit);
+    `, [parseInt(limit)]);
+    return rows;
   }
 
   // Get order by ID with items
-  getOrderById(id) {
-    const order = this.db.prepare(`
+  async getOrderById(id) {
+    const [orders] = await this.pool.query(`
       SELECT 
         o.*,
         u.first_name,
@@ -322,39 +316,37 @@ class AdminRepository {
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       WHERE o.id = ?
-    `).get(id);
+    `, [id]);
 
-    if (order) {
-      order.items = this.db.prepare(`
-        SELECT 
-          oi.*,
-          t.row_number,
-          t.seat_number,
-          m.home_team,
-          m.away_team,
-          m.match_date,
-          s.name as section_name
-        FROM order_items oi
-        LEFT JOIN tickets t ON oi.ticket_id = t.id
-        LEFT JOIN matches m ON t.match_id = m.id
-        LEFT JOIN sections s ON t.section_id = s.id
-        WHERE oi.order_id = ?
-      `).all(id);
-    }
+    if (orders.length === 0) return null;
 
+    const order = orders[0];
+    const [items] = await this.pool.query(`
+      SELECT 
+        oi.*,
+        t.row_number,
+        t.seat_number,
+        m.home_team,
+        m.away_team,
+        m.match_date,
+        s.name as section_name
+      FROM order_items oi
+      LEFT JOIN tickets t ON oi.ticket_id = t.id
+      LEFT JOIN matches m ON t.match_id = m.id
+      LEFT JOIN sections s ON t.section_id = s.id
+      WHERE oi.order_id = ?
+    `, [id]);
+
+    order.items = items;
     return order;
   }
 
   // Update order status
-  updateOrderStatus(id, status, updatedBy) {
-    this.db.prepare(`
-      UPDATE orders SET 
-        status = ?,
-        updated_by = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(status, updatedBy, id);
-
+  async updateOrderStatus(id, status, updatedBy) {
+    await this.pool.query(
+      'UPDATE orders SET status = ?, updated_by = ?, updated_at = NOW() WHERE id = ?',
+      [status, updatedBy, id]
+    );
     return this.getOrderById(id);
   }
 }
