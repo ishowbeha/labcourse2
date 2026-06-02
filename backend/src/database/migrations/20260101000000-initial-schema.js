@@ -845,7 +845,6 @@ module.exports = {
     // ============================================
     await queryInterface.addIndex('users', ['email']);
     await queryInterface.addIndex('users', ['is_active']);
-    await queryInterface.addIndex('tickets', ['match_id']);
     await queryInterface.addIndex('tickets', ['status']);
     await queryInterface.addIndex('tickets', ['purchaser_id']);
     await queryInterface.addIndex('matches', ['match_date']);
