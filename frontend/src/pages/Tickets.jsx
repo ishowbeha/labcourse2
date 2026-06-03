@@ -1,155 +1,507 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
+import MatchService from '../services/MatchService';
+import OrderService from '../services/OrderService';
+import { getFlagEmoji } from '../utils/flags';
 
 const Tickets = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const screenSize = useResponsiveStyles();
+  const matchId = searchParams.get('matchId');
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const [match, setMatch] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [step, setStep] = useState(1);
 
-  // Sample ticket data (would come from API in real app) - Updated for 2026
-  const myTickets = [
-    {
-      id: 1,
-      orderNumber: 'ORD-2026-001',
-      match: 'Albania vs Kosova',
-      date: '2026-04-11',
-      time: '20:45',
-      stadium: 'National Stadium, Tirana',
-      section: 'VIP North',
-      row: 'A',
-      seat: '12',
-      price: 90,
-      status: 'confirmed',
-      qrCode: 'QR123456789'
-    },
-    {
-      id: 2,
-      orderNumber: 'ORD-2026-002',
-      match: 'Kosova vs Albania',
-      date: '2026-04-18',
-      time: '20:45',
-      stadium: 'Fadil Vokrri Stadium, Pristina',
-      section: 'South Stand',
-      row: 'C',
-      seat: '45-46',
-      price: 50,
-      status: 'confirmed',
-      qrCode: 'QR987654321'
-    },
-    {
-      id: 3,
-      orderNumber: 'ORD-2026-003',
-      match: 'Albania vs Serbia',
-      date: '2026-04-25',
-      time: '20:45',
-      stadium: 'National Stadium, Tirana',
-      section: 'East Stand',
-      row: 'F',
-      seat: '23',
-      price: 70,
-      status: 'pending',
-      qrCode: null
-    }
+  const sections = [
+    { id: 'vip-north', name: 'VIP North', price: 150, capacity: 50 },
+    { id: 'vip-south', name: 'VIP South', price: 150, capacity: 50 },
+    { id: 'east-stand', name: 'East Stand', price: 60, capacity: 200 },
+    { id: 'west-stand', name: 'West Stand', price: 60, capacity: 200 },
+    { id: 'north-stand', name: 'North Stand', price: 40, capacity: 300 },
+    { id: 'south-stand', name: 'South Stand', price: 40, capacity: 300 },
   ];
 
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'confirmed': return '#27ae60';
-      case 'pending': return '#f39c12';
-      case 'cancelled': return '#e74c3c';
-      default: return '#7f8c8d';
+  const paymentMethods = [
+    { id: 'credit-card', name: 'Credit Card', icon: '💳' },
+    { id: 'paypal', name: 'PayPal', icon: '🅿️' },
+    { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
+  ];
+
+  useEffect(() => {
+    if (!matchId) {
+      setError('No match selected. Please go back and select a match.');
+      setLoading(false);
+      return;
+    }
+    fetchMatch();
+  }, [matchId]);
+
+  const fetchMatch = async () => {
+    try {
+      let matchData = await MatchService.getMatchById(matchId);
+      
+      if (!matchData && matchId.startsWith('api-')) {
+        matchData = {
+          id: matchId,
+          homeTeam: 'Team',
+          awayTeam: 'Team',
+          competition: 'FIFA World Cup 2026',
+          basePrice: 89,
+          stadiumName: 'TBD',
+          matchDate: null,
+          matchTime: null
+        };
+      }
+      
+      setMatch(matchData);
+    } catch (err) {
+      setError('Failed to load match details.');
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handlePurchase = async () => {
+    if (!selectedSection) {
+      setError('Please select a section');
+      return;
+    }
+    if (!paymentMethod) {
+      setError('Please select a payment method');
+      return;
+    }
+    if (paymentMethod === 'credit-card' && (!cardNumber || !cardName || !cardExpiry || !cardCvc)) {
+      setError('Please fill in all card details');
+      return;
+    }
+
+    setPurchasing(true);
+    setError('');
+    
+    try {
+      // Process payment
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      const selectedSectionData = sections.find(s => s.id === selectedSection);
+      const totalPrice = selectedSectionData.price * selectedQuantity;
+      const orderNumber = OrderService.generateOrderNumber();
+      const userName = user?.firstName || user?.first_name || 'User';
+      const userEmail = user?.email || '';
+
+      // Create order
+      const order = {
+        id: Date.now(),
+        orderNumber,
+        date: new Date().toISOString().split('T')[0],
+        match: `${match?.homeTeam} vs ${match?.awayTeam}`,
+        matchDate: match?.matchDate || 'TBD',
+        tickets: selectedQuantity,
+        seats: Array(selectedQuantity).fill(`${selectedSectionData.name}`),
+        subtotal: totalPrice,
+        fees: Math.round(totalPrice * 0.05),
+        total: totalPrice + Math.round(totalPrice * 0.05),
+        status: 'confirmed',
+        paymentMethod: paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod,
+        competition: match?.competition || 'Match',
+        stadium: match?.stadiumName || 'TBD'
+      };
+
+      OrderService.saveOrder(order);
+      setPurchaseSuccess(true);
+    } catch (err) {
+      setError('Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Date TBD';
+    return new Date(dateStr).toLocaleDateString('en-GB', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long', 
+      year: 'numeric' 
+    });
+  };
+
+  const formatCardNumber = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatExpiry = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+  };
+
+  if (!matchId) {
+    return (
+      <div style={styles.container}>
+        <Navbar />
+        <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
+          <div style={styles.emptyState}>
+            <span style={{ fontSize: '48px' }}>🎫</span>
+            <h2>No Match Selected</h2>
+            <p>Please go to the matches page and click "Buy Tickets" on a match.</p>
+            <button style={styles.backBtn} onClick={() => navigate('/matches')}>
+              Browse Matches
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <Navbar />
+        <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
+          <div style={styles.loading}>Loading match details...</div>
+        </main>
+      </div>
+    );
+  }
+
+  if (purchaseSuccess) {
+    const selectedSectionData = sections.find(s => s.id === selectedSection);
+    const totalPrice = selectedSectionData.price * selectedQuantity;
+    const pmName = paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod;
+    const orders = OrderService.getOrders();
+    const lastOrder = orders[0];
+
+    return (
+      <div style={styles.container}>
+        <Navbar />
+        <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
+          <div style={styles.successContainer}>
+            <span style={{ fontSize: '64px' }}>✅</span>
+            <h1 style={styles.successTitle}>Payment Successful!</h1>
+            <p style={styles.successText}>
+              You have successfully purchased tickets for {match?.homeTeam} vs {match?.awayTeam}.
+            </p>
+            <div style={styles.successOrderInfo}>
+              <p style={styles.successOrderNumber}>Order: {lastOrder?.orderNumber}</p>
+              <p style={styles.successDetails}>
+                Section: {selectedSectionData.name} | 
+                Tickets: {selectedQuantity} | 
+                Total: €{totalPrice + Math.round(totalPrice * 0.05)}
+              </p>
+              <p style={styles.successPayment}>Paid via: {pmName}</p>
+            </div>
+            <div style={styles.successActions}>
+              <button style={styles.backBtn} onClick={() => navigate('/orders')}>
+                View My Orders
+              </button>
+              <button style={styles.continueBtn} onClick={() => navigate('/matches')}>
+                Browse More Matches
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const selectedSectionData = sections.find(s => s.id === selectedSection);
+  const totalPrice = selectedSectionData ? selectedSectionData.price * selectedQuantity : 0;
+  const fees = Math.round(totalPrice * 0.05);
+  const grandTotal = totalPrice + fees;
+
+  const steps = [
+    { id: 1, label: 'Section & Quantity' },
+    { id: 2, label: 'Payment Method' },
+    { id: 3, label: 'Confirm & Pay' }
+  ];
 
   return (
     <div style={styles.container}>
       <Navbar />
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
+      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
         <div style={styles.header}>
-          <h1>🎫 My Tickets</h1>
-          <p>Your purchased tickets with QR codes for easy entry</p>
+          <h1>🎫 Buy Tickets</h1>
+          <p>{match?.homeTeam} vs {match?.awayTeam}</p>
         </div>
 
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.stats : screenSize === 'tablet' ? responsiveStyles.tablet.stats : styles.stats}>
-          <div style={styles.statCard}>
-            <span style={styles.statNumber}>{myTickets.length}</span>
-            <span style={styles.statLabel}>Total Tickets</span>
-          </div>
-          <div style={styles.statCard}>
-            <span style={styles.statNumber}>{myTickets.filter(t => t.status === 'confirmed').length}</span>
-            <span style={styles.statLabel}>Confirmed</span>
-          </div>
-          <div style={styles.statCard}>
-            <span style={styles.statNumber}>{myTickets.filter(t => t.status === 'pending').length}</span>
-            <span style={styles.statLabel}>Pending</span>
-          </div>
-        </div>
-
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.ticketList : screenSize === 'tablet' ? responsiveStyles.tablet.ticketList : styles.ticketList}>
-          {myTickets.map(ticket => (
-            <div key={ticket.id} style={styles.ticketCard}>
-              <div style={styles.ticketLeft}>
-                <div style={styles.ticketHeader}>
-                  <span style={styles.orderNumber}>{ticket.orderNumber}</span>
-                  <span style={{...styles.status, backgroundColor: getStatusColor(ticket.status)}}>
-                    {ticket.status.toUpperCase()}
-                  </span>
-                </div>
-                
-                <h3 style={styles.matchTitle}>{ticket.match}</h3>
-                
-                <div style={styles.ticketDetails}>
-                  <p>📅 {ticket.date} at {ticket.time}</p>
-                  <p>🏟️ {ticket.stadium}</p>
-                  <p>🪑 Section: {ticket.section}, Row: {ticket.row}, Seat: {ticket.seat}</p>
-                </div>
+        {/* Progress Steps */}
+        <div style={styles.progressBar}>
+          {steps.map(s => (
+            <div key={s.id} style={styles.progressStep}>
+              <div style={{
+                ...styles.progressCircle,
+                backgroundColor: step >= s.id ? '#2c3e50' : '#ddd',
+                color: step >= s.id ? 'white' : '#999'
+              }}>
+                {s.id}
               </div>
-              
-              <div style={styles.ticketDivider}></div>
-              
-              <div style={styles.ticketRight}>
-                {ticket.qrCode ? (
-                  <>
-                    <div style={styles.qrPlaceholder}>
-                      <span style={styles.qrIcon}>📱</span>
-                      <span style={styles.qrCode}>{ticket.qrCode}</span>
-                    </div>
-                    <p style={styles.price}>€{ticket.price}</p>
-                    <button style={styles.viewBtn}>View QR</button>
-                  </>
-                ) : (
-                  <>
-                    <div style={styles.pendingMessage}>
-                      <span style={{fontSize: '24px'}}>⏳</span>
-                      <p>Payment Pending</p>
-                    </div>
-                    <p style={styles.price}>€{ticket.price}</p>
-                    <button style={styles.payBtn}>Pay Now</button>
-                  </>
-                )}
-              </div>
+              <span style={{
+                ...styles.progressLabel,
+                color: step >= s.id ? '#2c3e50' : '#999'
+              }}>{s.label}</span>
             </div>
           ))}
         </div>
 
-        <div style={styles.infoBox}>
-          <h3>ℹ️ Important Information</h3>
-          <ul style={styles.infoList}>
-            <li>Present your QR code at the stadium entrance for scanning</li>
-            <li>Arrive at least 30 minutes before kickoff</li>
-            <li>Tickets are non-transferable and must match your ID</li>
-            <li>For any issues, contact support at support@stadiumtickets.com</li>
-          </ul>
-        </div>
+        {error && (
+          <div style={styles.errorBanner}>
+            {error}
+          </div>
+        )}
+
+        {/* Step 1: Section & Quantity */}
+        {step === 1 && (
+          <>
+            {/* Match Details Card */}
+            <div style={styles.matchCard}>
+              <div style={styles.matchTeams}>
+                <span style={styles.team}>{getFlagEmoji(match?.homeTeam)} {match?.homeTeam}</span>
+                <span style={styles.vs}>VS</span>
+                <span style={styles.team}>{getFlagEmoji(match?.awayTeam)} {match?.awayTeam}</span>
+              </div>
+              <div style={styles.matchInfo}>
+                <p>📅 {formatDate(match?.matchDate)} {match?.matchTime ? `at ${match?.matchTime}` : ''}</p>
+                <p>🏟️ {match?.stadiumName || 'TBD'}</p>
+                <p>🏆 {match?.competition || 'Match'}</p>
+              </div>
+            </div>
+
+            {/* Section Selection */}
+            <div style={styles.sectionSection}>
+              <h2 style={styles.sectionTitle}>Select Section</h2>
+              <div style={styles.sectionGrid}>
+                {sections.map(section => (
+                  <div
+                    key={section.id}
+                    style={{
+                      ...styles.sectionCard,
+                      borderColor: selectedSection === section.id ? '#2c3e50' : '#e9ecef',
+                      backgroundColor: selectedSection === section.id ? '#f0f4f8' : 'white',
+                    }}
+                    onClick={() => setSelectedSection(section.id)}
+                  >
+                    <span style={styles.sectionName}>{section.name}</span>
+                    <span style={styles.sectionPrice}>€{section.price}</span>
+                    <span style={styles.sectionCapacity}>{section.capacity} seats</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quantity Selector */}
+            <div style={styles.quantitySection}>
+              <h2 style={styles.sectionTitle}>Number of Tickets</h2>
+              <div style={styles.quantityControls}>
+                <button 
+                  style={styles.qtyBtn} 
+                  onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+                >
+                  −
+                </button>
+                <span style={styles.qtyValue}>{selectedQuantity}</span>
+                <button 
+                  style={styles.qtyBtn} 
+                  onClick={() => setSelectedQuantity(Math.min(10, selectedQuantity + 1))}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <button 
+              style={{
+                ...styles.nextBtn,
+                opacity: !selectedSection ? 0.6 : 1
+              }}
+              disabled={!selectedSection}
+              onClick={() => setStep(2)}
+            >
+              Continue to Payment →
+            </button>
+          </>
+        )}
+
+        {/* Step 2: Payment Method */}
+        {step === 2 && (
+          <div style={styles.paymentSection}>
+            <h2 style={styles.sectionTitle}>Select Payment Method</h2>
+            
+            <div style={styles.paymentMethods}>
+              {paymentMethods.map(pm => (
+                <div
+                  key={pm.id}
+                  style={{
+                    ...styles.paymentCard,
+                    borderColor: paymentMethod === pm.id ? '#2c3e50' : '#e9ecef',
+                    backgroundColor: paymentMethod === pm.id ? '#f0f4f8' : 'white',
+                  }}
+                  onClick={() => {
+                    setPaymentMethod(pm.id);
+                    if (pm.id !== 'credit-card') {
+                      setCardNumber('');
+                      setCardName('');
+                      setCardExpiry('');
+                      setCardCvc('');
+                    }
+                  }}
+                >
+                  <span style={styles.paymentIcon}>{pm.icon}</span>
+                  <span style={styles.paymentName}>{pm.name}</span>
+                  {paymentMethod === pm.id && <span style={styles.checkmark}>✓</span>}
+                </div>
+              ))}
+            </div>
+
+            {paymentMethod === 'credit-card' && (
+              <div style={styles.cardForm}>
+                <h3 style={styles.formTitle}>Card Details</h3>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Card Number</label>
+                  <input
+                    style={styles.formInput}
+                    placeholder="1234 5678 9012 3456"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                  />
+                </div>
+                <div style={styles.formGroup}>
+                  <label style={styles.formLabel}>Cardholder Name</label>
+                  <input
+                    style={styles.formInput}
+                    placeholder="John Doe"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                  />
+                </div>
+                <div style={styles.formRow}>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.formLabel}>Expiry Date</label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="MM/YY"
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={styles.formLabel}>CVC</label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="123"
+                      value={cardCvc}
+                      onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={styles.navButtons}>
+              <button style={styles.backBtnInline} onClick={() => setStep(1)}>
+                ← Back
+              </button>
+              <button 
+                style={{
+                  ...styles.nextBtn,
+                  opacity: !paymentMethod ? 0.6 : 1,
+                  flex: 1
+                }}
+                disabled={!paymentMethod}
+                onClick={() => setStep(3)}
+              >
+                Review Order →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Confirm & Pay */}
+        {step === 3 && (
+          <div style={styles.summaryCard}>
+            <h2 style={styles.sectionTitle}>Order Summary</h2>
+            
+            <div style={styles.summarySection}>
+              <h4 style={styles.summarySubtitle}>🎫 Match</h4>
+              <div style={styles.summaryRow}>
+                <span>{match?.homeTeam} vs {match?.awayTeam}</span>
+              </div>
+              <div style={styles.summaryRow}>
+                <span style={{ color: '#7f8c8d' }}>{formatDate(match?.matchDate)}</span>
+              </div>
+              <div style={styles.summaryRow}>
+                <span style={{ color: '#7f8c8d' }}>{match?.stadiumName || 'TBD'}</span>
+              </div>
+            </div>
+
+            <div style={styles.summarySection}>
+              <h4 style={styles.summarySubtitle}>🪑 Seating</h4>
+              {selectedSectionData && (
+                <div style={styles.summaryRow}>
+                  <span>{selectedSectionData.name}</span>
+                  <span>€{selectedSectionData.price} × {selectedQuantity}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={styles.summarySection}>
+              <h4 style={styles.summarySubtitle}>💳 Payment</h4>
+              <div style={styles.summaryRow}>
+                <span>Method</span>
+                <span>{paymentMethods.find(p => p.id === paymentMethod)?.icon} {paymentMethods.find(p => p.id === paymentMethod)?.name}</span>
+              </div>
+            </div>
+
+            <div style={styles.priceBreakdown}>
+              <div style={styles.summaryRow}>
+                <span>Subtotal</span>
+                <span>€{totalPrice}</span>
+              </div>
+              <div style={styles.summaryRow}>
+                <span>Booking Fee (5%)</span>
+                <span>€{fees}</span>
+              </div>
+              <div style={{ ...styles.summaryRow, ...styles.totalRow }}>
+                <span>Total</span>
+                <span>€{grandTotal}</span>
+              </div>
+            </div>
+
+            <div style={styles.navButtons}>
+              <button style={styles.backBtnInline} onClick={() => setStep(2)}>
+                ← Back
+              </button>
+              <button 
+                style={{
+                  ...styles.payBtn,
+                  opacity: purchasing ? 0.6 : 1,
+                  flex: 1
+                }}
+                onClick={handlePurchase}
+                disabled={purchasing}
+              >
+                {purchasing ? '⏳ Processing Payment...' : `✅ Pay €${grandTotal}`}
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -161,7 +513,7 @@ const styles = {
     backgroundColor: '#f5f5f5',
   },
   main: {
-    maxWidth: '1200px',
+    maxWidth: '800px',
     margin: '0 auto',
     padding: '40px 20px',
   },
@@ -169,197 +521,399 @@ const styles = {
     textAlign: 'center',
     marginBottom: '30px',
   },
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '20px',
-    marginBottom: '30px',
-  },
-  statCard: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '12px',
+  loading: {
     textAlign: 'center',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  statNumber: {
-    display: 'block',
-    fontSize: '32px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  statLabel: {
-    fontSize: '14px',
+    padding: '60px 20px',
     color: '#7f8c8d',
+    fontSize: '18px',
   },
-  ticketList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-    marginBottom: '30px',
+  emptyState: {
+    textAlign: 'center',
+    padding: '80px 20px',
+    color: '#555',
   },
-  ticketCard: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    display: 'flex',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-  },
-  ticketLeft: {
-    flex: 1,
-    padding: '24px',
-  },
-  ticketHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '12px',
-  },
-  orderNumber: {
-    fontSize: '12px',
-    color: '#7f8c8d',
-    fontFamily: 'monospace',
-  },
-  status: {
-    fontSize: '11px',
-    color: 'white',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    fontWeight: '600',
-  },
-  matchTitle: {
-    margin: '0 0 12px 0',
-    fontSize: '20px',
-    color: '#2c3e50',
-  },
-  ticketDetails: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-  },
-  ticketDivider: {
-    width: '2px',
-    backgroundColor: '#eee',
-    borderLeft: '2px dashed #ddd',
-  },
-  ticketRight: {
-    padding: '24px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: '180px',
-  },
-  qrPlaceholder: {
-    backgroundColor: '#f8f9fa',
-    padding: '16px',
+  errorBanner: {
+    backgroundColor: '#fee2e2',
+    color: '#dc2626',
+    padding: '12px 16px',
     borderRadius: '8px',
+    fontSize: '14px',
+    marginBottom: '20px',
     textAlign: 'center',
-    marginBottom: '12px',
   },
-  qrIcon: {
-    fontSize: '32px',
-    display: 'block',
-    marginBottom: '8px',
-  },
-  qrCode: {
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    color: '#7f8c8d',
-  },
-  price: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    margin: '8px 0',
-  },
-  viewBtn: {
-    padding: '8px 20px',
+  backBtn: {
+    padding: '12px 24px',
     backgroundColor: '#2c3e50',
     color: 'white',
     border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
+    borderRadius: '8px',
     fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginTop: '16px',
   },
-  pendingMessage: {
+  continueBtn: {
+    padding: '12px 24px',
+    backgroundColor: '#3498db',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginTop: '16px',
+  },
+  // Progress
+  progressBar: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '40px',
+    marginBottom: '30px',
+    padding: '20px',
+  },
+  progressStep: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  progressCircle: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold',
+    fontSize: '16px',
+  },
+  progressLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
     textAlign: 'center',
-    color: '#f39c12',
-    marginBottom: '12px',
+  },
+  // Match card
+  matchCard: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    marginBottom: '24px',
+  },
+  matchTeams: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '16px',
+  },
+  team: {
+    fontSize: '22px',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  vs: {
+    fontSize: '18px',
+    color: '#e74c3c',
+    fontWeight: '800',
+  },
+  matchInfo: {
+    textAlign: 'center',
+    fontSize: '15px',
+    color: '#7f8c8d',
+    lineHeight: '1.8',
+  },
+  // Section selection
+  sectionSection: {
+    marginBottom: '24px',
+  },
+  sectionTitle: {
+    fontSize: '20px',
+    color: '#2c3e50',
+    marginBottom: '16px',
+  },
+  sectionGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+    gap: '12px',
+  },
+  sectionCard: {
+    padding: '20px',
+    borderRadius: '10px',
+    border: '2px solid #e9ecef',
+    cursor: 'pointer',
+    textAlign: 'center',
+    transition: 'all 0.2s',
+  },
+  sectionName: {
+    display: 'block',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: '8px',
+  },
+  sectionPrice: {
+    display: 'block',
+    fontSize: '22px',
+    fontWeight: 'bold',
+    color: '#e74c3c',
+    marginBottom: '4px',
+  },
+  sectionCapacity: {
+    display: 'block',
+    fontSize: '12px',
+    color: '#95a5a6',
+  },
+  // Quantity
+  quantitySection: {
+    marginBottom: '24px',
+  },
+  quantityControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    justifyContent: 'center',
+    padding: '16px',
+  },
+  qtyBtn: {
+    width: '44px',
+    height: '44px',
+    borderRadius: '50%',
+    border: '2px solid #2c3e50',
+    backgroundColor: 'white',
+    color: '#2c3e50',
+    fontSize: '22px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyValue: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    minWidth: '40px',
+    textAlign: 'center',
+  },
+  // Payment
+  paymentSection: {
+    marginBottom: '24px',
+  },
+  paymentMethods: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '24px',
+  },
+  paymentCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '20px',
+    borderRadius: '10px',
+    border: '2px solid #e9ecef',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    position: 'relative',
+  },
+  paymentIcon: {
+    fontSize: '28px',
+  },
+  paymentName: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  checkmark: {
+    position: 'absolute',
+    right: '20px',
+    fontSize: '20px',
+    color: '#27ae60',
+    fontWeight: 'bold',
+  },
+  cardForm: {
+    backgroundColor: 'white',
+    padding: '24px',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    marginBottom: '24px',
+  },
+  formTitle: {
+    margin: '0 0 16px 0',
+    fontSize: '16px',
+    color: '#2c3e50',
+  },
+  formGroup: {
+    marginBottom: '16px',
+  },
+  formLabel: {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: '6px',
+  },
+  formInput: {
+    width: '100%',
+    padding: '12px 14px',
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    fontSize: '15px',
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  formRow: {
+    display: 'flex',
+    gap: '16px',
+  },
+  // Navigation
+  navButtons: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '20px',
+  },
+  backBtnInline: {
+    padding: '14px 24px',
+    backgroundColor: 'transparent',
+    color: '#2c3e50',
+    border: '2px solid #2c3e50',
+    borderRadius: '8px',
+    fontSize: '15px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  },
+  nextBtn: {
+    width: '100%',
+    padding: '16px',
+    backgroundColor: '#2c3e50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '16px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
   },
   payBtn: {
-    padding: '8px 20px',
+    padding: '16px',
     backgroundColor: '#27ae60',
     color: 'white',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '10px',
+    fontSize: '16px',
+    fontWeight: '700',
     cursor: 'pointer',
-    fontSize: '14px',
+    transition: 'all 0.2s',
   },
-  infoBox: {
-    backgroundColor: '#e8f4fd',
-    padding: '24px',
+  // Summary
+  summaryCard: {
+    backgroundColor: 'white',
     borderRadius: '12px',
-    border: '1px solid #b6e0fe',
+    padding: '24px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    marginBottom: '24px',
   },
-  infoList: {
-    margin: '12px 0 0 0',
-    padding: '0 0 0 20px',
+  summarySection: {
+    marginBottom: '20px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #eee',
+  },
+  summarySubtitle: {
+    margin: '0 0 12px 0',
+    fontSize: '15px',
     color: '#2c3e50',
+  },
+  summaryRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '6px 0',
+    fontSize: '15px',
+    color: '#555',
+  },
+  priceBreakdown: {
+    padding: '16px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '10px',
+    marginBottom: '20px',
+  },
+  totalRow: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    paddingTop: '12px',
+    marginTop: '8px',
+    borderTop: '2px solid #ddd',
+  },
+  // Success
+  successContainer: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  },
+  successTitle: {
+    color: '#27ae60',
+    marginTop: '20px',
+  },
+  successText: {
+    fontSize: '16px',
+    color: '#555',
+    marginTop: '12px',
+  },
+  successOrderInfo: {
+    marginTop: '20px',
+    padding: '16px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+  },
+  successOrderNumber: {
     fontSize: '14px',
+    color: '#7f8c8d',
+    fontWeight: '600',
+  },
+  successDetails: {
+    fontSize: '15px',
+    color: '#2c3e50',
+    fontWeight: '600',
+    marginTop: '8px',
+  },
+  successPayment: {
+    fontSize: '14px',
+    color: '#27ae60',
+    marginTop: '8px',
+  },
+  successActions: {
+    display: 'flex',
+    gap: '16px',
+    justifyContent: 'center',
+    marginTop: '24px',
+    flexWrap: 'wrap',
   },
 };
 
-// Responsive styles
 const responsiveStyles = {
   mobile: {
     main: {
       ...styles.main,
       padding: '20px 15px',
     },
-    stats: {
-      ...styles.stats,
-      gridTemplateColumns: '1fr',
+    progressBar: {
+      ...styles.progressBar,
+      gap: '20px',
     },
-    ticketList: {
-      ...styles.ticketList,
+    progressLabel: {
+      fontSize: '10px',
+    },
+    formRow: {
+      ...styles.formRow,
       flexDirection: 'column',
-    },
-    ticketCard: {
-      ...styles.ticketCard,
-      flexDirection: 'column',
-    },
-    ticketDivider: {
-      ...styles.ticketDivider,
-      width: '100%',
-      height: '2px',
-      borderLeft: 'none',
-      borderTop: '2px dashed #ddd',
-    },
-    ticketRight: {
-      ...styles.ticketRight,
-      minWidth: 'auto',
-      width: '100%',
-      borderTop: '1px solid #eee',
+      gap: '0',
     },
   },
-  tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    stats: {
-      ...styles.stats,
-      gridTemplateColumns: 'repeat(3, 1fr)',
-    },
-    ticketList: {
-      ...styles.ticketList,
-      flexDirection: 'column',
-    },
-    ticketCard: {
-      ...styles.ticketCard,
-      flexDirection: 'row',
-    },
-  }
+  tablet: {},
 };
 
 export default Tickets;

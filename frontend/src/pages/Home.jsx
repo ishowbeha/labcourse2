@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Navbar from '../components/Navbar';
 import MatchService from '../services/MatchService';
+import FootballService from '../services/FootballService';
 import { getFlagEmoji } from '../utils/flags';
 
 // Custom hook for responsive styles
@@ -47,9 +48,81 @@ const Home = () => {
 
   const fetchUpcomingMatches = async () => {
     try {
-      const matches = await MatchService.getUpcomingMatches();
-      // Get only the first 3 upcoming matches
-      setUpcomingMatches(matches.slice(0, 3));
+      // Fetch both local DB matches and API matches
+      const [localMatches, apiData] = await Promise.all([
+        MatchService.getUpcomingMatches().catch(() => []),
+        FootballService.getUpcomingFootballMatches(50).catch(() => [])
+      ]);
+
+      // Combine local matches with API matches that are FIFA World Cup 2026
+      const allMatches = [];
+
+      // Add local WC matches
+      localMatches.forEach(m => {
+        if ((m.competition || '').toLowerCase().includes('world cup')) {
+          allMatches.push({
+            ...m,
+            _sortDate: m.matchDate || ''
+          });
+        }
+      });
+
+      // Add API WC matches (avoiding duplicates with local ones)
+      const localKeys = new Set();
+      localMatches.forEach(m => {
+        if ((m.competition || '').toLowerCase().includes('world cup')) {
+          localKeys.add(`${m.homeTeam || ''}-${m.awayTeam || ''}`);
+        }
+      });
+
+      const apiWorldCupMatches = (apiData || []).filter(apiMatch => {
+        const compName = apiMatch.league?.name || '';
+        return compName === 'World Cup' || compName === 'WC' || compName?.includes('World Cup');
+      });
+
+      apiWorldCupMatches.forEach(apiMatch => {
+        const key = `${apiMatch.homeTeam?.name}-${apiMatch.awayTeam?.name}`;
+        if (!localKeys.has(key)) {
+          const matchDate = apiMatch.date ? apiMatch.date.split('T')[0] : null;
+          allMatches.push({
+            id: `api-${apiMatch.id}`,
+            homeTeam: apiMatch.homeTeam?.name || 'Home',
+            awayTeam: apiMatch.awayTeam?.name || 'Away',
+            matchDate,
+            matchTime: apiMatch.date ? new Date(apiMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
+            competition: 'FIFA World Cup 2026',
+            stadiumName: apiMatch.venue || 'TBD',
+            basePrice: 89,
+            _sortDate: matchDate || ''
+          });
+        }
+      });
+
+      // Sort by date (closest first), filter out past matches, and take top 4
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const currentTime = now.toTimeString().split(' ')[0].substring(0, 5);
+
+      const upcomingSorted = allMatches
+        .filter(m => {
+          if (!m._sortDate) return false;
+          // Exclude past matches
+          // Exclude Brazil vs Serbia match (removed upon request)
+          const home = (m.homeTeam || '').toLowerCase();
+          const away = (m.awayTeam || '').toLowerCase();
+          if ((home.includes('brazil') && away.includes('serbia')) || (home.includes('serbia') && away.includes('brazil'))) {
+            return false;
+          }
+          return m._sortDate > today || (m._sortDate === today && (!m.matchTime || m.matchTime >= currentTime));
+        })
+        .sort((a, b) => {
+          if (!a._sortDate) return 1;
+          if (!b._sortDate) return -1;
+          return a._sortDate.localeCompare(b._sortDate);
+        })
+        .slice(0, 3);
+
+      setUpcomingMatches(upcomingSorted);
     } catch (error) {
       console.error('Failed to fetch upcoming matches:', error);
     } finally {
@@ -122,7 +195,7 @@ const Home = () => {
                   </div>
                   <div style={styles.matchInfo}>
                     <span style={styles.matchDate}>📅 {formatDate(match.matchDate)}</span>
-                    <span style={styles.matchCompetition}>{match.competition}</span>
+                    <span style={styles.matchCompetition}>🏆 {match.competition || 'FIFA World Cup 2026'}</span>
                   </div>
                   <div style={styles.matchFooter}>
                     <span style={styles.matchStadium}>{match.stadiumName || 'TBA'}</span>

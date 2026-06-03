@@ -168,40 +168,42 @@ const Matches = () => {
       return a._sortDate.localeCompare(b._sortDate);
     });
 
-    // Apply competition filter (local, no API call)
+    // Apply ALL filters together (no early returns, so filters combine correctly)
+    let filtered = allMapped;
+
+    // Apply competition filter
     const competitionFilter = filters.competition;
     if (competitionFilter) {
-      let filtered = allMapped.filter(m => {
+      filtered = filtered.filter(m => {
         const comp = (m.competition || '').toLowerCase();
         const filter = competitionFilter.toLowerCase();
         return comp.includes(filter) || comp.includes(filter.replace(/2026/g, '').trim());
       });
-
-      // Apply group filter (instant!)
-      if (filters.wcGroup && filters.wcGroup !== 'all') {
-        const groupMatch = filters.wcGroup.match(/Group ([A-L])/i);
-        if (groupMatch) {
-          const groupLetter = groupMatch[1].toUpperCase();
-          filtered = filtered.filter(m => {
-            const g = (m._groupId || '').toUpperCase();
-            return g.includes(`GROUP ${groupLetter}`) || g.includes(`GROUP_${groupLetter}`);
-          });
-        }
-      }
-      return filtered;
     }
 
-    // Apply team filter (local)
+    // Apply group filter (independent of competition selection)
+    if (filters.wcGroup && filters.wcGroup !== 'all') {
+      const groupMatch = filters.wcGroup.match(/Group ([A-L])/i);
+      if (groupMatch) {
+        const groupLetter = groupMatch[1].toUpperCase();
+        filtered = filtered.filter(m => {
+          const g = (m._groupId || '').toUpperCase();
+          return g.includes(`GROUP ${groupLetter}`) || g.includes(`GROUP_${groupLetter}`);
+        });
+      }
+    }
+
+    // Apply team filter (now works even when competition/group is selected)
     if (filters.team) {
       const teamSearch = filters.team.toLowerCase();
-      return allMapped.filter(m => {
+      filtered = filtered.filter(m => {
         const home = (m.homeTeam || '').toLowerCase();
         const away = (m.awayTeam || '').toLowerCase();
         return home.includes(teamSearch) || away.includes(teamSearch);
       });
     }
 
-    return allMapped;
+    return filtered;
   };
 
   const isLive = (match) => match.status === 'LIVE' || match.status === 'live' || match.source === 'live';

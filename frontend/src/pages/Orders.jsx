@@ -1,78 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
+import OrderService from '../services/OrderService';
 
 const Orders = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const screenSize = useResponsiveStyles();
+  const [orders, setOrders] = useState([]);
+
+  useEffect(() => {
+    const userOrders = OrderService.getOrders();
+    setOrders(userOrders);
+  }, []);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  // Sample order data - Updated for 2026
-  const orders = [
-    {
-      id: 1,
-      orderNumber: 'ORD-2026-001',
-      date: '2026-04-05',
-      match: 'Albania vs Kosova',
-      matchDate: '2026-04-11',
-      tickets: 2,
-      seats: ['VIP North, Row A, Seat 12', 'VIP North, Row A, Seat 13'],
-      subtotal: 180,
-      fees: 6,
-      total: 186,
-      status: 'confirmed',
-      paymentMethod: 'Credit Card'
-    },
-    {
-      id: 2,
-      orderNumber: 'ORD-2026-002',
-      date: '2026-04-08',
-      match: 'Kosova vs Albania',
-      matchDate: '2026-04-18',
-      tickets: 2,
-      seats: ['South Stand, Row C, Seat 45', 'South Stand, Row C, Seat 46'],
-      subtotal: 50,
-      fees: 3,
-      total: 53,
-      status: 'confirmed',
-      paymentMethod: 'PayPal'
-    },
-    {
-      id: 3,
-      orderNumber: 'ORD-2026-003',
-      date: '2026-04-12',
-      match: 'Albania vs Serbia',
-      matchDate: '2026-04-25',
-      tickets: 1,
-      seats: ['East Stand, Row F, Seat 23'],
-      subtotal: 70,
-      fees: 3,
-      total: 73,
-      status: 'pending',
-      paymentMethod: 'Bank Transfer'
-    },
-    {
-      id: 4,
-      orderNumber: 'ORD-2026-004',
-      date: '2026-03-20',
-      match: 'Kosova vs North Macedonia',
-      matchDate: '2026-05-02',
-      tickets: 3,
-      seats: ['Main Stand, Row B, Seat 10', 'Main Stand, Row B, Seat 11', 'Main Stand, Row B, Seat 12'],
-      subtotal: 60,
-      fees: 4,
-      total: 64,
-      status: 'completed',
-      paymentMethod: 'Credit Card'
-    }
-  ];
 
   const getStatusColor = (status) => {
     switch(status) {
@@ -87,7 +34,7 @@ const Orders = () => {
   const getTotalSpent = () => {
     return orders
       .filter(o => o.status === 'confirmed' || o.status === 'completed')
-      .reduce((sum, o) => sum + o.total, 0);
+      .reduce((sum, o) => sum + (o.total || 0), 0);
   };
 
   return (
@@ -115,60 +62,72 @@ const Orders = () => {
           </div>
         </div>
 
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.orderList : screenSize === 'tablet' ? responsiveStyles.tablet.orderList : styles.orderList}>
-          {orders.map(order => (
-            <div key={order.id} style={styles.orderCard}>
-              <div style={styles.orderHeader}>
-                <div>
-                  <span style={styles.orderNumber}>{order.orderNumber}</span>
-                  <span style={styles.orderDate}>Placed on {order.date}</span>
-                </div>
-                <span style={{...styles.status, backgroundColor: getStatusColor(order.status)}}>
-                  {order.status.toUpperCase()}
-                </span>
-              </div>
-
-              <div style={styles.orderContent}>
-                <div style={styles.orderInfo}>
-                  <h3 style={styles.matchTitle}>{order.match}</h3>
-                  <p style={styles.matchDate}>Match Date: {order.matchDate}</p>
-                  <p style={styles.ticketInfo}>🎫 {order.tickets} ticket(s)</p>
-                  <div style={styles.seats}>
-                    {order.seats.map((seat, idx) => (
-                      <span key={idx} style={styles.seatTag}>{seat}</span>
-                    ))}
+        {orders.length === 0 ? (
+          <div style={styles.emptyState}>
+            <span style={{ fontSize: '48px' }}>📋</span>
+            <h2>No Orders Yet</h2>
+            <p>You haven't purchased any tickets yet.</p>
+            <button style={styles.browseBtn} onClick={() => navigate('/matches')}>
+              Browse Matches
+            </button>
+          </div>
+        ) : (
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.orderList : screenSize === 'tablet' ? responsiveStyles.tablet.orderList : styles.orderList}>
+            {orders.map(order => (
+              <div key={order.id} style={styles.orderCard}>
+                <div style={styles.orderHeader}>
+                  <div>
+                    <span style={styles.orderNumber}>{order.orderNumber}</span>
+                    <span style={styles.orderDate}>Placed on {order.date}</span>
                   </div>
+                  <span style={{...styles.status, backgroundColor: getStatusColor(order.status)}}>
+                    {order.status.toUpperCase()}
+                  </span>
                 </div>
 
-                <div style={styles.orderSummary}>
-                  <div style={styles.summaryRow}>
-                    <span>Subtotal</span>
-                    <span>€{order.subtotal.toFixed(2)}</span>
+                <div style={styles.orderContent}>
+                  <div style={styles.orderInfo}>
+                    <h3 style={styles.matchTitle}>{order.match}</h3>
+                    <p style={styles.matchDate}>Match Date: {order.matchDate}</p>
+                    <p style={styles.matchCompetition}>🏆 {order.competition || 'Match'}</p>
+                    <p style={styles.ticketInfo}>🎫 {order.tickets} ticket(s)</p>
+                    <div style={styles.seats}>
+                      {order.seats?.map((seat, idx) => (
+                        <span key={idx} style={styles.seatTag}>{seat}</span>
+                      ))}
+                    </div>
                   </div>
-                  <div style={styles.summaryRow}>
-                    <span>Fees</span>
-                    <span>€{order.fees.toFixed(2)}</span>
+
+                  <div style={styles.orderSummary}>
+                    <div style={styles.summaryRow}>
+                      <span>Subtotal</span>
+                      <span>€{(order.subtotal || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={styles.summaryRow}>
+                      <span>Fees</span>
+                      <span>€{(order.fees || 0).toFixed(2)}</span>
+                    </div>
+                    <div style={{...styles.summaryRow, ...styles.totalRow}}>
+                      <span>Total</span>
+                      <span>€{(order.total || 0).toFixed(2)}</span>
+                    </div>
+                    <p style={styles.paymentMethod}>Paid via {order.paymentMethod}</p>
                   </div>
-                  <div style={{...styles.summaryRow, ...styles.totalRow}}>
-                    <span>Total</span>
-                    <span>€{order.total.toFixed(2)}</span>
-                  </div>
-                  <p style={styles.paymentMethod}>Paid via {order.paymentMethod}</p>
+                </div>
+
+                <div style={styles.orderActions}>
+                  <button style={styles.primaryBtn}>View Details</button>
+                  {order.status === 'confirmed' && (
+                    <button style={styles.secondaryBtn}>Download Invoice</button>
+                  )}
+                  {order.status === 'pending' && (
+                    <button style={styles.payBtn}>Complete Payment</button>
+                  )}
                 </div>
               </div>
-
-              <div style={styles.orderActions}>
-                <button style={styles.primaryBtn}>View Details</button>
-                {order.status === 'confirmed' && (
-                  <button style={styles.secondaryBtn}>Download Invoice</button>
-                )}
-                {order.status === 'pending' && (
-                  <button style={styles.payBtn}>Complete Payment</button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -187,6 +146,25 @@ const styles = {
   header: {
     textAlign: 'center',
     marginBottom: '30px',
+  },
+  emptyState: {
+    textAlign: 'center',
+    padding: '80px 20px',
+    color: '#555',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  },
+  browseBtn: {
+    padding: '12px 24px',
+    backgroundColor: '#2c3e50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginTop: '16px',
   },
   stats: {
     display: 'grid',
@@ -261,6 +239,11 @@ const styles = {
     color: '#2c3e50',
   },
   matchDate: {
+    fontSize: '14px',
+    color: '#7f8c8d',
+    margin: '4px 0',
+  },
+  matchCompetition: {
     fontSize: '14px',
     color: '#7f8c8d',
     margin: '4px 0',
