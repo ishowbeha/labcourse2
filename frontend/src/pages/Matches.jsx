@@ -219,10 +219,6 @@ const Matches = () => {
         <div style={styles.tabs}>
           <button style={{...styles.tab, ...(activeTab === 'all' ? styles.activeTab : {})}} onClick={() => setActiveTab('all')}>All Matches</button>
           <button style={{...styles.tab, ...(activeTab === 'local' ? styles.activeTab : {})}} onClick={() => setActiveTab('local')}>Stadium Matches</button>
-          {apiAvailable && <>
-            <button style={{...styles.tab, ...(activeTab === 'api' ? styles.activeTab : {}), backgroundColor: activeTab === 'api' ? '#3498db' : 'transparent'}} onClick={() => setActiveTab('api')}>🌍 Live Fixtures</button>
-            <button style={{...styles.tab, ...(activeTab === 'live' ? styles.activeTab : {}), backgroundColor: activeTab === 'live' ? '#e74c3c' : 'transparent', color: activeTab === 'live' ? 'white' : '#e74c3c'}} onClick={() => setActiveTab('live')}>🔴 Live Now ({liveMatches.length})</button>
-          </>}
         </div>
 
         <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : styles.filters}>

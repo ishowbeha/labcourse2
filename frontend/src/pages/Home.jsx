@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Navbar from '../components/Navbar';
 import MatchService from '../services/MatchService';
+import { getFlagEmoji } from '../utils/flags';
 
 // Custom hook for responsive styles
 const useResponsiveStyles = () => {
@@ -115,9 +116,9 @@ const Home = () => {
               {upcomingMatches.map(match => (
                 <div key={match.id} style={styles.matchCard}>
                   <div style={styles.matchTeams}>
-                    <span style={styles.teamName}>{match.homeTeam}</span>
+                    <span style={styles.teamName}>{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
                     <span style={styles.vs}>VS</span>
-                    <span style={styles.teamName}>{match.awayTeam}</span>
+                    <span style={styles.teamName}>{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
                   </div>
                   <div style={styles.matchInfo}>
                     <span style={styles.matchDate}>📅 {formatDate(match.matchDate)}</span>
