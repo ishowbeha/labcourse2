@@ -7,11 +7,11 @@ class UserService {
   }
 
   async getAllUsers() {
-    return this.userRepository.findAll();
+    return await this.userRepository.findAll();
   }
 
   async getUserById(id) {
-    return this.userRepository.findById(id);
+    return await this.userRepository.findById(id);
   }
 
   async createUser(userData) {
@@ -28,7 +28,7 @@ class UserService {
     }
 
     // Check if user already exists
-    const existingUser = this.userRepository.findByEmail(email);
+    const existingUser = await this.userRepository.findByEmail(email);
     if (existingUser) {
       throw new Error('Email already registered');
     }
@@ -37,7 +37,7 @@ class UserService {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const user = this.userRepository.create({
+    const user = await this.userRepository.create({
       firstName,
       lastName,
       email,
@@ -54,7 +54,7 @@ class UserService {
       data.password = await bcrypt.hash(data.password, 10);
     }
 
-    return this.userRepository.update(id, {
+    return await this.userRepository.update(id, {
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
@@ -63,11 +63,11 @@ class UserService {
   }
 
   async deleteUser(id) {
-    return this.userRepository.delete(id);
+    return await this.userRepository.delete(id);
   }
 
   async authenticateUser(email, password) {
-    const user = this.userRepository.findByEmail(email);
+    const user = await this.userRepository.findByEmail(email);
     if (!user) {
       throw new Error('Invalid credentials');
     }

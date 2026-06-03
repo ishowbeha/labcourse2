@@ -20,13 +20,13 @@ class AuthService {
     }
 
     // Check if user already exists
-    const existingUser = this.authRepository.getUserByEmail(email);
+    const existingUser = await this.authRepository.getUserByEmail(email);
     if (existingUser) {
       throw new Error('Email already registered');
     }
 
     // Create user
-    const user = this.authRepository.createUser({
+    const user = await this.authRepository.createUser({
       firstName,
       lastName,
       email,
@@ -34,16 +34,16 @@ class AuthService {
     });
 
     // Assign default role
-    const defaultRole = this.authRepository.getRoleByName(role);
+    const defaultRole = await this.authRepository.getRoleByName(role);
     if (defaultRole) {
-      this.authRepository.assignRoleToUser(user.id, defaultRole.id);
+      await this.authRepository.assignRoleToUser(user.id, defaultRole.id);
     }
 
     // Generate tokens
-    const tokens = this.generateTokens(user.id);
+    const tokens = await this.generateTokens(user.id);
 
     // Log audit
-    this.authRepository.logAudit(
+    await this.authRepository.logAudit(
       user.id,
       'register',
       'user',
@@ -74,7 +74,7 @@ class AuthService {
     }
 
     // Get user with password hash
-    const user = this.authRepository.getUserByEmail(email);
+    const user = await this.authRepository.getUserByEmail(email);
     if (!user) {
       throw new Error('Invalid credentials');
     }
@@ -91,10 +91,10 @@ class AuthService {
     }
 
     // Generate tokens
-    const tokens = this.generateTokens(user.id);
+    const tokens = await this.generateTokens(user.id);
 
     // Log audit
-    this.authRepository.logAudit(
+    await this.authRepository.logAudit(
       user.id,
       'login',
       'user',
@@ -127,7 +127,7 @@ class AuthService {
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
     // Revoke the token
-    this.authRepository.revokeRefreshToken(tokenHash);
+    await this.authRepository.revokeRefreshToken(tokenHash);
 
     return { message: 'Logged out successfully' };
   }
@@ -148,14 +148,14 @@ class AuthService {
 
     // Check if token is in database and not revoked
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const storedToken = this.authRepository.getRefreshToken(tokenHash);
+    const storedToken = await this.authRepository.getRefreshToken(tokenHash);
 
     if (!storedToken) {
       throw new Error('Refresh token not found or revoked');
     }
 
     // Generate new tokens
-    return this.generateTokens(decoded.userId);
+    return await this.generateTokens(decoded.userId);
   }
 
   // Get current user profile
@@ -183,10 +183,10 @@ class AuthService {
 
   // Update user profile
   async updateProfile(userId, updateData) {
-    const user = this.authRepository.updateUser(userId, updateData);
+    const user = await this.authRepository.updateUser(userId, updateData);
     
     // Log audit
-    this.authRepository.logAudit(
+    await this.authRepository.logAudit(
       userId,
       'update_profile',
       'user',
@@ -216,7 +216,7 @@ class AuthService {
   }
 
   // Generate JWT tokens
-  generateTokens(userId) {
+  async generateTokens(userId) {
     // Access token (short-lived)
     const accessToken = jwt.sign(
       { userId, type: 'access' },
@@ -236,8 +236,11 @@ class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + this.refreshTokenExpiresIn);
 
+    // Format date for MySQL DATETIME (YYYY-MM-DD HH:MM:SS)
+    const mysqlDate = expiresAt.toISOString().replace('T', ' ').replace('Z', '').split('.')[0];
+
     // Store refresh token in database
-      this.authRepository.createRefreshToken(userId, refreshTokenHash, expiresAt.toISOString());
+    await this.authRepository.createRefreshToken(userId, refreshTokenHash, mysqlDate);
 
     return {
       accessToken,

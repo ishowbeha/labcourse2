@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 // Store connected users
 const connectedUsers = new Map();
 
-const setupWebSocket = (io, sequelize) => {
+const setupWebSocket = (io, pool) => {
   // Middleware to authenticate socket connections
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
@@ -35,15 +35,15 @@ const setupWebSocket = (io, sequelize) => {
       connectedAt: new Date().toISOString()
     });
 
-    // Get user info from database using Sequelize
+    // Get user info from database using pool
     try {
-      const User = sequelize.models.User;
-      const user = await User.findByPk(socket.userId, {
-        attributes: ['id', 'firstName', 'lastName', 'email']
-      });
-      if (user) {
-        socket.userName = `${user.firstName} ${user.lastName}`;
-        socket.userEmail = user.email;
+      const [users] = await pool.query(
+        'SELECT id, first_name, last_name, email FROM users WHERE id = ?',
+        [socket.userId]
+      );
+      if (users.length > 0) {
+        socket.userName = `${users[0].first_name} ${users[0].last_name}`;
+        socket.userEmail = users[0].email;
       }
     } catch (error) {
       console.error('Error fetching user info:', error.message);
@@ -76,18 +76,12 @@ const setupWebSocket = (io, sequelize) => {
         status: 'delivered'
       };
 
-      // Save message to database using Sequelize
+      // Save message to database using pool
       try {
-        const Notification = sequelize.models.Notification;
-        await Notification.create({
-          userId: to,
-          type: 'message',
-          title: `New message from ${socket.userName}`,
-          message: message,
-          data: JSON.stringify(messageData),
-          read: false,
-          createdAt: new Date()
-        });
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (?, ?, ?, ?, false, NOW())',
+          [to, 'message', `New message from ${socket.userName}`, message]
+        );
       } catch (error) {
         console.error('Error saving message:', error.message);
       }
@@ -120,10 +114,9 @@ const setupWebSocket = (io, sequelize) => {
     socket.on('mark-notification-read', async (data) => {
       const { notificationId } = data;
       try {
-        const Notification = sequelize.models.Notification;
-        await Notification.update(
-          { read: true },
-          { where: { id: notificationId, userId: socket.userId } }
+        await pool.query(
+          'UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = ? AND user_id = ?',
+          [notificationId, socket.userId]
         );
       } catch (error) {
         console.error('Error marking notification as read:', error.message);
@@ -148,18 +141,12 @@ const setupWebSocket = (io, sequelize) => {
       timestamp: new Date().toISOString()
     };
 
-    // Save to database using Sequelize
+    // Save to database using pool
     try {
-      const Notification = sequelize.models.Notification;
-      await Notification.create({
-        userId: userId,
-        type: notification.type,
-        title: notification.title,
-        message: notification.message,
-        data: JSON.stringify(notificationData),
-        read: false,
-        createdAt: new Date()
-      });
+      await pool.query(
+        'INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (?, ?, ?, ?, false, NOW())',
+        [userId, notification.type, notification.title, notification.message]
+      );
     } catch (error) {
       console.error('Error saving notification:', error.message);
     }
@@ -170,22 +157,16 @@ const setupWebSocket = (io, sequelize) => {
 
   // Helper function to broadcast to all admins
   const notifyAdmins = async (notification) => {
-    // Get all admin users using Sequelize
+    // Get all admin users using pool
     try {
-      const User = sequelize.models.User;
-      const Role = sequelize.models.Role;
-      const UserRole = sequelize.models.UserRole;
-      
-      const admins = await User.findAll({
-        include: [{
-          model: Role,
-          through: UserRole,
-          where: { name: 'admin' }
-        }],
-        where: { isActive: true }
-      });
+      const [adminUsers] = await pool.query(`
+        SELECT u.id FROM users u
+        INNER JOIN user_roles ur ON u.id = ur.user_id
+        INNER JOIN roles r ON ur.role_id = r.id
+        WHERE r.name = 'admin' AND u.is_active = 1
+      `);
 
-      for (const admin of admins) {
+      for (const admin of adminUsers) {
         await notifyUser(admin.id, notification);
       }
     } catch (error) {

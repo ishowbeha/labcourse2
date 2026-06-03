@@ -68,8 +68,8 @@ const startServer = async () => {
     // Initialize MongoDB (for flexible data - logs, analytics)
     await connectMongoDB();
 
-    // Setup WebSocket handlers (pass sequelize for model-based operations)
-    setupWebSocket(io, sequelize);
+    // Setup WebSocket handlers (pass the MySQL pool)
+    setupWebSocket(io, pool);
 
     // Routes - pass the MySQL pool
     app.use('/api/auth', createAuthRoutes(pool));
@@ -122,18 +122,14 @@ const startServer = async () => {
     console.log(`   POST /api/stadiums/:stadiumId/sections - Create section`);
     console.log(`   PUT /api/stadiums/:stadiumId/sections/:sectionId - Update section`);
     console.log(`   DELETE /api/stadiums/:stadiumId/sections/:sectionId - Delete section`);
-    console.log(`⚽ Football API endpoints (powered by API-Football):`);
-    console.log(`   GET /api/football/upcoming - Upcoming matches (Albania, Kosovo, Europe)`);
+    console.log(`⚽ Football API endpoints (powered by TheSportsDB):`);
+    console.log(`   GET /api/football/upcoming - Upcoming matches (World Cup, Europe, leagues)`);
     console.log(`   GET /api/football/live - Live matches`);
     console.log(`   GET /api/football/team/:name - Search matches by team`);
-    console.log(`   GET /api/football/league/:id - Matches by league ID`);
-    console.log(`   GET /api/football/leagues - Available league IDs`);
+    console.log(`   GET /api/football/competition/:id - Matches by league ID`);
+    console.log(`   GET /api/football/competitions - Available competition IDs`);
     console.log(`   POST /api/football/sync - Sync API matches into local database`);
-    if (!process.env.API_FOOTBALL_KEY) {
-      console.log(`   ⚠️  Set API_FOOTBALL_KEY in .env to enable (free at api-football.com)`);
-    } else {
-      console.log(`   ✅ API-Football is configured with key (${process.env.API_FOOTBALL_KEY.substring(0, 8)}...)`);
-    }
+    console.log(`   ✅ TheSportsDB API is configured with free key`);
       console.log(`💡 Visit http://localhost:${PORT}/api/health to check status`);
     });
   } catch (error) {

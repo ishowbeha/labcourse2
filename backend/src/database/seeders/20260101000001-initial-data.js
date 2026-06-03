@@ -176,26 +176,24 @@ module.exports = {
     }
 
     // Create matches (skip if already exist)
+    // Only local league matches as static data — real fixtures come from API sync
     const matches = [
-      { home_team: 'Albania', away_team: 'Kosova', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-06-12', match_time: '20:45', competition: 'Friendly Match', round: 'International Friendly', base_price: 30 },
-      { home_team: 'Kosova', away_team: 'Albania', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-06-19', match_time: '20:45', competition: 'Friendly Match', round: 'International Friendly', base_price: 25 },
-      { home_team: 'Albania', away_team: 'Serbia', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-06-26', match_time: '20:45', competition: 'Friendly Match', round: 'International Friendly', base_price: 35 },
-      { home_team: 'Albania', away_team: 'Greece', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-09-04', match_time: '20:45', competition: 'Euro 2028 Qualifiers', round: 'Matchday 1', base_price: 40 },
-      { home_team: 'Kosova', away_team: 'Turkey', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-09-05', match_time: '20:45', competition: 'Euro 2028 Qualifiers', round: 'Matchday 1', base_price: 35 },
-      { home_team: 'Albania', away_team: 'Montenegro', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-09-07', match_time: '20:45', competition: 'Euro 2028 Qualifiers', round: 'Matchday 2', base_price: 28 },
-      { home_team: 'Kosova', away_team: 'North Macedonia', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-09-08', match_time: '18:00', competition: 'Euro 2028 Qualifiers', round: 'Matchday 2', base_price: 20 },
+      // ===== FIFA World Cup 2026 (synced from API-Football) =====
+      // These will be imported via "Sync Fixtures" button
+
+      // ===== UEFA Nations League & Euro Qualifiers =====
       { home_team: 'Albania', away_team: 'Czech Republic', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-10-10', match_time: '20:45', competition: 'UEFA Nations League', round: 'Group Stage', base_price: 35 },
       { home_team: 'Kosova', away_team: 'Bosnia', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-10-11', match_time: '20:45', competition: 'UEFA Nations League', round: 'Group Stage', base_price: 22 },
       { home_team: 'Albania', away_team: 'Iceland', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-10-14', match_time: '20:45', competition: 'UEFA Nations League', round: 'Group Stage', base_price: 28 },
       { home_team: 'Kosova', away_team: 'Slovenia', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-10-15', match_time: '18:00', competition: 'UEFA Nations League', round: 'Group Stage', base_price: 20 },
       { home_team: 'Albania', away_team: 'Wales', stadium_name: 'National Stadium (Air Albania Stadium)', match_date: '2026-11-14', match_time: '20:45', competition: 'Euro 2028 Qualifiers', round: 'Matchday 5', base_price: 45 },
       { home_team: 'Kosova', away_team: 'Sweden', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-11-15', match_time: '20:45', competition: 'Euro 2028 Qualifiers', round: 'Matchday 5', base_price: 38 },
+
+      // ===== Domestic Leagues =====
       { home_team: 'Tirana', away_team: 'Partizani', stadium_name: 'Selman Stërmasi Stadium', match_date: '2026-08-22', match_time: '18:00', competition: 'Kategoria Superiore', round: 'Matchday 1', base_price: 15 },
       { home_team: 'Skënderbeu', away_team: 'Tirana', stadium_name: 'Korçë Stadium', match_date: '2026-08-29', match_time: '19:30', competition: 'Kategoria Superiore', round: 'Matchday 2', base_price: 12 },
       { home_team: 'Prishtina', away_team: 'Drita', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-08-23', match_time: '20:00', competition: 'Football Superleague of Kosova', round: 'Matchday 1', base_price: 18 },
-      { home_team: 'Balkan', away_team: 'Prishtina', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-08-30', match_time: '18:00', competition: 'Football Superleague of Kosova', round: 'Matchday 2', base_price: 15 },
-      { home_team: 'Albania U21', away_team: 'Kosova U21', stadium_name: 'Loro Boriçi Stadium', match_date: '2026-09-11', match_time: '17:00', competition: 'U21 Championship', round: 'Group Stage', base_price: 10 },
-      { home_team: 'Kosova U21', away_team: 'Albania U21', stadium_name: 'Loro Boriçi Stadium', match_date: '2026-10-09', match_time: '17:00', competition: 'U21 Championship', round: 'Group Stage', base_price: 10 }
+      { home_team: 'Balkan', away_team: 'Prishtina', stadium_name: 'Fadil Vokrri Stadium', match_date: '2026-08-30', match_time: '18:00', competition: 'Football Superleague of Kosova', round: 'Matchday 2', base_price: 15 }
     ];
 
     for (const match of matches) {

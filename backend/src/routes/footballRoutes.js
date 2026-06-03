@@ -5,7 +5,7 @@ const createFootballRoutes = (sequelize) => {
   const router = express.Router();
   const footballController = new FootballController(sequelize);
 
-  // GET /api/football/upcoming - Get upcoming matches from all leagues
+  // GET /api/football/upcoming - Get upcoming matches from all competitions
   router.get('/upcoming', footballController.getUpcomingMatches);
 
   // GET /api/football/live - Get live matches
@@ -14,11 +14,11 @@ const createFootballRoutes = (sequelize) => {
   // GET /api/football/team/:teamName - Get matches for a specific team
   router.get('/team/:teamName', footballController.getTeamMatches);
 
-  // GET /api/football/league/:leagueId - Get matches for a specific league
-  router.get('/league/:leagueId', footballController.getLeagueMatches);
+  // GET /api/football/competition/:code - Get matches for a competition (e.g. WC, CL, PL)
+  router.get('/competition/:code', footballController.getCompetitionMatches);
 
-  // GET /api/football/leagues - Get available league IDs
-  router.get('/leagues', footballController.getAvailableLeagues);
+  // GET /api/football/competitions - Get available competition codes
+  router.get('/competitions', footballController.getAvailableCompetitions);
 
   // POST /api/football/sync - Sync API matches into local database
   router.post('/sync', footballController.syncMatches);

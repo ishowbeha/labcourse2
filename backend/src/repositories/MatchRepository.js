@@ -3,6 +3,35 @@ class MatchRepository {
     this.pool = pool;
   }
 
+  // Map database snake_case to camelCase for frontend
+  _mapMatch(match) {
+    if (!match) return null;
+    return {
+      id: match.id,
+      homeTeam: match.home_team,
+      awayTeam: match.away_team,
+      stadiumId: match.stadium_id,
+      matchDate: match.match_date,
+      matchTime: match.match_time,
+      competition: match.competition,
+      round: match.round,
+      status: match.status,
+      homeScore: match.home_score,
+      awayScore: match.away_score,
+      basePrice: match.base_price,
+      maxTicketsPerUser: match.max_tickets_per_user,
+      saleStartDate: match.sale_start_date,
+      saleEndDate: match.sale_end_date,
+      createdBy: match.created_by,
+      updatedBy: match.updated_by,
+      createdAt: match.created_at,
+      updatedAt: match.updated_at,
+      stadiumName: match.stadium_name,
+      stadiumCity: match.stadium_city,
+      stadiumCapacity: match.stadium_capacity
+    };
+  }
+
   // Get all matches with optional filters
   async findAll(filters = {}) {
     try {
@@ -61,7 +90,7 @@ class MatchRepository {
         ORDER BY m.match_date ASC, m.match_time ASC
       `, params);
 
-      return rows;
+      return rows.map(match => this._mapMatch(match));
     } catch (error) {
       throw new Error(`Error fetching matches: ${error.message}`);
     }
@@ -85,7 +114,7 @@ class MatchRepository {
         throw new Error('Match not found');
       }
 
-      return rows[0];
+      return this._mapMatch(rows[0]);
     } catch (error) {
       if (error.message === 'Match not found') {
         throw error;
@@ -174,7 +203,7 @@ class MatchRepository {
         WHERE m.stadium_id = ?
         ORDER BY m.match_date ASC, m.match_time ASC
       `, [stadiumId]);
-      return rows;
+      return rows.map(match => this._mapMatch(match));
     } catch (error) {
       throw new Error(`Error fetching matches by stadium: ${error.message}`);
     }

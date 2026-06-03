@@ -9,14 +9,14 @@ class FootballController {
 
   /**
    * GET /api/football/upcoming
-   * Get upcoming matches from all relevant leagues
+   * Get upcoming matches from all relevant competitions
    */
   getUpcomingMatches = async (req, res, next) => {
     try {
       if (!this.footballApi.isConfigured()) {
         return res.status(503).json({
           success: false,
-          message: 'API-Football is not configured. Set API_FOOTBALL_KEY in .env',
+          message: 'Football API is not configured. Set FOOTBALL_DATA_KEY in .env',
           data: []
         });
       }
@@ -43,7 +43,7 @@ class FootballController {
       if (!this.footballApi.isConfigured()) {
         return res.status(503).json({
           success: false,
-          message: 'API-Football is not configured. Set API_FOOTBALL_KEY in .env',
+          message: 'Football API is not configured. Set FOOTBALL_DATA_KEY in .env',
           data: []
         });
       }
@@ -69,7 +69,7 @@ class FootballController {
       if (!this.footballApi.isConfigured()) {
         return res.status(503).json({
           success: false,
-          message: 'API-Football is not configured. Set API_FOOTBALL_KEY in .env',
+          message: 'Football API is not configured. Set FOOTBALL_DATA_KEY in .env',
           data: []
         });
       }
@@ -89,23 +89,22 @@ class FootballController {
   };
 
   /**
-   * GET /api/football/league/:leagueId
-   * Get matches for a specific league
+   * GET /api/football/competition/:id
+   * Get matches for a specific league ID (e.g. 4669 = World Cup, 4328 = Premier League)
    */
-  getLeagueMatches = async (req, res, next) => {
+  getCompetitionMatches = async (req, res, next) => {
     try {
       if (!this.footballApi.isConfigured()) {
         return res.status(503).json({
           success: false,
-          message: 'API-Football is not configured. Set API_FOOTBALL_KEY in .env',
+          message: 'Football API not available',
           data: []
         });
       }
 
-      const leagueId = parseInt(req.params.leagueId);
-      const season = parseInt(req.query.season) || 2026;
+      const leagueId = parseInt(req.params.id) || req.params.id;
       const limit = parseInt(req.query.limit) || 20;
-      const matches = await this.footballApi.getUpcomingMatches(leagueId, season, limit);
+      const matches = await this.footballApi.getUpcomingMatches(leagueId, limit);
 
       res.json({
         success: true,
@@ -118,26 +117,17 @@ class FootballController {
   };
 
   /**
-   * GET /api/football/leagues
-   * Get available league IDs
+   * GET /api/football/competitions
+   * Get available competition codes
    */
-  getAvailableLeagues = async (req, res, next) => {
+  getAvailableCompetitions = async (req, res, next) => {
     try {
-      const leagues = this.footballApi.getLeagueIds();
-      
-      const leagueNames = {
-        albania: 'Kategoria Superiore (Albania)',
-        kosovo: 'Superliga (Kosovo)',
-        champions: 'UEFA Champions League',
-        euro: 'Euro Championship',
-        nations: 'UEFA Nations League',
-        world: 'World Cup'
-      };
+      const codes = this.footballApi.getCompetitionCodes();
 
-      const formatted = Object.entries(leagues).map(([key, id]) => ({
-        key,
-        id,
-        name: leagueNames[key] || key
+      const formatted = Object.entries(codes).map(([name, code]) => ({
+        name,
+        code,
+        key: name.toLowerCase().replace(/\s+/g, '_')
       }));
 
       res.json({
@@ -148,6 +138,7 @@ class FootballController {
       next(error);
     }
   };
+
   /**
    * POST /api/football/sync
    * Sync external API matches into local MySQL database
@@ -164,7 +155,7 @@ class FootballController {
       if (!this.footballApi.isConfigured()) {
         return res.status(503).json({
           success: false,
-          message: 'API-Football is not configured. Set API_FOOTBALL_KEY in .env',
+          message: 'Football API is not configured. Set FOOTBALL_DATA_KEY in .env',
           synced: 0
         });
       }
@@ -174,7 +165,7 @@ class FootballController {
       res.json({
         success: true,
         message: result.synced > 0 
-          ? `Successfully synced ${result.synced} matches from API-Football`
+          ? `Successfully synced ${result.synced} matches from football-data.org`
           : 'No new matches to sync',
         ...result
       });
