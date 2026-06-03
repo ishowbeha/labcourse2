@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
+import OrderService from '../services/OrderService';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const AdminDashboard = () => {
@@ -10,10 +11,13 @@ const AdminDashboard = () => {
   const screenSize = useResponsiveStyles();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState(null);
+  const [localOrders, setLocalOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const local = OrderService.getOrders();
+    setLocalOrders(local);
     fetchDashboardStats();
   }, []);
 
@@ -50,6 +54,30 @@ const AdminDashboard = () => {
     navigate('/home');
     return null;
   }
+
+  // Merge local orders stats with DB stats - ONLY actual sales
+  const localConfirmedOrders = localOrders.filter(o => o.status === 'confirmed' || o.status === 'completed');
+  const localTicketsSold = localConfirmedOrders.reduce((sum, o) => sum + (o.tickets || 0), 0);
+  const localRevenue = localConfirmedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+  const totalTicketsSold = localTicketsSold;
+  const totalRevenue = localRevenue;
+  const recentOrders = localConfirmedOrders.length;
+  const ticketsAvailable = 0;
+
+  // Top matches from local orders by revenue
+  const localMatchRevenue = {};
+  localConfirmedOrders.forEach(o => {
+    const matchName = o.match || 'Unknown';
+    if (!localMatchRevenue[matchName]) {
+      localMatchRevenue[matchName] = { revenue: 0, tickets: 0 };
+    }
+    localMatchRevenue[matchName].revenue += o.total || 0;
+    localMatchRevenue[matchName].tickets += o.tickets || 0;
+  });
+
+  // Combine DB top matches with local orders and sort by revenue descending
+  const dbTopMatches = stats?.ticketsByStatus?.filter(t => t.status === 'sold') || [];
+  const dbSoldCount = dbTopMatches.reduce((sum, t) => sum + t.count, 0);
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
@@ -135,18 +163,10 @@ const AdminDashboard = () => {
             </p>
           </div>
           <div style={styles.userInfo}>
-            <Link to="/home" style={styles.homeBtn}>
-              🏠 Home
-            </Link>
-            <span style={styles.userName}>
-              {user?.first_name} {user?.last_name}
-            </span>
+            <Link to="/home" style={styles.homeBtn}>🏠 Home</Link>
+            <span style={styles.userName}>{user?.first_name} {user?.last_name}</span>
             <span style={styles.userRole}>Administrator</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>
-              Logout
-            </button>
-            
-            {/* Hamburger Menu Button for Mobile */}
+            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
             <button 
               className={`hamburger-btn ${mobileMenuOpen ? 'open' : ''}`} 
               onClick={toggleMobileMenu}
@@ -160,7 +180,6 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* Mobile Admin Menu Overlay */}
         {mobileMenuOpen && (
           <div style={styles.mobileOverlay} onClick={closeMobileMenu}>
             <div style={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
@@ -191,6 +210,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
+        {/* Key Metrics */}
         <div style={screenSize === 'mobile' ? responsiveStyles.mobile.stats : screenSize === 'tablet' ? responsiveStyles.tablet.stats : styles.stats}>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #3498db' }}>
             <span style={styles.statNumber}>{formatNumber(stats?.totalUsers)}</span>
@@ -201,36 +221,87 @@ const AdminDashboard = () => {
             <span style={styles.statLabel}>Active Matches</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #e74c3c' }}>
-            <span style={styles.statNumber}>{formatNumber(stats?.totalTicketsSold)}</span>
+            <span style={styles.statNumber}>{formatNumber(totalTicketsSold)}</span>
             <span style={styles.statLabel}>Tickets Sold</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #f39c12' }}>
-            <span style={styles.statNumber}>{formatCurrency(stats?.totalRevenue)}</span>
+            <span style={styles.statNumber}>{formatNumber(ticketsAvailable)}</span>
+            <span style={styles.statLabel}>Tickets Available</span>
+          </div>
+          <div style={{ ...styles.statCard, borderLeft: '4px solid #27ae60' }}>
+            <span style={styles.statNumber}>{formatCurrency(totalRevenue)}</span>
             <span style={styles.statLabel}>Total Revenue</span>
+          </div>
+          <div style={{ ...styles.statCard, borderLeft: '4px solid #9b59b6' }}>
+            <span style={styles.statNumber}>{formatNumber(recentOrders)}</span>
+            <span style={styles.statLabel}>Recent Orders (7 days)</span>
           </div>
         </div>
 
-        {/* Quick Stats Summary */}
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStats : screenSize === 'tablet' ? responsiveStyles.tablet.quickStats : styles.quickStats}>
-          <h2 style={styles.sectionTitle}>📈 Quick Overview</h2>
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStatsGrid : styles.quickStatsGrid}>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>Recent Orders (7 days)</span>
-              <span style={styles.quickStatValue}>{stats?.recentOrders || 0}</span>
-            </div>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>Ticket Status Distribution</span>
-              <div style={styles.ticketStatus}>
-                {stats?.ticketsByStatus?.map((ticket) => (
-                  <div key={ticket.status} style={styles.ticketStatusItem}>
-                    <span style={{
-                      ...styles.ticketStatusDot,
-                      backgroundColor: getStatusColor(ticket.status)
-                    }}></span>
-                    <span>{ticket.status}: {ticket.count}</span>
+        {/* Most Profitable Matches */}
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStats : responsiveStyles.mobile.quickStats || styles.quickStats}>
+          <h2 style={styles.sectionTitle}>🏆 Most Profitable Matches</h2>
+          
+          {localConfirmedOrders.length > 0 ? (
+            <div style={styles.topMatchesList}>
+              {localConfirmedOrders
+                .reduce((acc, o) => {
+                  const existing = acc.find(a => a.match === o.match);
+                  if (existing) {
+                    existing.revenue += o.total || 0;
+                    existing.tickets += o.tickets || 0;
+                  } else {
+                    acc.push({ match: o.match, revenue: o.total || 0, tickets: o.tickets || 0, date: o.matchDate });
+                  }
+                  return acc;
+                }, [])
+                .sort((a, b) => b.revenue - a.revenue)
+                .slice(0, 10)
+                .map((m, i) => (
+                  <div key={i} style={styles.topMatchRow}>
+                    <span style={styles.topMatchRank}>#{i + 1}</span>
+                    <div style={styles.topMatchInfo}>
+                      <span style={styles.topMatchName}>{m.match}</span>
+                      <span style={styles.topMatchMeta}>{m.tickets} tickets • {m.date}</span>
+                    </div>
+                    <span style={styles.topMatchRevenue}>{formatCurrency(m.revenue)}</span>
                   </div>
                 ))}
-              </div>
+            </div>
+          ) : (
+            <div style={styles.noData}>
+              <p>No ticket sales data yet. Purchase tickets to see analytics here.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Ticket Status Overview */}
+        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStats : responsiveStyles.mobile.quickStats || styles.quickStats}>
+          <h2 style={styles.sectionTitle}>📈 Ticket Status Overview</h2>
+          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStatsGrid : styles.quickStatsGrid}>
+            <div style={styles.quickStatItem}>
+              <span style={styles.quickStatLabel}>DB Tickets Sold</span>
+              <span style={styles.quickStatValue}>{stats?.totalTicketsSold || 0}</span>
+            </div>
+            <div style={styles.quickStatItem}>
+              <span style={styles.quickStatLabel}>Local Tickets Sold (via app)</span>
+              <span style={styles.quickStatValue}>{localTicketsSold}</span>
+            </div>
+            <div style={styles.quickStatItem}>
+              <span style={styles.quickStatLabel}>DB Revenue</span>
+              <span style={styles.quickStatValue}>{formatCurrency(stats?.totalRevenue || 0)}</span>
+            </div>
+            <div style={styles.quickStatItem}>
+              <span style={styles.quickStatLabel}>Local Revenue (via app)</span>
+              <span style={styles.quickStatValue}>{formatCurrency(localRevenue)}</span>
+            </div>
+            <div style={styles.quickStatItem}>
+              <span style={styles.quickStatLabel}>Matches</span>
+              <span style={styles.quickStatValue}>{stats?.totalMatches || 0}</span>
+            </div>
+            <div style={styles.quickStatItem}>
+              <span style={styles.quickStatLabel}>Tickets Available</span>
+              <span style={styles.quickStatValue}>{formatNumber(ticketsAvailable)}</span>
             </div>
           </div>
         </div>
@@ -297,305 +368,73 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: {
-    margin: '0',
-    fontSize: '28px',
-  },
-  welcome: {
-    margin: '5px 0 0 0',
-    color: '#bdc3c7',
-    fontSize: '14px',
-  },
-  userInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
+  title: { margin: '0', fontSize: '28px' },
+  welcome: { margin: '5px 0 0 0', color: '#bdc3c7', fontSize: '14px' },
+  userInfo: { display: 'flex', alignItems: 'center', gap: '16px' },
   homeBtn: {
     backgroundColor: 'rgba(255,255,255,0.15)',
     border: '1px solid rgba(255,255,255,0.3)',
-    color: 'white',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    textDecoration: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    transition: 'background-color 0.2s',
+    color: 'white', padding: '8px 16px',
+    borderRadius: '6px', cursor: 'pointer', fontSize: '14px',
+    textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px',
   },
-  userName: {
-    fontWeight: '600',
-  },
-  userRole: {
-    backgroundColor: '#3498db',
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  hamburgerBtn: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: '5px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '5px',
-    zIndex: 1001,
-  },
-  hamburgerLine: {
-    width: '25px',
-    height: '3px',
-    backgroundColor: 'white',
-    borderRadius: '2px',
-    transition: 'transform 0.3s, opacity 0.3s',
-  },
-  mobileOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 999,
-    opacity: 1,
-    visibility: 'visible',
-    transition: 'opacity 0.3s, visibility 0.3s',
-  },
-  mobileMenu: {
-    position: 'fixed',
-    top: 0,
-    right: 0,
-    width: '280px',
-    height: '100%',
-    backgroundColor: '#2c3e50',
-    zIndex: 1000,
-    padding: '20px',
-    boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)',
-    transition: 'right 0.3s ease-in-out',
-    overflowY: 'auto',
-  },
-  mobileMenuHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '30px',
-    paddingBottom: '20px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  mobileUserName: {
-    color: 'white',
-    fontSize: '16px',
-    fontWeight: '600',
-  },
-  mobileLogoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-  },
-  mobileNav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  mobileNavLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '16px',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '30px 20px',
-  },
-  errorBanner: {
-    backgroundColor: '#fee2e2',
-    border: '1px solid #ef4444',
-    color: '#dc2626',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  retryBtn: {
-    backgroundColor: '#dc2626',
-    color: 'white',
-    border: 'none',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '20px',
-    marginBottom: '30px',
-  },
-  statCard: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-    textAlign: 'center',
-  },
-  statNumber: {
-    display: 'block',
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#2c3e50',
-    marginBottom: '8px',
-  },
-  statLabel: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-  },
-  quickStats: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-    marginBottom: '30px',
-  },
-  sectionTitle: {
-    fontSize: '20px',
-    color: '#2c3e50',
-    marginBottom: '16px',
-  },
-  quickStatsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '20px',
-  },
-  quickStatItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  quickStatLabel: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-    fontWeight: '600',
-  },
-  quickStatValue: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#2c3e50',
-  },
-  ticketStatus: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-  },
-  ticketStatusItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    color: '#555',
-  },
-  ticketStatusDot: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '20px',
-  },
-  cardLink: {
-    textDecoration: 'none',
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-  },
-  cardTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '18px',
-    color: '#2c3e50',
-  },
-  cardDescription: {
-    margin: '0',
-    fontSize: '14px',
-    color: '#7f8c8d',
-  },
+  userName: { fontWeight: '600' },
+  userRole: { backgroundColor: '#3498db', padding: '4px 12px', borderRadius: '12px', fontSize: '12px' },
+  logoutBtn: { backgroundColor: 'transparent', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
+  hamburgerBtn: { display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '5px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', zIndex: 1001 },
+  hamburgerLine: { width: '25px', height: '3px', backgroundColor: 'white', borderRadius: '2px', transition: 'transform 0.3s, opacity 0.3s' },
+  mobileOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 999, opacity: 1, visibility: 'visible' },
+  mobileMenu: { position: 'fixed', top: 0, right: 0, width: '280px', height: '100%', backgroundColor: '#2c3e50', zIndex: 1000, padding: '20px', boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)', overflowY: 'auto' },
+  mobileMenuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', paddingBottom: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' },
+  mobileUserName: { color: 'white', fontSize: '16px', fontWeight: '600' },
+  mobileLogoutBtn: { backgroundColor: 'transparent', border: '1px solid rgba(255, 255, 255, 0.3)', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
+  mobileNav: { display: 'flex', flexDirection: 'column', gap: '10px' },
+  mobileNavLink: { color: 'white', textDecoration: 'none', fontSize: '16px', padding: '12px 16px', borderRadius: '8px' },
+  main: { maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' },
+  errorBanner: { backgroundColor: '#fee2e2', border: '1px solid #ef4444', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  retryBtn: { backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' },
+  stats: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '30px' },
+  statCard: { backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', textAlign: 'center' },
+  statNumber: { display: 'block', fontSize: '32px', fontWeight: '700', color: '#2c3e50', marginBottom: '8px' },
+  statLabel: { fontSize: '14px', color: '#7f8c8d' },
+  quickStats: { backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '30px' },
+  sectionTitle: { fontSize: '20px', color: '#2c3e50', margin: '0 0 16px 0' },
+  quickStatsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' },
+  quickStatItem: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  quickStatLabel: { fontSize: '14px', color: '#7f8c8d', fontWeight: '600' },
+  quickStatValue: { fontSize: '24px', fontWeight: '700', color: '#2c3e50' },
+  // Top matches
+  topMatchesList: { display: 'flex', flexDirection: 'column', gap: '8px' },
+  topMatchRow: { display: 'flex', alignItems: 'center', gap: '16px', padding: '12px 16px', backgroundColor: '#f8f9fa', borderRadius: '8px' },
+  topMatchRank: { fontSize: '16px', fontWeight: '700', color: '#f39c12', minWidth: '28px' },
+  topMatchInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: '2px' },
+  topMatchName: { fontSize: '15px', fontWeight: '600', color: '#2c3e50' },
+  topMatchMeta: { fontSize: '12px', color: '#7f8c8d' },
+  topMatchRevenue: { fontSize: '18px', fontWeight: '700', color: '#27ae60' },
+  noData: { textAlign: 'center', padding: '20px', color: '#95a5a6' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' },
+  cardLink: { textDecoration: 'none' },
+  card: { backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+  cardTitle: { margin: '0 0 8px 0', fontSize: '18px', color: '#2c3e50' },
+  cardDescription: { margin: '0', fontSize: '14px', color: '#7f8c8d' },
 };
 
-// Responsive styles
 const responsiveStyles = {
   mobile: {
-    main: {
-      ...styles.main,
-      padding: '20px 15px',
-    },
-    stats: {
-      ...styles.stats,
-      gridTemplateColumns: '1fr',
-    },
-    quickStats: {
-      ...styles.quickStats,
-      padding: '16px',
-    },
-    quickStatsGrid: {
-      ...styles.quickStatsGrid,
-      gridTemplateColumns: '1fr',
-    },
-    grid: {
-      ...styles.grid,
-      gridTemplateColumns: '1fr',
-    },
-    hamburgerBtn: {
-      display: 'flex',
-    },
+    main: { ...styles.main, padding: '20px 15px' },
+    stats: { ...styles.stats, gridTemplateColumns: '1fr' },
+    quickStats: { ...styles.quickStats, padding: '16px' },
+    quickStatsGrid: { ...styles.quickStatsGrid, gridTemplateColumns: '1fr' },
+    grid: { ...styles.grid, gridTemplateColumns: '1fr' },
+    hamburgerBtn: { display: 'flex' },
   },
   tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    stats: {
-      ...styles.stats,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-    },
-    quickStats: {
-      ...styles.quickStats,
-      padding: '20px',
-    },
-    quickStatsGrid: {
-      ...styles.quickStatsGrid,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-    },
-    grid: {
-      ...styles.grid,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-    },
-    hamburgerBtn: {
-      display: 'none',
-    },
+    main: { ...styles.main, padding: '30px 15px' },
+    stats: { ...styles.stats, gridTemplateColumns: 'repeat(3, 1fr)' },
+    quickStats: { ...styles.quickStats, padding: '20px' },
+    quickStatsGrid: { ...styles.quickStatsGrid, gridTemplateColumns: 'repeat(2, 1fr)' },
+    grid: { ...styles.grid, gridTemplateColumns: 'repeat(2, 1fr)' },
+    hamburgerBtn: { display: 'none' },
   }
 };
 
