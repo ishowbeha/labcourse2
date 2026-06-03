@@ -349,6 +349,13 @@ class AdminRepository {
     );
     return this.getOrderById(id);
   }
+
+  // Hard delete order
+  async deleteOrder(id) {
+    await this.pool.query('DELETE FROM order_items WHERE order_id = ?', [id]);
+    await this.pool.query('DELETE FROM orders WHERE id = ?', [id]);
+    return true;
+  }
 }
 
 module.exports = AdminRepository;

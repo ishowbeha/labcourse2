@@ -230,6 +230,20 @@ class AdminController {
       next(error);
     }
   }
+
+  // Delete order
+  async deleteOrder(req, res, next) {
+    try {
+      const { id } = req.params;
+      await this.service.deleteOrder(id);
+      res.json({
+        success: true,
+        message: 'Order deleted successfully'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = AdminController;

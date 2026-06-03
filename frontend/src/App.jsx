@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminStadiums from './pages/AdminStadiums';
 import AdminReports from './pages/AdminReports';
+import AdminOrders from './pages/AdminOrders';
 import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
 import Stadiums from './pages/Stadiums';
@@ -195,7 +196,7 @@ function AppRoutes() {
         path="/admin/orders" 
         element={
           <AdminRoute>
-            <AdminPlaceholder title="Order Management" />
+            <AdminOrders />
           </AdminRoute>
         } 
       />

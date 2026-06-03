@@ -64,21 +64,6 @@ const AdminDashboard = () => {
   const recentOrders = localConfirmedOrders.length;
   const ticketsAvailable = 0;
 
-  // Top matches from local orders by revenue
-  const localMatchRevenue = {};
-  localConfirmedOrders.forEach(o => {
-    const matchName = o.match || 'Unknown';
-    if (!localMatchRevenue[matchName]) {
-      localMatchRevenue[matchName] = { revenue: 0, tickets: 0 };
-    }
-    localMatchRevenue[matchName].revenue += o.total || 0;
-    localMatchRevenue[matchName].tickets += o.tickets || 0;
-  });
-
-  // Combine DB top matches with local orders and sort by revenue descending
-  const dbTopMatches = stats?.ticketsByStatus?.filter(t => t.status === 'sold') || [];
-  const dbSoldCount = dbTopMatches.reduce((sum, t) => sum + t.count, 0);
-
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -235,74 +220,6 @@ const AdminDashboard = () => {
           <div style={{ ...styles.statCard, borderLeft: '4px solid #9b59b6' }}>
             <span style={styles.statNumber}>{formatNumber(recentOrders)}</span>
             <span style={styles.statLabel}>Recent Orders (7 days)</span>
-          </div>
-        </div>
-
-        {/* Most Profitable Matches */}
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStats : responsiveStyles.mobile.quickStats || styles.quickStats}>
-          <h2 style={styles.sectionTitle}>🏆 Most Profitable Matches</h2>
-          
-          {localConfirmedOrders.length > 0 ? (
-            <div style={styles.topMatchesList}>
-              {localConfirmedOrders
-                .reduce((acc, o) => {
-                  const existing = acc.find(a => a.match === o.match);
-                  if (existing) {
-                    existing.revenue += o.total || 0;
-                    existing.tickets += o.tickets || 0;
-                  } else {
-                    acc.push({ match: o.match, revenue: o.total || 0, tickets: o.tickets || 0, date: o.matchDate });
-                  }
-                  return acc;
-                }, [])
-                .sort((a, b) => b.revenue - a.revenue)
-                .slice(0, 10)
-                .map((m, i) => (
-                  <div key={i} style={styles.topMatchRow}>
-                    <span style={styles.topMatchRank}>#{i + 1}</span>
-                    <div style={styles.topMatchInfo}>
-                      <span style={styles.topMatchName}>{m.match}</span>
-                      <span style={styles.topMatchMeta}>{m.tickets} tickets • {m.date}</span>
-                    </div>
-                    <span style={styles.topMatchRevenue}>{formatCurrency(m.revenue)}</span>
-                  </div>
-                ))}
-            </div>
-          ) : (
-            <div style={styles.noData}>
-              <p>No ticket sales data yet. Purchase tickets to see analytics here.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Ticket Status Overview */}
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStats : responsiveStyles.mobile.quickStats || styles.quickStats}>
-          <h2 style={styles.sectionTitle}>📈 Ticket Status Overview</h2>
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickStatsGrid : styles.quickStatsGrid}>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>DB Tickets Sold</span>
-              <span style={styles.quickStatValue}>{stats?.totalTicketsSold || 0}</span>
-            </div>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>Local Tickets Sold (via app)</span>
-              <span style={styles.quickStatValue}>{localTicketsSold}</span>
-            </div>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>DB Revenue</span>
-              <span style={styles.quickStatValue}>{formatCurrency(stats?.totalRevenue || 0)}</span>
-            </div>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>Local Revenue (via app)</span>
-              <span style={styles.quickStatValue}>{formatCurrency(localRevenue)}</span>
-            </div>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>Matches</span>
-              <span style={styles.quickStatValue}>{stats?.totalMatches || 0}</span>
-            </div>
-            <div style={styles.quickStatItem}>
-              <span style={styles.quickStatLabel}>Tickets Available</span>
-              <span style={styles.quickStatValue}>{formatNumber(ticketsAvailable)}</span>
-            </div>
           </div>
         </div>
 

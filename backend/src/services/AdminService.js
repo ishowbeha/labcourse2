@@ -167,6 +167,18 @@ class AdminService {
       throw new Error(`Failed to fetch top selling matches: ${error.message}`);
     }
   }
+
+  async deleteOrder(id) {
+    try {
+      const order = await this.repository.getOrderById(id);
+      if (!order) {
+        throw new Error('Order not found');
+      }
+      return await this.repository.deleteOrder(id);
+    } catch (error) {
+      throw new Error(`Failed to delete order: ${error.message}`);
+    }
+  }
 }
 
 module.exports = AdminService;

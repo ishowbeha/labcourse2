@@ -148,6 +148,12 @@ const AdminService = {
   deleteSection: async (stadiumId, sectionId) => {
     const response = await api.delete(`/stadiums/${stadiumId}/sections/${sectionId}`);
     return response;
+  },
+
+  // Delete order
+  deleteOrder: async (id) => {
+    const response = await api.delete(`/admin/orders/${id}`);
+    return response;
   }
 };
 
