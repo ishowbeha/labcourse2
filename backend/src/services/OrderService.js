@@ -84,10 +84,23 @@ class OrderService {
     const offset = (page - 1) * limit;
 
     const [orders] = await this.pool.query(`
-      SELECT o.*,
-        COUNT(oi.id) as items_count
+      SELECT 
+        o.*,
+        m.home_team,
+        m.away_team,
+        m.match_date,
+        m.match_time,
+        m.competition,
+        s.name as stadium_name,
+        GROUP_CONCAT(DISTINCT sec.name ORDER BY sec.name SEPARATOR ', ') as section_names,
+        COUNT(DISTINCT oi.id) as items_count,
+        COUNT(DISTINCT t.id) as ticket_count
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN tickets t ON oi.ticket_id = t.id
+      LEFT JOIN matches m ON t.match_id = m.id
+      LEFT JOIN sections sec ON t.section_id = sec.id
+      LEFT JOIN stadiums s ON m.stadium_id = s.id
       WHERE o.user_id = ?
       GROUP BY o.id
       ORDER BY o.created_at DESC
@@ -99,8 +112,31 @@ class OrderService {
       [userId]
     );
 
+    // Map orders to include match details
+    const mappedOrders = orders.map(order => ({
+      id: order.id,
+      order_number: order.order_number,
+      total_amount: order.total_amount,
+      status: order.status,
+      payment_method: order.payment_method,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      match_name: order.home_team && order.away_team 
+        ? `${order.home_team} vs ${order.away_team}` 
+        : null,
+      home_team: order.home_team,
+      away_team: order.away_team,
+      match_date: order.match_date,
+      match_time: order.match_time,
+      competition: order.competition,
+      stadium_name: order.stadium_name,
+      section_names: order.section_names,
+      items_count: order.items_count,
+      ticket_count: order.ticket_count
+    }));
+
     return {
-      orders,
+      orders: mappedOrders,
       total: totalRows[0].count,
       page,
       limit,

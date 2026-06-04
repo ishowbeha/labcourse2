@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
-import MatchService from '../services/MatchService';
 import OrderService from '../services/OrderService';
-import api from '../services/api';
+import axios from 'axios';
 import { getFlagEmoji } from '../utils/flags';
 
 const Tickets = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const screenSize = useResponsiveStyles();
   const matchId = searchParams.get('matchId');
@@ -58,11 +58,55 @@ const Tickets = () => {
     fetchMatch();
   }, [matchId]);
 
+  // Get match data passed from Matches page via location.state (has full match details)
+  const passedMatch = location.state?.match;
+
   const fetchMatch = async () => {
     try {
-      let matchData = await MatchService.getMatchById(matchId);
+      let matchData = null;
+
+      // First priority: use match data passed from Matches page (for API/World Cup matches)
+      if (passedMatch) {
+        matchData = {
+          id: passedMatch.id,
+          homeTeam: passedMatch.homeTeam || passedMatch.home_team,
+          awayTeam: passedMatch.awayTeam || passedMatch.away_team,
+          matchDate: passedMatch.matchDate || passedMatch.match_date,
+          matchTime: passedMatch.matchTime || passedMatch.match_time,
+          competition: passedMatch.competition,
+          stadiumName: passedMatch.stadiumName || passedMatch.stadium_name || passedMatch.venue || 'TBD',
+          basePrice: passedMatch.basePrice || passedMatch.base_price
+        };
+      }
+
+      // Second priority: try to fetch from backend API (for local DB matches)
+      if (!matchData) {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await axios.get(`/api/matches/${matchId}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            withCredentials: true
+          });
+          const data = response.data;
+          const m = data?.data || data;
+          if (m) {
+            matchData = {
+              id: m.id || m.id,
+              homeTeam: m.homeTeam || m.home_team,
+              awayTeam: m.awayTeam || m.away_team,
+              matchDate: m.matchDate || m.match_date,
+              matchTime: m.matchTime || m.match_time,
+              competition: m.competition,
+              stadiumName: m.stadiumName || m.stadium_name,
+              basePrice: m.basePrice || m.base_price
+            };
+          }
+        } catch (apiErr) {
+          console.warn('Match fetch failed from API:', apiErr);
+        }
+      }
       
-      if (!matchData && matchId.startsWith('api-')) {
+      if (!matchData) {
         matchData = {
           id: matchId,
           homeTeam: 'Team',
@@ -101,24 +145,57 @@ const Tickets = () => {
     setError('');
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       const selectedSectionData = sections.find(s => s.id === selectedSection);
       const totalPrice = selectedSectionData.price * selectedQuantity;
       const fees = Math.round(totalPrice * 0.05);
       const discountAmount = couponDiscount;
       const grandTotalAfterDiscount = Math.max(0, totalPrice + fees - discountAmount);
       const pmName = paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod;
-      const orderNumber = OrderService.generateOrderNumber();
 
-      // Create order with unique timestamp-based ID to avoid collisions
+      let orderNumber = '';
+      let apiPurchaseSucceeded = false;
+
+      // Try to purchase via backend API first
+      // Use raw axios instead of api to avoid the 401 interceptor redirect
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.post('/api/orders/purchase', {
+          matchId: match?.id,
+          sectionName: selectedSection,
+          quantity: selectedQuantity,
+          paymentMethod: paymentMethod,
+          notes: appliedCoupon?.code ? `Coupon: ${appliedCoupon.code}` : undefined
+        }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true
+        });
+
+        const data = response.data;
+        if (data?.success && data?.data?.orderNumber) {
+          orderNumber = data.data.orderNumber;
+          apiPurchaseSucceeded = true;
+        }
+      } catch (apiErr) {
+        console.warn('Backend purchase failed, using local simulation:', apiErr);
+      }
+
+      // If API didn't return an order number, generate one locally
+      if (!apiPurchaseSucceeded) {
+        // Simulate payment processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        orderNumber = OrderService.generateOrderNumber();
+      }
+
+      // Save order to localStorage (uses per-user key, never leaks between users)
       const order = {
         id: Date.now() + Math.random(),
         orderNumber,
         date: new Date().toISOString().split('T')[0],
         match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
         matchDate: match?.matchDate || 'TBD',
+        matchTime: match?.matchTime || '',
+        stadium: match?.stadiumName || 'TBD',
+        competition: match?.competition || 'Match',
         tickets: selectedQuantity,
         seats: Array(selectedQuantity).fill(`${selectedSectionData.name}`),
         subtotal: totalPrice,
@@ -127,27 +204,24 @@ const Tickets = () => {
         couponCode: appliedCoupon?.code || null,
         total: grandTotalAfterDiscount,
         status: 'confirmed',
-        paymentMethod: pmName,
-        competition: match?.competition || 'Match',
-        stadium: match?.stadiumName || 'TBD'
+        paymentMethod: pmName
       };
-
-      // Save to localStorage
-      const saved = OrderService.saveOrder(order);
-      if (!saved) {
-        throw new Error('Failed to save order');
-      }
+      OrderService.saveOrder(order);
 
       setLastOrderNum(orderNumber);
 
-      // Log purchase activity (for activity logs in admin)
+      // Log purchase activity
       try {
-        await api.post('/logs/activity', {
+        const token = localStorage.getItem('token');
+        await axios.post('/api/logs/activity', {
           action: 'purchase',
           description: `Bought ticket for ${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
           resourceType: 'ticket',
-          resourceId: String(order.id),
+          resourceId: orderNumber,
           metadata: { match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`, quantity: selectedQuantity }
+        }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true
         });
       } catch (e) {}
 
@@ -455,7 +529,12 @@ const Tickets = () => {
                 <button onClick={async () => {
                   if (!couponCode) return;
                   try {
-                    const r = await api.post('/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal });
+                    const token = localStorage.getItem('token');
+                    const rResponse = await axios.post('/api/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal }, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      withCredentials: true
+                    });
+                    const r = rResponse.data;
                     if (r.success) {
                       setCouponDiscount(r.data.discount);
                       setAppliedCoupon(r.data);

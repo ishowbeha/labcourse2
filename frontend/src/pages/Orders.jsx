@@ -4,17 +4,73 @@ import { useAuth } from '../context/AuthContext';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
 import OrderService from '../services/OrderService';
+import axios from 'axios';
 
 const Orders = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const screenSize = useResponsiveStyles();
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userOrders = OrderService.getOrders();
-    setOrders(userOrders);
+    fetchOrders();
   }, []);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      // First try fetching from backend API using raw axios (avoid 401 redirect interceptor)
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/orders', { 
+        params: { limit: 50 },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        withCredentials: true 
+      });
+      const responseData = response.data;
+      let apiOrders = [];
+      if (responseData?.success && responseData?.data?.orders) {
+        apiOrders = responseData.data.orders.map(o => ({
+          id: o.id,
+          orderNumber: o.order_number,
+          date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : 'N/A',
+          match: o.match_name || `${o.home_team || ''} vs ${o.away_team || ''}` || 'Unknown Match',
+          matchDate: o.match_date || 'N/A',
+          matchTime: o.match_time || '',
+          competition: o.competition || 'Match',
+          stadium: o.stadium_name || 'TBD',
+          tickets: o.ticket_count || o.items_count || 0,
+          seats: o.section_names ? o.section_names.split(', ') : [],
+          subtotal: o.total_amount || 0,
+          fees: Math.round((o.total_amount || 0) * 0.05 / 1.05 * 100) / 100,
+          discount: 0,
+          total: o.total_amount || 0,
+          status: o.status || 'confirmed',
+          paymentMethod: o.payment_method || 'credit-card',
+        }));
+      }
+      
+      if (apiOrders.length > 0) {
+        // API returned orders, use only those
+        setOrders(apiOrders);
+      } else {
+        // API returned empty - fallback to per-user localStorage
+        const localOrders = OrderService.getOrders();
+        if (localOrders.length > 0) {
+          setOrders(localOrders);
+        } else {
+          setOrders([]);
+        }
+      }
+    } catch (err) {
+      console.log('Failed to fetch orders from API:', err);
+      // Fallback to per-user localStorage (each user has own key)
+      const localOrders = OrderService.getOrders();
+      setOrders(localOrders.length > 0 ? localOrders : []);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -88,7 +144,8 @@ const Orders = () => {
                 <div style={styles.orderContent}>
                   <div style={styles.orderInfo}>
                     <h3 style={styles.matchTitle}>{order.match}</h3>
-                    <p style={styles.matchDate}>Match Date: {order.matchDate}</p>
+                    <p style={styles.matchDate}>📅 Match Date: {order.matchDate} {order.matchTime ? `at ${order.matchTime}` : ''}</p>
+                    <p style={styles.matchStadium}>🏟️ {order.stadium || 'TBD'}</p>
                     <p style={styles.matchCompetition}>🏆 {order.competition || 'Match'}</p>
                     <p style={styles.ticketInfo}>🎫 {order.tickets} ticket(s)</p>
                     <div style={styles.seats}>
@@ -245,6 +302,11 @@ const styles = {
     color: '#2c3e50',
   },
   matchDate: {
+    fontSize: '14px',
+    color: '#7f8c8d',
+    margin: '4px 0',
+  },
+  matchStadium: {
     fontSize: '14px',
     color: '#7f8c8d',
     margin: '4px 0',

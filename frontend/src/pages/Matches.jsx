@@ -245,7 +245,7 @@ const Matches = () => {
                     <span style={styles.price}>{match.basePrice ? `From €${match.basePrice}` : isLive(match) ? '🔴 Watch Live' : 'Check venue'}</span>
                   </div>
                   {!isLive(match) && match.basePrice ? (
-                    <button style={styles.buyBtn} onClick={() => navigate(`/tickets?matchId=${match.id}`)}>Buy Tickets</button>
+                    <button style={styles.buyBtn} onClick={() => navigate(`/tickets?matchId=${match.id}`, { state: { match } })}>Buy Tickets</button>
                   ) : null}
                 </div>
               </div>

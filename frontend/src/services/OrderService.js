@@ -1,9 +1,18 @@
-const STORAGE_KEY = 'user_orders';
+const getStorageKey = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const userId = user?.id || user?.userId || 'anonymous';
+    return `user_orders_${userId}`;
+  } catch {
+    return 'user_orders_anonymous';
+  }
+};
 
 const OrderService = {
   getOrders: () => {
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
+      const key = getStorageKey();
+      const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch {
       return [];
@@ -12,9 +21,13 @@ const OrderService = {
 
   saveOrder: (order) => {
     try {
+      const key = getStorageKey();
       const orders = OrderService.getOrders();
+      // Check for duplicate orderNumber to prevent duplicates
+      const exists = orders.some(o => o.orderNumber === order.orderNumber);
+      if (exists) return true;
       orders.unshift(order);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+      localStorage.setItem(key, JSON.stringify(orders));
       return true;
     } catch {
       return false;
