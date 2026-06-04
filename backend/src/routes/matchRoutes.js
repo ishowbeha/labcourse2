@@ -11,11 +11,15 @@ const createMatchRoutes = (db) => {
   // Public routes - anyone can view matches
   router.get('/', (req, res) => matchController.getAllMatches(req, res));
   router.get('/upcoming', (req, res) => matchController.getUpcomingMatches(req, res));
+  router.get('/competitions', (req, res) => matchController.getCompetitions(req, res));
   router.get('/:id', (req, res) => matchController.getMatchById(req, res));
   router.get('/team/:team', (req, res) => matchController.getMatchesByTeam(req, res));
 
   // Protected routes - require authentication
   router.use(authenticate);
+
+  // Admin matches with pagination and ticket stats
+  router.get('/admin/all', requireRole(['admin', 'manager']), (req, res) => matchController.getAdminMatches(req, res));
 
   // Admin only routes
   router.post('/', requireRole(['admin', 'manager']), (req, res) => matchController.createMatch(req, res));

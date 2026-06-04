@@ -10,6 +10,11 @@ class MatchService {
     return this.matchRepository.findAll(filters);
   }
 
+  // Get paginated admin matches with ticket stats
+  async getAdminMatches(filters = {}) {
+    return this.matchRepository.findAllAdmin(filters);
+  }
+
   // Get match by ID
   async getMatchById(id) {
     return this.matchRepository.findById(id);
@@ -25,12 +30,6 @@ class MatchService {
     // Validate base price
     if (!matchData.basePrice || matchData.basePrice <= 0) {
       throw new Error('Valid base price is required');
-    }
-
-    // Validate match date is in the future
-    const matchDateTime = new Date(`${matchData.matchDate}T${matchData.matchTime}`);
-    if (matchDateTime < new Date()) {
-      throw new Error('Match date must be in the future');
     }
 
     return this.matchRepository.create(matchData);
@@ -81,6 +80,11 @@ class MatchService {
     if (awayScore !== undefined) updateData.awayScore = awayScore;
     
     return this.matchRepository.update(id, updateData);
+  }
+
+  // Get all competitions
+  async getAllCompetitions() {
+    return this.matchRepository.getAllCompetitions();
   }
 }
 

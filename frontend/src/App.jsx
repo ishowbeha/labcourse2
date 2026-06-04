@@ -11,6 +11,7 @@ import AdminStadiums from './pages/AdminStadiums';
 import AdminReports from './pages/AdminReports';
 import AdminOrders from './pages/AdminOrders';
 import AdminCoupons from './pages/AdminCoupons';
+import AdminMatches from './pages/AdminMatches';
 import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
 import Stadiums from './pages/Stadiums';
@@ -181,7 +182,7 @@ function AppRoutes() {
         path="/admin/matches" 
         element={
           <AdminRoute>
-            <AdminPlaceholder title="Match Management" />
+            <AdminMatches />
           </AdminRoute>
         } 
       />

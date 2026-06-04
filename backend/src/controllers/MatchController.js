@@ -8,9 +8,9 @@ class MatchController {
   // Get all matches
   async getAllMatches(req, res) {
     try {
-      const { status, competition, startDate, endDate, team } = req.query;
+      const { status, competition, startDate, endDate, team, stadium, search } = req.query;
       
-      const filters = { status, competition, startDate, endDate, team };
+      const filters = { status, competition, startDate, endDate, team, stadium, search, adminMode: true };
       Object.keys(filters).forEach(key => {
         if (filters[key] === undefined || filters[key] === '') {
           delete filters[key];
@@ -19,6 +19,25 @@ class MatchController {
 
       const matches = await this.matchService.getAllMatches(filters);
       res.json({ success: true, data: matches, count: matches.length });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // Get paginated admin matches with ticket stats
+  async getAdminMatches(req, res) {
+    try {
+      const { page, limit, status, search, team, stadium, competition, dateFrom, dateTo } = req.query;
+      
+      const filters = { page, limit, status, search, team, stadium, competition, dateFrom, dateTo };
+      Object.keys(filters).forEach(key => {
+        if (filters[key] === undefined || filters[key] === '') {
+          delete filters[key];
+        }
+      });
+
+      const result = await this.matchService.getAdminMatches(filters);
+      res.json({ success: true, data: result });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -38,7 +57,11 @@ class MatchController {
   // Create new match
   async createMatch(req, res) {
     try {
-      const matchData = req.body;
+      const matchData = {
+        ...req.body,
+        createdBy: req.user?.id || 1,
+        updatedBy: req.user?.id || 1
+      };
       const match = await this.matchService.createMatch(matchData);
       res.status(201).json({ success: true, data: match });
     } catch (error) {
@@ -50,7 +73,10 @@ class MatchController {
   async updateMatch(req, res) {
     try {
       const { id } = req.params;
-      const updateData = req.body;
+      const updateData = {
+        ...req.body,
+        updatedBy: req.user?.id || 1
+      };
       const match = await this.matchService.updateMatch(id, updateData);
       res.json({ success: true, data: match });
     } catch (error) {
@@ -85,6 +111,16 @@ class MatchController {
       const { team } = req.params;
       const matches = await this.matchService.getMatchesByTeam(team);
       res.json({ success: true, data: matches, count: matches.length });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // Get all competitions
+  async getCompetitions(req, res) {
+    try {
+      const competitions = await this.matchService.getAllCompetitions();
+      res.json({ success: true, data: competitions });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }

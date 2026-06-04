@@ -3,7 +3,6 @@ import api from './api';
 const AdminService = {
   // Dashboard Statistics
   getDashboardStats: async () => {
-    // The API interceptor already unwraps response.data, so response is { success: true, data: {...} }
     const response = await api.get('/admin/stats');
     return response;
   },
@@ -44,6 +43,44 @@ const AdminService = {
     return response;
   },
 
+  // ==================== MATCH MANAGEMENT ====================
+
+  // Get paginated admin matches with ticket stats
+  getAdminMatches: async (params = {}) => {
+    const response = await api.get('/matches/admin/all', { params });
+    return response;
+  },
+
+  // Get single match
+  getMatch: async (id) => {
+    const response = await api.get(`/matches/${id}`);
+    return response;
+  },
+
+  // Create match
+  createMatch: async (matchData) => {
+    const response = await api.post('/matches', matchData);
+    return response;
+  },
+
+  // Update match
+  updateMatch: async (id, matchData) => {
+    const response = await api.put(`/matches/${id}`, matchData);
+    return response;
+  },
+
+  // Delete match
+  deleteMatch: async (id) => {
+    const response = await api.delete(`/matches/${id}`);
+    return response;
+  },
+
+  // Get all competitions
+  getCompetitions: async () => {
+    const response = await api.get('/matches/competitions');
+    return response;
+  },
+
   // Reports - Ticket Sales
   getTicketSalesByMatch: async () => {
     const response = await api.get('/admin/reports/ticket-sales');
@@ -78,7 +115,6 @@ const AdminService = {
 
   // ==================== STADIUM MANAGEMENT ====================
 
-  // Stadium operations
   getStadiums: async (params = {}) => {
     const response = await api.get('/stadiums', { params });
     return response;
