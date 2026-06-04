@@ -5,6 +5,7 @@ import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
 import MatchService from '../services/MatchService';
 import OrderService from '../services/OrderService';
+import api from '../services/api';
 import { getFlagEmoji } from '../utils/flags';
 
 const Tickets = () => {
@@ -130,6 +131,18 @@ const Tickets = () => {
       }
 
       setLastOrderNum(orderNumber);
+
+      // Log purchase activity (for activity logs in admin)
+      try {
+        await api.post('/logs/activity', {
+          action: 'purchase',
+          description: `Bought ticket for ${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
+          resourceType: 'ticket',
+          resourceId: String(order.id),
+          metadata: { match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`, quantity: selectedQuantity }
+        });
+      } catch (e) {}
+
       setPurchaseSuccess(true);
     } catch (err) {
       console.error('Purchase failed:', err);

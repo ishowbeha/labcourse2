@@ -234,12 +234,23 @@ class AdminController {
   // Delete order
   async deleteOrder(req, res, next) {
     try {
-      const { id } = req.params;
-      await this.service.deleteOrder(id);
+      const orderId = req.params.id;
+      await this.service.deleteOrder(orderId);
       res.json({
         success: true,
         message: 'Order deleted successfully'
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // POST /api/admin/reports/dynamic - Dynamic report generation
+  async generateDynamicReport(req, res, next) {
+    try {
+      const { dateFrom, dateTo, metrics = ['tickets_sold', 'revenue'], groupBy = 'none', filters = {} } = req.body;
+      const result = await this.service.generateDynamicReport({ dateFrom, dateTo, metrics, groupBy, filters });
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

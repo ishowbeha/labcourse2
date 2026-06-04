@@ -52,6 +52,24 @@ class OrderController {
         });
       }
 
+      // Write to audit_logs for activity tracking
+      try {
+        await this.db.query(
+          'INSERT INTO audit_logs (user_id, action, entity, entity_id, new_value, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+          [
+            userId,
+            'purchase',
+            'ticket',
+            result?.orderId || null,
+            JSON.stringify({ match: result?.match, quantity, totalAmount: result?.totalAmount }),
+            req.ip || null,
+            req.headers['user-agent'] || null
+          ]
+        );
+      } catch (logErr) {
+        console.log('Audit log write failed:', logErr.message);
+      }
+
       res.status(201).json({
         success: true,
         data: result,

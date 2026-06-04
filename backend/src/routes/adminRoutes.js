@@ -40,6 +40,9 @@ const createAdminRoutes = (db) => {
   router.get('/reports/revenue', controller.getRevenueAnalytics.bind(controller));
   router.get('/reports/top-matches', controller.getTopSellingMatches.bind(controller));
 
+  // Dynamic Report Generation
+  router.post('/reports/dynamic', controller.generateDynamicReport.bind(controller));
+
   // Orders Management
   router.get('/orders', controller.getOrders.bind(controller));
   router.get('/orders/:id', controller.getOrderById.bind(controller));
