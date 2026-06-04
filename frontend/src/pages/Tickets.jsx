@@ -26,6 +26,10 @@ const Tickets = () => {
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
   const [purchasing, setPurchasing] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [step, setStep] = useState(1);
   const [lastOrderNum, setLastOrderNum] = useState('');
@@ -438,12 +442,42 @@ const Tickets = () => {
               </div>
             </div>
 
+            {/* Promo Code */}
+            <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '10px' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#2c3e50', fontWeight: 600 }}>🎟️ Promo Code</h4>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input value={couponCode} onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponMsg(''); setCouponDiscount(0); setAppliedCoupon(null); }}
+                  placeholder="Enter code" style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', fontFamily: 'monospace' }} />
+                <button onClick={async () => {
+                  if (!couponCode) return;
+                  try {
+                    const r = await api.post('/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal });
+                    if (r.data?.success) {
+                      setCouponDiscount(r.data.data.discount);
+                      setAppliedCoupon(r.data.data);
+                      setCouponMsg(`✅ ${r.data.data.description || 'Discount applied!'}`);
+                    } else {
+                      setCouponMsg('❌ ' + (r.data?.message || 'Invalid code'));
+                      setCouponDiscount(0);
+                      setAppliedCoupon(null);
+                    }
+                  } catch (e) { setCouponMsg('❌ Failed to validate'); setCouponDiscount(0); setAppliedCoupon(null); }
+                }} style={{ padding: '10px 16px', backgroundColor: couponDiscount ? '#27ae60' : '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+                  {appliedCoupon ? 'Applied' : 'Apply'}
+                </button>
+              </div>
+              {couponMsg && <p style={{ margin: '6px 0 0', fontSize: '13px', color: couponMsg.includes('✅') ? '#047857' : '#dc2626' }}>{couponMsg}</p>}
+            </div>
+
             <div style={styles.priceBreakdown}>
               <div style={styles.summaryRow}><span>Subtotal</span><span>€{totalPrice}</span></div>
               <div style={styles.summaryRow}><span>Booking Fee (5%)</span><span>€{fees}</span></div>
+              {couponDiscount > 0 && (
+                <div style={styles.summaryRow}><span style={{ color: '#047857' }}>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span><span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(couponDiscount).toFixed(2)}</span></div>
+              )}
               <div style={{ ...styles.summaryRow, ...styles.totalRow }}>
                 <span>Total</span>
-                <span>€{grandTotal}</span>
+                <span>€{Math.max(0, grandTotal - couponDiscount).toFixed(2)}</span>
               </div>
             </div>
 
@@ -454,7 +488,7 @@ const Tickets = () => {
                 onClick={handlePurchase}
                 disabled={purchasing}
               >
-                {purchasing ? '⏳ Processing Payment...' : `✅ Pay €${grandTotal}`}
+                {purchasing ? '⏳ Processing Payment...' : `✅ Pay €${Math.max(0, grandTotal - couponDiscount).toFixed(2)}`}
               </button>
             </div>
           </div>

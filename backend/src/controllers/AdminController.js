@@ -255,6 +255,107 @@ class AdminController {
       next(error);
     }
   }
+
+  // =====================
+  // COUPONS MANAGEMENT
+  // =====================
+  async getAllCoupons(req, res, next) {
+    try {
+      const [rows] = await this.db.query('SELECT * FROM coupons ORDER BY created_at DESC');
+      res.json({ success: true, data: rows });
+    } catch (error) { next(error); }
+  }
+
+  async createCoupon(req, res, next) {
+    try {
+      const { code, description, discount_type, discount_value, min_order_amount, max_uses, valid_from, valid_until } = req.body;
+      if (!code) return res.status(400).json({ success: false, message: 'Coupon code is required' });
+      if (!discount_value || isNaN(parseFloat(discount_value)) || parseFloat(discount_value) <= 0) return res.status(400).json({ success: false, message: 'A valid discount value is required' });
+      await this.db.query(
+        'INSERT INTO coupons (code, description, discount_type, discount_value, min_order_amount, max_uses, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [code.toUpperCase(), description || null, discount_type || 'percentage', parseFloat(discount_value), min_order_amount || null, parseInt(max_uses) || 100, req.user.id]
+      );
+      res.json({ success: true, message: 'Coupon created' });
+    } catch (error) { next(error); }
+  }
+
+  async toggleCouponStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const [coupon] = await this.db.query('SELECT is_active FROM coupons WHERE id = ?', [id]);
+      if (!coupon.length) return res.status(404).json({ success: false, message: 'Coupon not found' });
+      const newStatus = coupon[0].is_active ? 0 : 1;
+      await this.db.query('UPDATE coupons SET is_active = ? WHERE id = ?', [newStatus, id]);
+      res.json({ success: true, message: 'Coupon status updated' });
+    } catch (error) { next(error); }
+  }
+
+  async deleteCoupon(req, res, next) {
+    try {
+      await this.db.query('DELETE FROM coupons WHERE id = ?', [req.params.id]);
+      res.json({ success: true, message: 'Coupon deleted' });
+    } catch (error) { next(error); }
+  }
+
+  // =====================
+  // FAVORITES
+  // =====================
+  async getUserFavorites(req, res, next) {
+    try {
+      const [rows] = await this.db.query(
+        `SELECT f.*, m.home_team, m.away_team, m.match_date, m.match_time, s.name as stadium_name
+         FROM favorites f
+         LEFT JOIN matches m ON f.match_id = m.id
+         LEFT JOIN stadiums s ON m.stadium_id = s.id
+         WHERE f.user_id = ?
+         ORDER BY f.created_at DESC`,
+        [req.user.id]
+      );
+      res.json({ success: true, data: rows });
+    } catch (error) { next(error); }
+  }
+
+  async toggleFavorite(req, res, next) {
+    try {
+      const { match_id, stadium_id } = req.body;
+      const userId = req.user.id;
+      // Check if already favorited
+      const [existing] = await this.db.query('SELECT id FROM favorites WHERE user_id = ? AND match_id = ?', [userId, match_id || null]);
+      if (existing.length > 0) {
+        await this.db.query('DELETE FROM favorites WHERE id = ?', [existing[0].id]);
+        return res.json({ success: true, favorited: false, message: 'Removed from favorites' });
+      }
+      await this.db.query('INSERT INTO favorites (user_id, match_id, stadium_id) VALUES (?, ?, ?)', [userId, match_id || null, stadium_id || null]);
+      res.json({ success: true, favorited: true, message: 'Added to favorites' });
+    } catch (error) { next(error); }
+  }
+
+  // =====================
+  // COUPON VALIDATION (for checkout)
+  // =====================
+  async validateCoupon(req, res, next) {
+    try {
+      const { code, orderTotal } = req.body;
+      const [coupons] = await this.db.query(
+        'SELECT * FROM coupons WHERE code = ? AND is_active = 1 AND (valid_from IS NULL OR valid_from <= NOW()) AND (valid_until IS NULL OR valid_until >= NOW())',
+        [code]
+      );
+      if (!coupons.length) return res.json({ success: false, message: 'Invalid or expired coupon' });
+
+      const coupon = coupons[0];
+      if (coupon.used_count >= coupon.max_uses) return res.json({ success: false, message: 'Coupon usage limit reached' });
+      if (coupon.min_order_amount && orderTotal < parseFloat(coupon.min_order_amount)) return res.json({ success: false, message: `Minimum order amount: €${coupon.min_order_amount}` });
+
+      let discount = 0;
+      if (coupon.discount_type === 'percentage') {
+        discount = (parseFloat(orderTotal) * parseFloat(coupon.discount_value)) / 100;
+      } else {
+        discount = parseFloat(coupon.discount_value);
+      }
+
+      res.json({ success: true, data: { id: coupon.id, code: coupon.code, discount_type: coupon.discount_type, discount_value: coupon.discount_value, discount, description: coupon.description } });
+    } catch (error) { next(error); }
+  }
 }
 
 module.exports = AdminController;

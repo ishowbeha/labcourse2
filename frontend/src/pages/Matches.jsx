@@ -5,6 +5,7 @@ import MatchService from '../services/MatchService';
 import FootballService from '../services/FootballService';
 import Navbar from '../components/Navbar';
 import { getFlagEmoji, getFlagUrl } from '../utils/flags';
+import api from '../services/api';
 
 const useResponsiveStyles = () => {
   const [screenSize, setScreenSize] = useState('desktop');
@@ -26,12 +27,13 @@ const Matches = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const screenSize = useResponsiveStyles();
-  const [matches, setMatches] = useState([]);       // local DB matches
+  const [favorites, setFavorites] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({});       // { competition?, wcGroup?, team? }
+  const [filters, setFilters] = useState({});
   const [activeTab, setActiveTab] = useState('all');
   const [liveMatches, setLiveMatches] = useState([]);
-  const [apiMatches, setApiMatches] = useState([]);  // from football-data.org
+  const [apiMatches, setApiMatches] = useState([]);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [apiAvailable, setApiAvailable] = useState(false);
@@ -39,7 +41,6 @@ const Matches = () => {
   const [dataFetched, setDataFetched] = useState(false);
   const wcGroups = ['All Groups', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G', 'Group H', 'Group I', 'Group J', 'Group K', 'Group L'];
 
-  // Fetch ALL data ONCE on mount (not on every filter change)
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -54,15 +55,16 @@ const Matches = () => {
         setMatches(localData || []);
         setLiveMatches(liveData || []);
         setApiMatches(upcomingData || []);
-      } catch (e) {
-        console.error('Init error:', e);
-      } finally {
-        setLoading(false);
-        setDataFetched(true);
-      }
+        try { const r = await api.get('/admin/favorites'); setFavorites(r.data?.data?.map(f => f.match_id) || []); } catch (e) {}
+      } catch (e) { console.error('Init error:', e); }
+      finally { setLoading(false); setDataFetched(true); }
     };
     init();
-  }, []); // Empty deps = run once
+  }, []);
+
+  const toggleFavorite = async (matchId) => {
+    try { const r = await api.post('/admin/favorites/toggle', { match_id: matchId }); if (r.data?.success) { const res = await api.get('/admin/favorites'); setFavorites(res.data?.data?.map(f => f.match_id) || []); } } catch (e) { console.error(e); }
+  };
 
   const handleSync = async () => {
     try {
@@ -70,15 +72,10 @@ const Matches = () => {
       const result = await fetch('/api/football/sync', { method: 'POST' });
       const data = await result.json();
       setSyncMessage(data.message || 'Sync complete');
-      // Re-fetch local matches after sync
       const localData = await MatchService.getAllMatches().catch(() => []);
       setMatches(localData || []);
-    } catch (error) {
-      setSyncMessage('Sync failed: ' + error.message);
-    } finally {
-      setSyncing(false);
-      setTimeout(() => setSyncMessage(''), 5000);
-    }
+    } catch (error) { setSyncMessage('Sync failed: ' + error.message); }
+    finally { setSyncing(false); setTimeout(() => setSyncMessage(''), 5000); }
   };
 
   const handleLogout = () => { logout(); navigate('/login'); };
@@ -101,11 +98,8 @@ const Matches = () => {
     return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value || undefined }));
-  };
+  const handleFilterChange = (key, value) => { setFilters(prev => ({ ...prev, [key]: value || undefined })); };
 
-  // Pure filtering — runs instantly, no API calls
   const getDisplayMatches = () => {
     if (activeTab === 'local') return matches;
     if (activeTab === 'api') return apiMatches;
@@ -114,10 +108,7 @@ const Matches = () => {
     const allMapped = [];
     const localKeys = new Set();
 
-    matches.forEach(m => {
-      allMapped.push({ ...m, _sortDate: m.matchDate || '', _groupId: '' });
-      localKeys.add(`${m.homeTeam || ''}-${m.awayTeam || ''}`);
-    });
+    matches.forEach(m => { allMapped.push({ ...m, _sortDate: m.matchDate || '', _groupId: '' }); localKeys.add(`${m.homeTeam || ''}-${m.awayTeam || ''}`); });
 
     apiMatches.forEach(apiMatch => {
       const key = `${apiMatch.homeTeam?.name}-${apiMatch.awayTeam?.name}`;
@@ -127,20 +118,11 @@ const Matches = () => {
         const matchDate = apiMatch.date ? apiMatch.date.split('T')[0] : null;
         const group = apiMatch.group || '';
         allMapped.push({
-          id: `api-${apiMatch.id}`,
-          homeTeam: apiMatch.homeTeam?.name || 'Home',
-          awayTeam: apiMatch.awayTeam?.name || 'Away',
-          matchDate,
-          matchTime: apiMatch.date ? new Date(apiMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
-          competition: isWorldCup ? 'FIFA World Cup 2026' : (compName || 'International'),
-          basePrice: isWorldCup ? 89 : 25,
-          stadiumName: apiMatch.venue || 'TBD',
-          status: apiMatch.status || 'Scheduled',
-          source: 'api-football',
-          homeScore: apiMatch.goals?.home,
-          awayScore: apiMatch.goals?.away,
-          _sortDate: matchDate || '',
-          _groupId: group
+          id: `api-${apiMatch.id}`, homeTeam: apiMatch.homeTeam?.name || 'Home', awayTeam: apiMatch.awayTeam?.name || 'Away',
+          matchDate, matchTime: apiMatch.date ? new Date(apiMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
+          competition: isWorldCup ? 'FIFA World Cup 2026' : (compName || 'International'), basePrice: isWorldCup ? 89 : 25,
+          stadiumName: apiMatch.venue || 'TBD', status: apiMatch.status || 'Scheduled', source: 'api-football',
+          homeScore: apiMatch.goals?.home, awayScore: apiMatch.goals?.away, _sortDate: matchDate || '', _groupId: group
         });
       }
     });
@@ -149,60 +131,27 @@ const Matches = () => {
       const key = `${liveMatch.homeTeam?.name}-${liveMatch.awayTeam?.name}`;
       const existingIdx = allMapped.findIndex(m => `${m.homeTeam}-${m.awayTeam}` === key);
       const matchDate = liveMatch.date ? liveMatch.date.split('T')[0] : null;
-      if (existingIdx >= 0) {
-        allMapped[existingIdx] = { ...allMapped[existingIdx], status: 'LIVE', homeScore: liveMatch.goals?.home, awayScore: liveMatch.goals?.away, source: 'live' };
-      } else {
+      if (existingIdx >= 0) { allMapped[existingIdx] = { ...allMapped[existingIdx], status: 'LIVE', homeScore: liveMatch.goals?.home, awayScore: liveMatch.goals?.away, source: 'live' }; }
+      else {
         allMapped.push({
           id: `live-${liveMatch.id}`, homeTeam: liveMatch.homeTeam?.name || 'Home', awayTeam: liveMatch.awayTeam?.name || 'Away',
           matchDate, matchTime: liveMatch.date ? new Date(liveMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
           competition: liveMatch.league?.name || 'Live Match', basePrice: null, stadiumName: liveMatch.venue || 'TBD',
-          status: 'LIVE', source: 'live', homeScore: liveMatch.goals?.home, awayScore: liveMatch.goals?.away,
-          _sortDate: matchDate || '', _groupId: ''
+          status: 'LIVE', source: 'live', homeScore: liveMatch.goals?.home, awayScore: liveMatch.goals?.away, _sortDate: matchDate || '', _groupId: ''
         });
       }
     });
 
-    // Sort by date
-    allMapped.sort((a, b) => {
-      if (!a._sortDate) return 1; if (!b._sortDate) return -1;
-      return a._sortDate.localeCompare(b._sortDate);
-    });
+    allMapped.sort((a, b) => { if (!a._sortDate) return 1; if (!b._sortDate) return -1; return a._sortDate.localeCompare(b._sortDate); });
 
-    // Apply ALL filters together (no early returns, so filters combine correctly)
     let filtered = allMapped;
-
-    // Apply competition filter
     const competitionFilter = filters.competition;
-    if (competitionFilter) {
-      filtered = filtered.filter(m => {
-        const comp = (m.competition || '').toLowerCase();
-        const filter = competitionFilter.toLowerCase();
-        return comp.includes(filter) || comp.includes(filter.replace(/2026/g, '').trim());
-      });
-    }
-
-    // Apply group filter (independent of competition selection)
+    if (competitionFilter) { filtered = filtered.filter(m => { const c = (m.competition || '').toLowerCase(); const f = competitionFilter.toLowerCase(); return c.includes(f) || c.includes(f.replace(/2026/g, '').trim()); }); }
     if (filters.wcGroup && filters.wcGroup !== 'all') {
       const groupMatch = filters.wcGroup.match(/Group ([A-L])/i);
-      if (groupMatch) {
-        const groupLetter = groupMatch[1].toUpperCase();
-        filtered = filtered.filter(m => {
-          const g = (m._groupId || '').toUpperCase();
-          return g.includes(`GROUP ${groupLetter}`) || g.includes(`GROUP_${groupLetter}`);
-        });
-      }
+      if (groupMatch) { const g = groupMatch[1].toUpperCase(); filtered = filtered.filter(m => { const gr = (m._groupId || '').toUpperCase(); return gr.includes(`GROUP ${g}`) || gr.includes(`GROUP_${g}`); }); }
     }
-
-    // Apply team filter (now works even when competition/group is selected)
-    if (filters.team) {
-      const teamSearch = filters.team.toLowerCase();
-      filtered = filtered.filter(m => {
-        const home = (m.homeTeam || '').toLowerCase();
-        const away = (m.awayTeam || '').toLowerCase();
-        return home.includes(teamSearch) || away.includes(teamSearch);
-      });
-    }
-
+    if (filters.team) { const t = filters.team.toLowerCase(); filtered = filtered.filter(m => { const h = (m.homeTeam || '').toLowerCase(); const a = (m.awayTeam || '').toLowerCase(); return h.includes(t) || a.includes(t); }); }
     return filtered;
   };
 
@@ -225,14 +174,7 @@ const Matches = () => {
 
         <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : styles.filters}>
           <div style={styles.filterGroup}>
-            <select
-              style={styles.select}
-              value={filters.competition || ''}
-              onChange={(e) => {
-                handleFilterChange('competition', e.target.value);
-                handleFilterChange('wcGroup', undefined);
-              }}
-            >
+            <select style={styles.select} value={filters.competition || ''} onChange={(e) => { handleFilterChange('competition', e.target.value); handleFilterChange('wcGroup', undefined); }}>
               <option value="">All Competitions</option>
               <option value="FIFA World Cup 2026">⚽ FIFA World Cup 2026</option>
               <option value="European Championship">🏆 European Championship</option>
@@ -242,7 +184,6 @@ const Matches = () => {
               <option value="Kategoria Superiore">🇦🇱 Kategoria Superiore</option>
               <option value="Football Superleague of Kosova">🇽🇰 Football Superleague of Kosova</option>
             </select>
-
             {filters.competition && filters.competition.toLowerCase().includes('world cup') && (
               <div style={styles.groupDropdownWrapper} onClick={(e) => { e.stopPropagation(); setWcDropdownOpen(!wcDropdownOpen); }}>
                 <div style={{...styles.groupDropdownTrigger, backgroundColor: filters.wcGroup && filters.wcGroup !== 'all' ? '#2c3e50' : '#fff', color: filters.wcGroup && filters.wcGroup !== 'all' ? '#fff' : '#555'}}>
@@ -252,14 +193,8 @@ const Matches = () => {
                 {wcDropdownOpen && (
                   <div style={styles.groupDropdownMenu}>
                     {wcGroups.map(group => (
-                      <div
-                        key={group}
-                        style={{...styles.groupDropdownItem, fontWeight: group === filters.wcGroup ? 'bold' : 'normal', backgroundColor: group === filters.wcGroup ? '#f0f0f0' : 'transparent'}}
-                        onClick={() => {
-                          handleFilterChange('wcGroup', group === 'All Groups' ? undefined : group);
-                          setWcDropdownOpen(false);
-                        }}
-                      >
+                      <div key={group} style={{...styles.groupDropdownItem, fontWeight: group === filters.wcGroup ? 'bold' : 'normal', backgroundColor: group === filters.wcGroup ? '#f0f0f0' : 'transparent'}}
+                        onClick={() => { handleFilterChange('wcGroup', group === 'All Groups' ? undefined : group); setWcDropdownOpen(false); }}>
                         {group === 'All Groups' ? '🌍 All Groups' : `📋 ${group}`}
                       </div>
                     ))}
@@ -268,14 +203,9 @@ const Matches = () => {
               </div>
             )}
           </div>
-
           <input type="text" style={styles.input} placeholder="Search team..." value={filters.team || ''} onChange={(e) => handleFilterChange('team', e.target.value)} />
-          <button style={styles.searchBtn} onClick={() => {/* already auto-filters */}}>Search</button>
-          {apiAvailable && (
-            <button style={styles.syncBtn} onClick={handleSync} disabled={syncing}>
-              {syncing ? '⏳ Syncing...' : '🔄 Sync Fixtures'}
-            </button>
-          )}
+          <button style={styles.searchBtn} onClick={() => {}}>Search</button>
+          {apiAvailable && <button style={styles.syncBtn} onClick={handleSync} disabled={syncing}>{syncing ? '⏳ Syncing...' : '🔄 Sync Fixtures'}</button>}
         </div>
 
         {loading ? (
@@ -307,7 +237,13 @@ const Matches = () => {
                   <p style={styles.infoItem}>🏟️ {match.stadiumName || match.venue || 'TBD'}</p>
                 </div>
                 <div style={styles.footer}>
-                  <span style={styles.price}>{match.basePrice ? `From €${match.basePrice}` : isLive(match) ? '🔴 Watch Live' : 'Check venue'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span onClick={() => toggleFavorite(match.id)} style={{ cursor: 'pointer', fontSize: '22px', lineHeight: '1' }}
+                      title={favorites.includes(match.id) ? 'Remove from favorites' : 'Add to favorites'}>
+                      {favorites.includes(match.id) ? '⭐' : '☆'}
+                    </span>
+                    <span style={styles.price}>{match.basePrice ? `From €${match.basePrice}` : isLive(match) ? '🔴 Watch Live' : 'Check venue'}</span>
+                  </div>
                   {!isLive(match) && match.basePrice ? (
                     <button style={styles.buyBtn} onClick={() => navigate(`/tickets?matchId=${match.id}`)}>Buy Tickets</button>
                   ) : null}
@@ -327,7 +263,7 @@ const styles = {
   header: { textAlign: 'center', marginBottom: '20px' },
   syncMessage: { marginTop: '10px', padding: '8px 16px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '6px', fontSize: '14px', display: 'inline-block' },
   tabs: { display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center', flexWrap: 'wrap' },
-  tab: { padding: '8px 20px', border: '2px solid #ddd', borderRadius: '20px', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#555', transition: 'all 0.2s' },
+  tab: { padding: '8px 20px', border: '2px solid #ddd', borderRadius: '20px', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#555' },
   activeTab: { backgroundColor: '#2c3e50', color: 'white', borderColor: '#2c3e50' },
   filters: { display: 'flex', gap: '16px', marginBottom: '30px', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'flex-start' },
   filterGroup: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' },
@@ -338,13 +274,13 @@ const styles = {
   groupDropdownWrapper: { position: 'relative', display: 'inline-block', cursor: 'pointer' },
   groupDropdownTrigger: { padding: '10px 16px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', minWidth: '180px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   groupDropdownMenu: { position: 'absolute', top: '100%', left: 0, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 1000, minWidth: '200px', maxHeight: '300px', overflowY: 'auto', marginTop: '4px' },
-  groupDropdownItem: { padding: '10px 16px', cursor: 'pointer', fontSize: '14px', borderBottom: '1px solid #f0f0f0', transition: 'background 0.2s' },
+  groupDropdownItem: { padding: '10px 16px', cursor: 'pointer', fontSize: '14px', borderBottom: '1px solid #f0f0f0' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' },
-  card: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '2px solid #e9ecef', transition: 'transform 0.2s, box-shadow 0.2s' },
+  card: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '2px solid #e9ecef' },
   matchHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '16px' },
   headerRight: { display: 'flex', gap: '8px', alignItems: 'center' },
   competition: { fontSize: '12px', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  liveBadge: { fontSize: '11px', color: '#e74c3c', fontWeight: 'bold', animation: 'pulse 1.5s infinite' },
+  liveBadge: { fontSize: '11px', color: '#e74c3c', fontWeight: 'bold' },
   apiBadge: { fontSize: '14px' },
   timeAgo: { fontSize: '12px', color: '#27ae60', fontWeight: '600' },
   teams: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '16px' },
@@ -361,15 +297,8 @@ const styles = {
 };
 
 const responsiveStyles = {
-  mobile: {
-    main: { ...styles.main, padding: '20px 15px' },
-    filters: { ...styles.filters, flexDirection: 'column', alignItems: 'stretch' },
-    grid: { ...styles.grid, gridTemplateColumns: '1fr', gap: '16px' },
-  },
-  tablet: {
-    main: { ...styles.main, padding: '30px 15px' },
-    grid: { ...styles.grid, gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' },
-  }
+  mobile: { main: { ...styles.main, padding: '20px 15px' }, filters: { ...styles.filters, flexDirection: 'column', alignItems: 'stretch' }, grid: { ...styles.grid, gridTemplateColumns: '1fr', gap: '16px' } },
+  tablet: { main: { ...styles.main, padding: '30px 15px' }, grid: { ...styles.grid, gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' } }
 };
 
 export default Matches;

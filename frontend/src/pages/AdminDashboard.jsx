@@ -113,6 +113,12 @@ const AdminDashboard = () => {
       color: '#1abc9c',
     },
     {
+      title: '🎫 Coupon Management',
+      description: 'Create and manage discount coupons',
+      link: '/admin/coupons',
+      color: '#e67e22',
+    },
+    {
       title: '📊 Reports & Analytics',
       description: 'View sales and attendance reports',
       link: '/admin/reports',

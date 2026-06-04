@@ -10,6 +10,7 @@ import AdminUsers from './pages/AdminUsers';
 import AdminStadiums from './pages/AdminStadiums';
 import AdminReports from './pages/AdminReports';
 import AdminOrders from './pages/AdminOrders';
+import AdminCoupons from './pages/AdminCoupons';
 import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
 import Stadiums from './pages/Stadiums';
@@ -208,13 +209,21 @@ function AppRoutes() {
           </AdminRoute>
         } 
       />
-      <Route 
-        path="/admin/reports" 
+      <Route
+        path="/admin/coupons"
+        element={
+          <AdminRoute>
+            <AdminCoupons />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/reports"
         element={
           <AdminRoute>
             <AdminReports />
           </AdminRoute>
-        } 
+        }
       />
       <Route 
         path="/admin/settings" 

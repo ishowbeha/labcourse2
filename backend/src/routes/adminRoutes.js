@@ -13,12 +13,21 @@ const createAdminRoutes = (db) => {
     next();
   });
 
-  // All admin routes require authentication and admin role
+  // All admin routes require authentication
   router.use(authenticate);
   router.use((req, res, next) => {
     console.log('Authenticated user:', req.user);
     next();
   });
+
+  // Favorites (any authenticated user) — before admin role check
+  router.get('/favorites', controller.getUserFavorites.bind(controller));
+  router.post('/favorites/toggle', controller.toggleFavorite.bind(controller));
+
+  // Coupon Validation (any authenticated user during checkout)
+  router.post('/coupons/validate', controller.validateCoupon.bind(controller));
+
+  // Admin-only routes below
   router.use(requireRole(['admin']));
 
   // Dashboard
@@ -42,6 +51,12 @@ const createAdminRoutes = (db) => {
 
   // Dynamic Report Generation
   router.post('/reports/dynamic', controller.generateDynamicReport.bind(controller));
+
+  // Coupons Management (admin only)
+  router.get('/coupons', controller.getAllCoupons.bind(controller));
+  router.post('/coupons', controller.createCoupon.bind(controller));
+  router.patch('/coupons/:id/toggle', controller.toggleCouponStatus.bind(controller));
+  router.delete('/coupons/:id', controller.deleteCoupon.bind(controller));
 
   // Orders Management
   router.get('/orders', controller.getOrders.bind(controller));
