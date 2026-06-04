@@ -18,7 +18,7 @@ const AdminCoupons = () => {
 
   const fetchCoupons = async () => {
     setLoading(true);
-    try { const r = await api.get('/admin/coupons'); setCoupons(r.data?.data || []); } catch (e) { console.error(e); }
+    try { const r = await api.get('/admin/coupons'); setCoupons(r.data || []); } catch (e) { console.error(e); }
     setLoading(false);
   };
 

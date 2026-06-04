@@ -107,6 +107,8 @@ const Tickets = () => {
       const selectedSectionData = sections.find(s => s.id === selectedSection);
       const totalPrice = selectedSectionData.price * selectedQuantity;
       const fees = Math.round(totalPrice * 0.05);
+      const discountAmount = couponDiscount;
+      const grandTotalAfterDiscount = Math.max(0, totalPrice + fees - discountAmount);
       const pmName = paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod;
       const orderNumber = OrderService.generateOrderNumber();
 
@@ -121,7 +123,9 @@ const Tickets = () => {
         seats: Array(selectedQuantity).fill(`${selectedSectionData.name}`),
         subtotal: totalPrice,
         fees: fees,
-        total: totalPrice + fees,
+        discount: discountAmount,
+        couponCode: appliedCoupon?.code || null,
+        total: grandTotalAfterDiscount,
         status: 'confirmed',
         paymentMethod: pmName,
         competition: match?.competition || 'Match',
@@ -452,12 +456,12 @@ const Tickets = () => {
                   if (!couponCode) return;
                   try {
                     const r = await api.post('/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal });
-                    if (r.data?.success) {
-                      setCouponDiscount(r.data.data.discount);
-                      setAppliedCoupon(r.data.data);
-                      setCouponMsg(`✅ ${r.data.data.description || 'Discount applied!'}`);
+                    if (r.success) {
+                      setCouponDiscount(r.data.discount);
+                      setAppliedCoupon(r.data);
+                      setCouponMsg(`✅ ${r.data.description || 'Discount applied!'}`);
                     } else {
-                      setCouponMsg('❌ ' + (r.data?.message || 'Invalid code'));
+                      setCouponMsg('❌ ' + (r.message || 'Invalid code'));
                       setCouponDiscount(0);
                       setAppliedCoupon(null);
                     }

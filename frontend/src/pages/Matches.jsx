@@ -55,7 +55,7 @@ const Matches = () => {
         setMatches(localData || []);
         setLiveMatches(liveData || []);
         setApiMatches(upcomingData || []);
-        try { const r = await api.get('/admin/favorites'); setFavorites(r.data?.data?.map(f => f.match_id) || []); } catch (e) {}
+        try { const r = await api.get('/admin/favorites'); setFavorites(r.data?.map(f => f.match_id) || []); } catch (e) {}
       } catch (e) { console.error('Init error:', e); }
       finally { setLoading(false); setDataFetched(true); }
     };
@@ -63,7 +63,7 @@ const Matches = () => {
   }, []);
 
   const toggleFavorite = async (matchId) => {
-    try { const r = await api.post('/admin/favorites/toggle', { match_id: matchId }); if (r.data?.success) { const res = await api.get('/admin/favorites'); setFavorites(res.data?.data?.map(f => f.match_id) || []); } } catch (e) { console.error(e); }
+    try { const r = await api.post('/admin/favorites/toggle', { match_id: matchId }); if (r.success) { const res = await api.get('/admin/favorites'); setFavorites(res.data?.map(f => f.match_id) || []); } } catch (e) { console.error(e); }
   };
 
   const handleSync = async () => {

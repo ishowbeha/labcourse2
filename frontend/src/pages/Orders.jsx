@@ -107,6 +107,12 @@ const Orders = () => {
                       <span>Fees</span>
                       <span>€{(order.fees || 0).toFixed(2)}</span>
                     </div>
+                    {order.discount > 0 && (
+                      <div style={styles.summaryRow}>
+                        <span style={{ color: '#047857' }}>Discount {order.couponCode ? `(${order.couponCode})` : ''}</span>
+                        <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(order.discount).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div style={{...styles.summaryRow, ...styles.totalRow}}>
                       <span>Total</span>
                       <span>€{(order.total || 0).toFixed(2)}</span>
