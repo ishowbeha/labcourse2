@@ -238,9 +238,11 @@ const Matches = () => {
                 </div>
                 <div style={styles.footer}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span onClick={() => toggleFavorite(match.id)} style={{ cursor: 'pointer', fontSize: '22px', lineHeight: '1' }}
+                    <span onClick={() => { if (typeof match.id === 'string' && match.id.startsWith('api-')) return; toggleFavorite(match.id); }} style={{ cursor: typeof match.id === 'string' && match.id.startsWith('api-') ? 'not-allowed' : 'pointer', fontSize: '22px', lineHeight: '1', color: favorites.includes(match.id) ? '#f39c12' : '#bbb', transition: 'color 0.2s, transform 0.2s', display: 'inline-block' }}
+                      onMouseOver={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                      onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
                       title={favorites.includes(match.id) ? 'Remove from favorites' : 'Add to favorites'}>
-                      {favorites.includes(match.id) ? '⭐' : '☆'}
+                      {favorites.includes(match.id) ? '★' : '☆'}
                     </span>
                     <span style={styles.price}>{match.basePrice ? `From €${match.basePrice}` : isLive(match) ? '🔴 Watch Live' : 'Check venue'}</span>
                   </div>

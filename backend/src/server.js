@@ -18,6 +18,7 @@ const createFootballRoutes = require('./routes/footballRoutes');
 const createOrderRoutes = require('./routes/orderRoutes');
 const createReportRoutes = require('./routes/reportRoutes');
 const createLogRoutes = require('./routes/logRoutes');
+const createReviewRoutes = require('./routes/reviewRoutes');
 const { setupWebSocket } = require('./websocket/websocket');
 
 const app = express();
@@ -88,6 +89,7 @@ const startServer = async () => {
 
     // Report routes (activity logs)
     app.use('/api/reports', createReportRoutes(pool));
+    app.use('/api/reviews', createReviewRoutes(pool));
 
     // Football routes still need Sequelize for sync service
     app.use('/api/football', createFootballRoutes(sequelize));

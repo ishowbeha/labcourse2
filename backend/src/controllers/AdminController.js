@@ -268,15 +268,20 @@ class AdminController {
 
   async createCoupon(req, res, next) {
     try {
-      const { code, description, discount_type, discount_value, min_order_amount, max_uses, valid_from, valid_until } = req.body;
+      const { code, description, discount_type, discount_value, max_uses } = req.body;
       if (!code) return res.status(400).json({ success: false, message: 'Coupon code is required' });
-      if (!discount_value || isNaN(parseFloat(discount_value)) || parseFloat(discount_value) <= 0) return res.status(400).json({ success: false, message: 'A valid discount value is required' });
+      const val = parseFloat(discount_value);
+      if (isNaN(val) || val <= 0) return res.status(400).json({ success: false, message: 'A valid discount value is required' });
+      const uses = parseInt(max_uses) || 100;
       await this.db.query(
-        'INSERT INTO coupons (code, description, discount_type, discount_value, min_order_amount, max_uses, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [code.toUpperCase(), description || null, discount_type || 'percentage', parseFloat(discount_value), min_order_amount || null, parseInt(max_uses) || 100, req.user.id]
+        'INSERT INTO coupons (code, description, discount_type, discount_value, max_uses, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+        [code.toUpperCase().trim(), description || null, discount_type || 'percentage', val, uses, req.user.id]
       );
       res.json({ success: true, message: 'Coupon created' });
-    } catch (error) { next(error); }
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') return res.status(400).json({ success: false, message: 'Coupon code already exists' });
+      next(error);
+    }
   }
 
   async toggleCouponStatus(req, res, next) {
@@ -302,6 +307,8 @@ class AdminController {
   // =====================
   async getUserFavorites(req, res, next) {
     try {
+      const userId = req.user?.userId || req.user?.id;
+      if (!userId) return res.status(400).json({ success: false, message: 'User ID required' });
       const [rows] = await this.db.query(
         `SELECT f.*, m.home_team, m.away_team, m.match_date, m.match_time, s.name as stadium_name
          FROM favorites f
@@ -309,7 +316,7 @@ class AdminController {
          LEFT JOIN stadiums s ON m.stadium_id = s.id
          WHERE f.user_id = ?
          ORDER BY f.created_at DESC`,
-        [req.user.id]
+        [userId]
       );
       res.json({ success: true, data: rows });
     } catch (error) { next(error); }
@@ -318,14 +325,15 @@ class AdminController {
   async toggleFavorite(req, res, next) {
     try {
       const { match_id, stadium_id } = req.body;
-      const userId = req.user.id;
+      const userId = req.user?.userId || req.user?.id;
+      if (!userId || !match_id) return res.status(400).json({ success: false, message: 'User ID and match ID required' });
       // Check if already favorited
-      const [existing] = await this.db.query('SELECT id FROM favorites WHERE user_id = ? AND match_id = ?', [userId, match_id || null]);
+      const [existing] = await this.db.query('SELECT id FROM favorites WHERE user_id = ? AND match_id = ?', [userId, match_id]);
       if (existing.length > 0) {
         await this.db.query('DELETE FROM favorites WHERE id = ?', [existing[0].id]);
         return res.json({ success: true, favorited: false, message: 'Removed from favorites' });
       }
-      await this.db.query('INSERT INTO favorites (user_id, match_id, stadium_id) VALUES (?, ?, ?)', [userId, match_id || null, stadium_id || null]);
+      await this.db.query('INSERT INTO favorites (user_id, match_id, stadium_id) VALUES (?, ?, ?)', [userId, parseInt(match_id), stadium_id || null]);
       res.json({ success: true, favorited: true, message: 'Added to favorites' });
     } catch (error) { next(error); }
   }
@@ -352,6 +360,9 @@ class AdminController {
       } else {
         discount = parseFloat(coupon.discount_value);
       }
+
+      // Increment used_count
+      await this.db.query('UPDATE coupons SET used_count = used_count + 1 WHERE id = ?', [coupon.id]);
 
       res.json({ success: true, data: { id: coupon.id, code: coupon.code, discount_type: coupon.discount_type, discount_value: coupon.discount_value, discount, description: coupon.description } });
     } catch (error) { next(error); }

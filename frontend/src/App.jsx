@@ -11,6 +11,9 @@ import AdminStadiums from './pages/AdminStadiums';
 import AdminReports from './pages/AdminReports';
 import AdminOrders from './pages/AdminOrders';
 import AdminCoupons from './pages/AdminCoupons';
+import AdminReviews from './pages/AdminReviews';
+import Favorites from './pages/Favorites';
+import MyReviews from './pages/MyReviews';
 import AdminMatches from './pages/AdminMatches';
 import Matches from './pages/Matches';
 import Tickets from './pages/Tickets';
@@ -219,6 +222,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/admin/reviews"
+        element={
+          <AdminRoute>
+            <AdminReviews />
+          </AdminRoute>
+        }
+      />
+      <Route
         path="/admin/reports"
         element={
           <AdminRoute>
@@ -268,13 +279,29 @@ function AppRoutes() {
           </ProtectedRoute>
         } 
       />
-      <Route 
-        path="/users" 
+      <Route
+        path="/favorites"
+        element={
+          <ProtectedRoute>
+            <Favorites />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reviews"
+        element={
+          <ProtectedRoute>
+            <MyReviews />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
         element={
           <ProtectedRoute>
             <UserPage title="👥 User Management" description="Manage user accounts and roles." />
           </ProtectedRoute>
-        } 
+        }
       />
 
       {/* Default redirect */}

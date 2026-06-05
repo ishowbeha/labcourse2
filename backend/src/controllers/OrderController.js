@@ -80,6 +80,37 @@ class OrderController {
     }
   }
 
+  async saveSimpleOrder(req, res, next) {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      if (!userId) return res.status(401).json({ success: false, message: 'Authentication required' });
+
+      const { matchName, sectionName, quantity, totalAmount, status, paymentMethod, notes } = req.body;
+      if (!matchName || !quantity) return res.status(400).json({ success: false, message: 'matchName and quantity required' });
+
+      const orderNumber = 'ORD-' + Date.now().toString(36).toUpperCase();
+      const total = totalAmount || (quantity * 50);
+
+      const combinedNotes = (notes ? notes + ' | ' : '') + 'Match: ' + matchName + (sectionName ? ' - ' + sectionName : '');
+      const [result] = await this.db.query(
+        'INSERT INTO orders (user_id, order_number, status, total_amount, payment_method, notes, customer_email, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+        [userId, orderNumber, status || 'confirmed', total, paymentMethod || 'simulated', combinedNotes, req.user?.email || '']
+      );
+
+      // Insert ticket info into order_items (store match in notes since there's no description column)
+      await this.db.query(
+        'INSERT INTO order_items (order_id, ticket_id, quantity, unit_price, subtotal, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [result.insertId, null, parseInt(quantity), total / parseInt(quantity), total]
+      );
+
+      res.status(201).json({
+        success: true,
+        data: { orderId: result.insertId, orderNumber },
+        message: 'Order saved successfully'
+      });
+    } catch (error) { next(error); }
+  }
+
   async getUserOrders(req, res, next) {
     try {
       const userId = req.user?.userId || req.user?.id;

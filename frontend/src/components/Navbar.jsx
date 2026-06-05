@@ -33,6 +33,8 @@ const Navbar = () => {
               <a href="/matches" className="nav-link">Matches</a>
               <a href="/tickets" className="nav-link">Tickets</a>
               <a href="/stadiums" className="nav-link">Stadiums</a>
+              <a href="/favorites" className="nav-link">⭐ Favorites</a>
+              <a href="/reviews" className="nav-link">⭐ My Reviews</a>
               <a href="/orders" className="nav-link">My Orders</a>
               {isAdmin() && (
                 <a href="/admin/dashboard" className="nav-link admin-link">
@@ -72,6 +74,8 @@ const Navbar = () => {
             <a href="/matches" className="mobile-nav-link" onClick={closeMobileMenu}>⚽ Matches</a>
             <a href="/tickets" className="mobile-nav-link" onClick={closeMobileMenu}>🎫 My Tickets</a>
             <a href="/stadiums" className="mobile-nav-link" onClick={closeMobileMenu}>🏟️ Stadiums</a>
+            <a href="/favorites" className="mobile-nav-link" onClick={closeMobileMenu}>⭐ Favorites</a>
+            <a href="/reviews" className="mobile-nav-link" onClick={closeMobileMenu}>⭐ Reviews</a>
             <a href="/orders" className="mobile-nav-link" onClick={closeMobileMenu}>📋 My Orders</a>
             {isAdmin() && (
               <a href="/admin/dashboard" className="mobile-nav-link admin-link" onClick={closeMobileMenu}>

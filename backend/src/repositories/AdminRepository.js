@@ -229,12 +229,13 @@ class AdminRepository {
         o.created_at,
         u.first_name,
         u.last_name,
-        COUNT(oi.id) as items_count
+        o.notes as match_name,
+        oi.quantity as ticket_count
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       ${whereClause}
-      GROUP BY o.id, o.order_number, o.user_id, o.total_amount, o.status, o.payment_status, o.payment_method, o.customer_email, o.created_at, u.first_name, u.last_name
+      GROUP BY o.id, o.order_number, o.user_id, o.total_amount, o.status, o.payment_status, o.payment_method, o.customer_email, o.created_at, u.first_name, u.last_name, o.notes, oi.quantity
       ORDER BY o.created_at DESC
       LIMIT ? OFFSET ?
     `, [...params, parseInt(limit), parseInt(offset)]);

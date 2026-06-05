@@ -155,33 +155,32 @@ const Tickets = () => {
       let orderNumber = '';
       let apiPurchaseSucceeded = false;
 
-      // Try to purchase via backend API first
-      // Use raw axios instead of api to avoid the 401 interceptor redirect
+      // Save order to backend via simple-purchase (works for all matches)
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.post('/api/orders/purchase', {
-          matchId: match?.id,
-          sectionName: selectedSection,
+        const response = await axios.post('/api/orders/simple-purchase', {
+          matchName: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
+          sectionName: selectedSectionData?.name || selectedSection,
           quantity: selectedQuantity,
+          totalAmount: grandTotalAfterDiscount,
           paymentMethod: paymentMethod,
-          notes: appliedCoupon?.code ? `Coupon: ${appliedCoupon.code}` : undefined
+          notes: appliedCoupon?.code ? `Coupon: ${appliedCoupon.code}` : undefined,
+          status: 'confirmed'
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           withCredentials: true
         });
-
         const data = response.data;
         if (data?.success && data?.data?.orderNumber) {
           orderNumber = data.data.orderNumber;
           apiPurchaseSucceeded = true;
         }
       } catch (apiErr) {
-        console.warn('Backend purchase failed, using local simulation:', apiErr);
+        console.warn('Backend simple-purchase failed:', apiErr);
       }
 
-      // If API didn't return an order number, generate one locally
+      // Generate order number locally if API failed
       if (!apiPurchaseSucceeded) {
-        // Simulate payment processing
         await new Promise(resolve => setTimeout(resolve, 1000));
         orderNumber = OrderService.generateOrderNumber();
       }

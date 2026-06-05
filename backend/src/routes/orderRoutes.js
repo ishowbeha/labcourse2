@@ -11,6 +11,7 @@ const createOrderRoutes = (pool) => {
 
   // Purchase tickets
   router.post('/purchase', (req, res, next) => controller.purchaseTickets(req, res, next));
+  router.post('/simple-purchase', (req, res, next) => controller.saveSimpleOrder(req, res, next));
 
   // Get user's orders
   router.get('/', (req, res, next) => controller.getUserOrders(req, res, next));

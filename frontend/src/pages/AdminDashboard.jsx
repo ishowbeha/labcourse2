@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import OrderService from '../services/OrderService';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
+import axios from 'axios';
 
 const AdminDashboard = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -19,7 +20,41 @@ const AdminDashboard = () => {
     const local = OrderService.getOrders();
     setLocalOrders(local);
     fetchDashboardStats();
+    fetchBackendOrders();
   }, []);
+
+  const fetchBackendOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get('/api/admin/orders?limit=1000', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        withCredentials: true
+      });
+      if (res.data?.success && res.data?.data?.orders) {
+        // Merge backend orders into local orders set
+        const existing = OrderService.getOrders();
+        const existingOrderNumbers = new Set(existing.map(o => o.orderNumber));
+        const newOrders = res.data.data.orders
+          .filter(o => !existingOrderNumbers.has(o.order_number))
+          .map(o => ({
+            id: o.id,
+            orderNumber: o.order_number,
+            date: o.created_at ? o.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+            match: o.match_name || 'Match',
+            tickets: o.ticket_count || 1,
+            total: parseFloat(o.total_amount) || 0,
+            status: o.status || 'confirmed',
+            paymentMethod: o.payment_method || 'Credit Card',
+            fromBackend: true
+          }));
+        if (newOrders.length > 0) {
+          setLocalOrders(prev => [...prev, ...newOrders]);
+        }
+      }
+    } catch (e) {
+      console.log('Backend orders fetch optional:', e.message);
+    }
+  };
 
   const fetchDashboardStats = async () => {
     try {
@@ -114,9 +149,15 @@ const AdminDashboard = () => {
     },
     {
       title: '🎫 Coupon Management',
-      description: 'Create and manage discount coupons',
+      description: 'Manage discount coupons',
       link: '/admin/coupons',
       color: '#e67e22',
+    },
+    {
+      title: '⭐ Reviews Management',
+      description: 'Approve and manage user reviews',
+      link: '/admin/reviews',
+      color: '#9b59b6',
     },
     {
       title: '📊 Reports & Analytics',
@@ -185,6 +226,7 @@ const AdminDashboard = () => {
                 <Link to="/admin/tickets" style={styles.mobileNavLink} onClick={closeMobileMenu}>🎫 Ticket Management</Link>
                 <Link to="/admin/orders" style={styles.mobileNavLink} onClick={closeMobileMenu}>📋 Order Management</Link>
                 <Link to="/admin/payments" style={styles.mobileNavLink} onClick={closeMobileMenu}>💳 Payment Management</Link>
+                <Link to="/admin/reviews" style={styles.mobileNavLink} onClick={closeMobileMenu}>⭐ Reviews Management</Link>
                 <Link to="/admin/reports" style={styles.mobileNavLink} onClick={closeMobileMenu}>📊 Reports & Analytics</Link>
                 <Link to="/admin/settings" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚙️ System Settings</Link>
               </nav>

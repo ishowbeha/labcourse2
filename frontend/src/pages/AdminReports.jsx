@@ -5,6 +5,7 @@ import AdminService from '../services/AdminService';
 import OrderService from '../services/OrderService';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import api from '../services/api';
+import axios from 'axios';
 
 const AdminReports = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -31,12 +32,36 @@ const AdminReports = () => {
   });
 
   useEffect(() => {
-    if (!isAdmin()) {
-      navigate('/home');
-      return;
-    }
+    if (!isAdmin()) { navigate('/home'); return; }
     const local = OrderService.getOrders();
     setLocalOrders(local);
+    // Also fetch backend orders
+    (async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await axios.get('/api/admin/orders?limit=1000', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true
+        });
+        if (res.data?.success && res.data?.data?.orders) {
+          const existing = OrderService.getOrders();
+          const existingNums = new Set(existing.map(o => o.orderNumber));
+          const backendOrders = res.data.data.orders
+            .filter(o => !existingNums.has(o.order_number))
+            .map(o => ({
+              id: o.id, orderNumber: o.order_number,
+              date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : '',
+              match: typeof o.match_name === 'string' ? o.match_name.replace(/^Match:\s*/i, '') : 'Match',
+              tickets: o.ticket_count || 1,
+              total: parseFloat(o.total_amount) || 0,
+              status: o.status || 'confirmed',
+              paymentMethod: o.payment_method || 'Credit Card',
+              matchDate: o.created_at
+            }));
+          if (backendOrders.length > 0) setLocalOrders(prev => [...prev, ...backendOrders]);
+        }
+      } catch (e) { console.log('Backend orders:', e.message); }
+    })();
     fetchReports();
   }, []);
 
@@ -87,7 +112,7 @@ const AdminReports = () => {
   confirmedLocalOrders.forEach(o => {
     const key = o.match || 'Unknown Match';
     if (dbMatchesMap[key]) { dbMatchesMap[key].ticketsSold += o.tickets || 0; dbMatchesMap[key].revenue += o.total || 0; }
-    else { dbMatchesMap[key] = { match: key, date: o.matchDate, stadium: o.stadium || 'N/A', ticketsSold: o.tickets || 0, totalTickets: o.tickets || 0, revenue: o.total || 0, basePrice: Math.round((o.total || 0) / (o.tickets || 1)), status: 'confirmed' }; }
+    else { dbMatchesMap[key] = { match: key, date: o.matchDate || o.date || o.created_at, stadium: o.stadium || 'N/A', ticketsSold: o.tickets || 0, totalTickets: o.tickets || 0, revenue: o.total || 0, basePrice: Math.round((o.total || 0) / (o.tickets || 1)), status: 'confirmed' }; }
   });
 
   const allMatches = Object.values(dbMatchesMap).filter(m => m.ticketsSold > 0);
