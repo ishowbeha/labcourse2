@@ -86,15 +86,16 @@ class OrderService {
     const [orders] = await this.pool.query(`
       SELECT 
         o.*,
-        m.home_team,
-        m.away_team,
-        m.match_date,
-        m.match_time,
-        m.competition,
-        s.name as stadium_name,
+        ANY_VALUE(m.home_team) as home_team,
+        ANY_VALUE(m.away_team) as away_team,
+        ANY_VALUE(m.match_date) as match_date,
+        ANY_VALUE(m.match_time) as match_time,
+        ANY_VALUE(m.competition) as competition,
+        ANY_VALUE(s.name) as stadium_name,
         GROUP_CONCAT(DISTINCT sec.name ORDER BY sec.name SEPARATOR ', ') as section_names,
         COUNT(DISTINCT oi.id) as items_count,
-        COUNT(DISTINCT t.id) as ticket_count
+        COUNT(DISTINCT t.id) as ticket_count,
+        COALESCE(SUM(oi.quantity), 0) as items_quantity_sum
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN tickets t ON oi.ticket_id = t.id
@@ -112,28 +113,80 @@ class OrderService {
       [userId]
     );
 
+    // Parse match info from notes for orders without ticket join data
+    const parseMatchFromNotes = (notes) => {
+      if (!notes) return null;
+      const matchRegex = notes.match(/Match:\s*([^-]+?)(?:\s*-\s*|$)/);
+      if (matchRegex && matchRegex[1]) {
+        return matchRegex[1].trim();
+      }
+      return null;
+    };
+
+    // Parse section from notes
+    const parseSectionFromNotes = (notes) => {
+      if (!notes) return null;
+      const sectionRegex = notes.match(/-\s*(.+)$/);
+      if (sectionRegex && sectionRegex[1] && !sectionRegex[1].startsWith('Coupon')) {
+        return sectionRegex[1].trim();
+      }
+      return null;
+    };
+
     // Map orders to include match details
-    const mappedOrders = orders.map(order => ({
-      id: order.id,
-      order_number: order.order_number,
-      total_amount: order.total_amount,
-      status: order.status,
-      payment_method: order.payment_method,
-      created_at: order.created_at,
-      updated_at: order.updated_at,
-      match_name: order.home_team && order.away_team 
+    const mappedOrders = orders.map(order => {
+      // For orders with ticket join (ticket_id is not null), use joined data
+      // For simple-purchase orders (ticket_id is null), parse from notes
+      let homeTeam = order.home_team;
+      let awayTeam = order.away_team;
+      let matchName = order.home_team && order.away_team 
         ? `${order.home_team} vs ${order.away_team}` 
-        : null,
-      home_team: order.home_team,
-      away_team: order.away_team,
-      match_date: order.match_date,
-      match_time: order.match_time,
-      competition: order.competition,
-      stadium_name: order.stadium_name,
-      section_names: order.section_names,
-      items_count: order.items_count,
-      ticket_count: order.ticket_count
-    }));
+        : null;
+      let sectionNames = order.section_names;
+      let ticketCount = order.ticket_count;
+      let matchDate = order.match_date;
+      let matchTime = order.match_time;
+      let competition = order.competition;
+      let stadiumName = order.stadium_name;
+
+      // If no match data from join (simple-purchase), parse from notes
+      if (!matchName) {
+        const parsedMatch = parseMatchFromNotes(order.notes);
+        if (parsedMatch) {
+          matchName = parsedMatch;
+          const teams = parsedMatch.split(' vs ');
+          if (teams.length >= 2) {
+            homeTeam = teams[0].trim();
+            awayTeam = teams[1].trim();
+          }
+        }
+        const parsedSection = parseSectionFromNotes(order.notes);
+        if (parsedSection) {
+          sectionNames = parsedSection;
+        }
+        ticketCount = order.items_quantity_sum || 0;
+      }
+
+      return {
+        id: order.id,
+        order_number: order.order_number,
+        total_amount: order.total_amount,
+        status: order.status,
+        payment_method: order.payment_method,
+        created_at: order.created_at,
+        updated_at: order.updated_at,
+        match_name: matchName,
+        home_team: homeTeam,
+        away_team: awayTeam,
+        match_date: matchDate,
+        match_time: matchTime,
+        competition: competition,
+        stadium_name: stadiumName,
+        section_names: sectionNames,
+        items_count: order.items_count,
+        ticket_count: ticketCount
+      };
+    });
 
     return {
       orders: mappedOrders,

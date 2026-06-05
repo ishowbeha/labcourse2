@@ -186,7 +186,13 @@ const AdminService = {
     return response;
   },
 
-  // Delete order
+  // Refund order (soft-delete with notification to user)
+  refundOrder: async (id) => {
+    const response = await api.post(`/admin/orders/${id}/refund`);
+    return response;
+  },
+
+  // Hard delete order (permanent, no trace)
   deleteOrder: async (id) => {
     const response = await api.delete(`/admin/orders/${id}`);
     return response;

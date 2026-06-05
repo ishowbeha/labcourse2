@@ -10,6 +10,7 @@ const NotificationBell = () => {
       case 'ticket_purchase': return '🎫';
       case 'order_confirmed': return '✅';
       case 'order_pending': return '⏳';
+      case 'refund': return '💰';
       case 'message': return '💬';
       case 'system': return '🔔';
       case 'broadcast': return '📢';
@@ -132,7 +133,7 @@ const styles = {
     top: '100%',
     right: '0',
     marginTop: '8px',
-    width: '360px',
+    width: '480px',
     maxWidth: '90vw',
     backgroundColor: 'white',
     borderRadius: '12px',

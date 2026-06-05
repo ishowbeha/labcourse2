@@ -15,12 +15,15 @@ class AdminRepository {
     const [matchRows] = await this.pool.query("SELECT COUNT(*) as count FROM matches WHERE status IN ('scheduled', 'live')");
     stats.totalMatches = matchRows[0].count;
 
-    // Total tickets sold
+    // Total tickets sold (from tickets + from simple-purchase orders)
     const [ticketRows] = await this.pool.query("SELECT COUNT(*) as count FROM tickets WHERE status = 'sold'");
-    stats.totalTicketsSold = ticketRows[0].count;
+    const [orderTicketRows] = await this.pool.query(
+      "SELECT COALESCE(SUM(oi.quantity), 0) as count FROM order_items oi INNER JOIN orders o ON oi.order_id = o.id WHERE oi.ticket_id IS NULL AND o.status IN ('paid', 'confirmed', 'completed')"
+    );
+    stats.totalTicketsSold = parseInt(ticketRows[0].count) + parseInt(orderTicketRows[0].count);
 
-    // Total revenue
-    const [revenueRows] = await this.pool.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status = 'paid'");
+    // Total revenue (from orders that have paid/confirmed/completed status)
+    const [revenueRows] = await this.pool.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status IN ('paid', 'confirmed', 'completed')");
     stats.totalRevenue = revenueRows[0].total;
 
     // Tickets by status
@@ -351,11 +354,59 @@ class AdminRepository {
     return this.getOrderById(id);
   }
 
-  // Hard delete order
-  async deleteOrder(id) {
+  // Refund/soft-delete order: mark as refunded, free tickets, notify user
+  async refundOrder(id) {
+    // Get order info first (user_id and any ticket IDs)
+    const [orders] = await this.pool.query(
+      'SELECT id, user_id, total_amount, order_number FROM orders WHERE id = ?',
+      [id]
+    );
+    if (orders.length === 0) return null;
+
+    const order = orders[0];
+
+    // Get associated ticket IDs from order_items
+    const [items] = await this.pool.query(
+      'SELECT ticket_id FROM order_items WHERE order_id = ? AND ticket_id IS NOT NULL',
+      [id]
+    );
+
+    // Free up the tickets (set back to available)
+    for (const item of items) {
+      if (item.ticket_id) {
+        await this.pool.query(
+          "UPDATE tickets SET status = 'available', purchaser_id = NULL, purchased_at = NULL, updated_at = NOW() WHERE id = ?",
+          [item.ticket_id]
+        );
+      }
+    }
+
+    // Soft-delete: mark order as refunded instead of hard-deleting
+    await this.pool.query(
+      "UPDATE orders SET status = 'refunded', updated_at = NOW() WHERE id = ?",
+      [id]
+    );
+
+    return {
+      id: order.id,
+      userId: order.user_id,
+      totalAmount: order.total_amount,
+      orderNumber: order.order_number,
+      ticketsFreed: items.length
+    };
+  }
+
+  // Hard delete order: permanently remove without any trace
+  async hardDeleteOrder(id) {
+    const [orders] = await this.pool.query(
+      'SELECT id, user_id, order_number FROM orders WHERE id = ?',
+      [id]
+    );
+    if (orders.length === 0) return null;
+
     await this.pool.query('DELETE FROM order_items WHERE order_id = ?', [id]);
     await this.pool.query('DELETE FROM orders WHERE id = ?', [id]);
-    return true;
+    return orders[0];
   }
 }
 

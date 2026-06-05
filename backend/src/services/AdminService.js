@@ -168,13 +168,25 @@ class AdminService {
     }
   }
 
-  async deleteOrder(id) {
+  async refundOrder(id) {
     try {
-      const order = await this.repository.getOrderById(id);
-      if (!order) {
+      const result = await this.repository.refundOrder(id);
+      if (!result) {
         throw new Error('Order not found');
       }
-      return await this.repository.deleteOrder(id);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to refund order: ${error.message}`);
+    }
+  }
+
+  async hardDeleteOrder(id) {
+    try {
+      const result = await this.repository.hardDeleteOrder(id);
+      if (!result) {
+        throw new Error('Order not found');
+      }
+      return result;
     } catch (error) {
       throw new Error(`Failed to delete order: ${error.message}`);
     }

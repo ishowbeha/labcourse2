@@ -181,11 +181,24 @@ class MatchRepository {
           (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'available') as available_tickets,
           (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'sold') as sold_tickets,
           (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'reserved') as reserved_tickets,
-          (SELECT COALESCE(SUM(t.price), 0) FROM tickets t WHERE t.match_id = m.id AND t.status = 'sold') as revenue
+          (
+            SELECT COALESCE(SUM(sub.revenue), 0) FROM (
+              SELECT COALESCE(SUM(t.price), 0) as revenue
+              FROM tickets t
+              WHERE t.match_id = m.id AND t.status = 'sold'
+              UNION ALL
+              SELECT COALESCE(SUM(oi.subtotal), 0)
+              FROM order_items oi
+              INNER JOIN orders o ON oi.order_id = o.id
+              WHERE o.notes LIKE CONCAT('%Match: ', m.home_team, ' vs ', m.away_team, '%')
+                AND o.status IN ('paid', 'confirmed', 'completed')
+                AND oi.ticket_id IS NULL
+            ) sub
+          ) as revenue
         FROM matches m
         LEFT JOIN stadiums s ON m.stadium_id = s.id
         ${whereClause}
-        ORDER BY m.match_date DESC, m.match_time DESC
+        ORDER BY revenue DESC, m.match_date DESC, m.match_time DESC
         LIMIT ? OFFSET ?
       `, [...params, parseInt(limit), parseInt(offset)]);
 
@@ -210,7 +223,7 @@ class MatchRepository {
     }
   }
 
-  // Get match by ID
+  // Get match by ID with revenue data
   async findById(id) {
     try {
       const [rows] = await this.pool.query(`
@@ -218,7 +231,25 @@ class MatchRepository {
           m.*,
           s.name as stadium_name,
           s.city as stadium_city,
-          s.capacity as stadium_capacity
+          s.capacity as stadium_capacity,
+          (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id) as total_tickets,
+          (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'available') as available_tickets,
+          (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'sold') as sold_tickets,
+          (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'reserved') as reserved_tickets,
+          (
+            SELECT COALESCE(SUM(sub.revenue), 0) FROM (
+              SELECT COALESCE(SUM(t.price), 0) as revenue
+              FROM tickets t
+              WHERE t.match_id = m.id AND t.status = 'sold'
+              UNION ALL
+              SELECT COALESCE(SUM(oi.subtotal), 0)
+              FROM order_items oi
+              INNER JOIN orders o ON oi.order_id = o.id
+              WHERE o.notes LIKE CONCAT('%Match: ', m.home_team, ' vs ', m.away_team, '%')
+                AND o.status IN ('paid', 'confirmed', 'completed')
+                AND oi.ticket_id IS NULL
+            ) sub
+          ) as revenue
         FROM matches m
         LEFT JOIN stadiums s ON m.stadium_id = s.id
         WHERE m.id = ?
@@ -228,7 +259,13 @@ class MatchRepository {
         throw new Error('Match not found');
       }
 
-      return this._mapMatch(rows[0]);
+      const match = this._mapMatch(rows[0]);
+      match.totalTickets = rows[0].total_tickets;
+      match.availableTickets = rows[0].available_tickets;
+      match.soldTickets = rows[0].sold_tickets;
+      match.reservedTickets = rows[0].reserved_tickets;
+      match.revenue = rows[0].revenue;
+      return match;
     } catch (error) {
       if (error.message === 'Match not found') {
         throw error;

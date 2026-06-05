@@ -50,18 +50,8 @@ const Orders = () => {
         }));
       }
       
-      if (apiOrders.length > 0) {
-        // API returned orders, use only those
-        setOrders(apiOrders);
-      } else {
-        // API returned empty - fallback to per-user localStorage
-        const localOrders = OrderService.getOrders();
-        if (localOrders.length > 0) {
-          setOrders(localOrders);
-        } else {
-          setOrders([]);
-        }
-      }
+      // Always use API results (database is the source of truth)
+      setOrders(apiOrders);
     } catch (err) {
       console.log('Failed to fetch orders from API:', err);
       // Fallback to per-user localStorage (each user has own key)

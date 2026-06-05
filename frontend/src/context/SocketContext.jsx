@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import axios from 'axios';
 
 const SocketContext = createContext(null);
 
@@ -10,6 +11,22 @@ export const useSocket = () => {
     throw new Error('useSocket must be used within a SocketProvider');
   }
   return context;
+};
+
+// Load past notifications from API
+const loadPastNotifications = async (token) => {
+  try {
+    const res = await axios.get('/api/notifications', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      withCredentials: true
+    });
+    if (res.data?.success && res.data?.data) {
+      return res.data.data;
+    }
+  } catch (e) {
+    console.log('Could not load past notifications:', e.message);
+  }
+  return [];
 };
 
 export const SocketProvider = ({ children }) => {
@@ -22,6 +39,14 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (isAuthenticated && token) {
+      // Load past notifications from API
+      loadPastNotifications(token).then(pastNots => {
+        if (pastNots.length > 0) {
+          setNotifications(pastNots);
+          setUnreadCount(pastNots.filter(n => !n.isRead).length);
+        }
+      });
+
       // Connect to Socket.IO server
       const newSocket = io('http://localhost:3000', {
         auth: { token },
@@ -70,10 +95,10 @@ export const SocketProvider = ({ children }) => {
         }
       });
 
-      // Broadcast messages
+      // Broadcast messages (only for admins, not added to user notifications)
       newSocket.on('broadcast', (data) => {
         console.log('📢 Broadcast:', data);
-        setNotifications(prev => [data, ...prev].slice(0, 50));
+        // Not added to user notifications to keep them per-user
       });
 
       // Chat messages

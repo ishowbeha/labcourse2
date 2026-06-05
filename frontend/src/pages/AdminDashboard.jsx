@@ -254,7 +254,7 @@ const AdminDashboard = () => {
             <span style={styles.statLabel}>Active Matches</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #e74c3c' }}>
-            <span style={styles.statNumber}>{formatNumber(totalTicketsSold)}</span>
+            <span style={styles.statNumber}>{formatNumber(stats?.totalTicketsSold || totalTicketsSold)}</span>
             <span style={styles.statLabel}>Tickets Sold</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #f39c12' }}>

@@ -62,7 +62,8 @@ const createAdminRoutes = (db) => {
   router.get('/orders', controller.getOrders.bind(controller));
   router.get('/orders/:id', controller.getOrderById.bind(controller));
   router.patch('/orders/:id/status', controller.updateOrderStatus.bind(controller));
-  router.delete('/orders/:id', controller.deleteOrder.bind(controller));
+  router.post('/orders/:id/refund', controller.refundOrder.bind(controller));
+  router.delete('/orders/:id', controller.hardDeleteOrder.bind(controller));
 
   return router;
 };

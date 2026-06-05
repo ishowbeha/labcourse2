@@ -231,14 +231,66 @@ class AdminController {
     }
   }
 
-  // Delete order
-  async deleteOrder(req, res, next) {
+  // Refund order - frees tickets and notifies user
+  async refundOrder(req, res, next) {
     try {
       const orderId = req.params.id;
-      await this.service.deleteOrder(orderId);
+      const result = await this.service.refundOrder(orderId);
+      
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
+      }
+
+      // Send real-time notification to the user via WebSocket
+      const io = req.app.get('io');
+      if (io && io.notifyUser) {
+        const message = `Your order #${result.orderNumber} has been refunded (€${parseFloat(result.totalAmount).toFixed(2)}). The tickets are now available for other users.`;
+        await io.notifyUser(result.userId, {
+          type: 'refund',
+          title: '🎫 Order Refunded',
+          message: message
+        });
+      }
+
       res.json({
         success: true,
-        message: 'Order deleted successfully'
+        message: 'Order refunded successfully. User has been notified.',
+        data: {
+          orderId: result.id,
+          orderNumber: result.orderNumber,
+          refunded: true,
+          ticketsFreed: result.ticketsFreed
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Hard delete order - permanent, no trace, no notification
+  async hardDeleteOrder(req, res, next) {
+    try {
+      const orderId = req.params.id;
+      const result = await this.service.hardDeleteOrder(orderId);
+      
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: 'Order not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Order permanently deleted.',
+        data: {
+          orderId: result.id,
+          orderNumber: result.order_number,
+          deleted: true
+        }
       });
     } catch (error) {
       next(error);

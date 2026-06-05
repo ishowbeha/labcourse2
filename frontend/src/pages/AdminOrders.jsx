@@ -17,6 +17,8 @@ const AdminOrders = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [deletingId, setDeletingId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [confirmPermanentDelete, setConfirmPermanentDelete] = useState(null);
+  const [refundingId, setRefundingId] = useState(null);
 
   useEffect(() => {
     if (!isAdmin()) {
@@ -225,30 +227,48 @@ const AdminOrders = () => {
                           </span>
                         </td>
                         <td style={styles.td}>
-                          {showConfirm ? (
-                            <div style={styles.confirmGroup}>
-                              <button 
-                                style={styles.confirmDeleteBtn}
-                                onClick={() => handleDeleteOrder(orderId)}
-                                disabled={isDeleting}
-                              >
-                                {isDeleting ? '...' : '✓ Yes'}
-                              </button>
-                              <button 
-                                style={styles.cancelDeleteBtn}
-                                onClick={() => setConfirmDelete(null)}
-                              >
-                                ✕ No
-                              </button>
-                            </div>
-                          ) : (
+                          <div style={styles.actionGroup}>
                             <button 
-                              style={styles.deleteBtn}
-                              onClick={() => setConfirmDelete(orderId)}
+                              style={styles.refundBtn}
+                              onClick={async () => {
+                                setRefundingId(orderId);
+                                try {
+                                  await AdminService.refundOrder(orderId);
+                                  fetchOrders();
+                                } catch (err) {
+                                  setError('Failed to refund order: ' + err.message);
+                                }
+                                setRefundingId(null);
+                              }}
+                              disabled={refundingId === orderId || order.status === 'refunded' || order.status === 'cancelled'}
                             >
-                              🗑 Delete
+                              {refundingId === orderId ? '...' : '💰 Refund'}
                             </button>
-                          )}
+                            {confirmPermanentDelete === orderId ? (
+                              <div style={styles.confirmGroup}>
+                                <button 
+                                  style={styles.confirmDeleteBtn}
+                                  onClick={() => handleDeleteOrder(orderId)}
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting ? '...' : '✓ Yes'}
+                                </button>
+                                <button 
+                                  style={styles.cancelDeleteBtn}
+                                  onClick={() => setConfirmPermanentDelete(null)}
+                                >
+                                  ✕ No
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                style={styles.permanentDeleteBtn}
+                                onClick={() => setConfirmPermanentDelete(orderId)}
+                              >
+                                🗑 Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -322,6 +342,9 @@ const styles = {
   customerInfo: { display: 'flex', flexDirection: 'column', gap: '2px' },
   customerEmail: { fontSize: '12px', color: '#7f8c8d' },
   statusBadge: { fontSize: '11px', color: 'white', padding: '4px 10px', borderRadius: '4px', fontWeight: '600', display: 'inline-block' },
+  actionGroup: { display: 'flex', gap: '4px', flexWrap: 'nowrap' },
+  refundBtn: { padding: '6px 10px', backgroundColor: '#9b59b6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' },
+  permanentDeleteBtn: { padding: '6px 10px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' },
   deleteBtn: { padding: '6px 12px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
   confirmGroup: { display: 'flex', gap: '4px' },
   confirmDeleteBtn: { padding: '6px 10px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
