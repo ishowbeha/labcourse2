@@ -90,13 +90,6 @@ const AdminDashboard = () => {
     return null;
   }
 
-  // Merge local orders stats with DB stats - ONLY actual sales
-  const localConfirmedOrders = localOrders.filter(o => o.status === 'confirmed' || o.status === 'completed');
-  const localTicketsSold = localConfirmedOrders.reduce((sum, o) => sum + (o.tickets || 0), 0);
-  const localRevenue = localConfirmedOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const totalTicketsSold = localTicketsSold;
-  const totalRevenue = localRevenue;
-  const recentOrders = localConfirmedOrders.length;
   const ticketsAvailable = 0;
 
   const formatCurrency = (value) => {
@@ -254,7 +247,7 @@ const AdminDashboard = () => {
             <span style={styles.statLabel}>Active Matches</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #e74c3c' }}>
-            <span style={styles.statNumber}>{formatNumber(stats?.totalTicketsSold || totalTicketsSold)}</span>
+            <span style={styles.statNumber}>{formatNumber(stats?.totalTicketsSold || 0)}</span>
             <span style={styles.statLabel}>Tickets Sold</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #f39c12' }}>
@@ -262,12 +255,12 @@ const AdminDashboard = () => {
             <span style={styles.statLabel}>Tickets Available</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #27ae60' }}>
-            <span style={styles.statNumber}>{formatCurrency(totalRevenue)}</span>
+            <span style={styles.statNumber}>{formatCurrency(stats?.totalRevenue || 0)}</span>
             <span style={styles.statLabel}>Total Revenue</span>
           </div>
           <div style={{ ...styles.statCard, borderLeft: '4px solid #9b59b6' }}>
-            <span style={styles.statNumber}>{formatNumber(recentOrders)}</span>
-            <span style={styles.statLabel}>Recent Orders (7 days)</span>
+            <span style={styles.statNumber}>{formatNumber(stats?.recentOrders || 0)}</span>
+            <span style={styles.statLabel}>Total Orders</span>
           </div>
         </div>
 
