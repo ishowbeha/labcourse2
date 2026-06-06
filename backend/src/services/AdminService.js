@@ -119,9 +119,9 @@ class AdminService {
     }
   }
 
-  async getOrdersWithDetails(page = 1, limit = 10, status = '') {
+  async getOrdersWithDetails(page = 1, limit = 10, status = '', search = '') {
     try {
-      return await this.repository.getOrdersWithDetails(page, limit, status);
+      return await this.repository.getOrdersWithDetails(page, limit, status, search);
     } catch (error) {
       throw new Error(`Failed to fetch orders: ${error.message}`);
     }

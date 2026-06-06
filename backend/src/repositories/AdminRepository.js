@@ -209,7 +209,7 @@ class AdminRepository {
   }
 
   // Reports - Orders with User Details
-  async getOrdersWithDetails(page = 1, limit = 10, status = '') {
+  async getOrdersWithDetails(page = 1, limit = 10, status = '', search = '') {
     const offset = (page - 1) * limit;
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -217,6 +217,12 @@ class AdminRepository {
     if (status) {
       whereClause += ' AND o.status = ?';
       params.push(status);
+    }
+
+    if (search) {
+      whereClause += ' AND (o.order_number LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR CONCAT(u.first_name, " ", u.last_name) LIKE ?)';
+      const searchParam = `%${search}%`;
+      params.push(searchParam, searchParam, searchParam, searchParam, searchParam);
     }
 
     const [orders] = await this.pool.query(`
@@ -244,8 +250,8 @@ class AdminRepository {
     `, [...params, parseInt(limit), parseInt(offset)]);
 
     const [totalRows] = await this.pool.query(
-      `SELECT COUNT(*) as count FROM orders o WHERE 1=1 ${status ? 'AND o.status = ?' : ''}`,
-      status ? [status] : []
+      `SELECT COUNT(*) as count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause}`,
+      params
     );
 
     return {

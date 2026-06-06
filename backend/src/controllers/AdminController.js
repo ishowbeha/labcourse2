@@ -152,11 +152,12 @@ class AdminController {
   // Reports - Orders
   async getOrders(req, res, next) {
     try {
-      const { page = 1, limit = 10, status = '' } = req.query;
+      const { page = 1, limit = 10, status = '', search = '' } = req.query;
       const result = await this.service.getOrdersWithDetails(
         parseInt(page),
         parseInt(limit),
-        status
+        status,
+        search
       );
       res.json({
         success: true,
