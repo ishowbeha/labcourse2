@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
 import OrderService from '../services/OrderService';
@@ -9,6 +10,7 @@ import { getFlagEmoji } from '../utils/flags';
 
 const Tickets = () => {
   const { user } = useAuth();
+  const { maxTicketsPerOrder, formatPrice, currencySymbol } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -405,12 +407,16 @@ const Tickets = () => {
                 </button>
                 <span style={styles.qtyValue}>{selectedQuantity}</span>
                 <button 
-                  style={styles.qtyBtn} 
-                  onClick={() => setSelectedQuantity(Math.min(10, selectedQuantity + 1))}
+                  style={{ ...styles.qtyBtn, opacity: selectedQuantity >= maxTicketsPerOrder ? 0.4 : 1 }}
+                  onClick={() => setSelectedQuantity(Math.min(maxTicketsPerOrder, selectedQuantity + 1))}
+                  disabled={selectedQuantity >= maxTicketsPerOrder}
                 >
                   +
                 </button>
               </div>
+              <p style={{ textAlign: 'center', fontSize: '13px', color: '#7f8c8d', marginTop: '8px' }}>
+                Max {maxTicketsPerOrder} ticket{maxTicketsPerOrder !== 1 ? 's' : ''} per order
+              </p>
             </div>
 
             <button 

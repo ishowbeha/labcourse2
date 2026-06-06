@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SettingsProvider } from './context/SettingsContext';
 import { SocketProvider } from './context/SocketContext';
 
 // Lazy load all page components for better performance
@@ -623,9 +624,11 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <SocketProvider>
-          <AppRoutes />
-        </SocketProvider>
+        <SettingsProvider>
+          <SocketProvider>
+            <AppRoutes />
+          </SocketProvider>
+        </SettingsProvider>
       </AuthProvider>
     </Router>
   );

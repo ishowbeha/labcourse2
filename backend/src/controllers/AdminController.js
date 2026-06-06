@@ -407,9 +407,35 @@ class AdminController {
       if (coupon.used_count >= coupon.max_uses) return res.json({ success: false, message: 'Coupon usage limit reached' });
       if (coupon.min_order_amount && orderTotal < parseFloat(coupon.min_order_amount)) return res.json({ success: false, message: `Minimum order amount: €${coupon.min_order_amount}` });
 
+      // ── Read max_discount_percent from system_settings ──
+      let maxDiscountPercent = 100; // fallback: no cap
+      try {
+        const [[row]] = await this.db.query(
+          "SELECT setting_value FROM system_settings WHERE setting_key = 'max_discount_percent'"
+        );
+        if (row) maxDiscountPercent = parseFloat(row.setting_value) || 100;
+      } catch { /* ignore */ }
+
+      // ── Check allow_stacking_coupons (future: pass existing coupons count in body) ──
+
       let discount = 0;
       if (coupon.discount_type === 'percentage') {
-        discount = (parseFloat(orderTotal) * parseFloat(coupon.discount_value)) / 100;
+        // Cap the effective percentage at system max
+        const effectivePct = Math.min(parseFloat(coupon.discount_value), maxDiscountPercent);
+        discount = (parseFloat(orderTotal) * effectivePct) / 100;
+        if (effectivePct < parseFloat(coupon.discount_value)) {
+          return res.json({
+            success: true,
+            data: {
+              id: coupon.id, code: coupon.code,
+              discount_type: coupon.discount_type,
+              discount_value: effectivePct,
+              discount,
+              description: coupon.description,
+              cappedNote: `Discount capped at system maximum of ${maxDiscountPercent}%`
+            }
+          });
+        }
       } else {
         discount = parseFloat(coupon.discount_value);
       }

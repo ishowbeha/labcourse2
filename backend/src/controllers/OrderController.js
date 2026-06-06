@@ -25,6 +25,23 @@ class OrderController {
         });
       }
 
+      // ── Enforce max_tickets_per_order from system_settings ──
+      const qty = parseInt(quantity);
+      try {
+        const [[maxRow]] = await this.db.query(
+          "SELECT setting_value FROM system_settings WHERE setting_key = 'max_tickets_per_order'"
+        );
+        const maxAllowed = parseInt(maxRow?.setting_value) || 10;
+        if (qty > maxAllowed) {
+          return res.status(400).json({
+            success: false,
+            message: `You can only buy up to ${maxAllowed} ticket(s) per order. Please reduce your quantity.`
+          });
+        }
+      } catch (settingsErr) {
+        console.warn('Could not read max_tickets_per_order setting:', settingsErr.message);
+      }
+
       const userEmail = req.user?.email || '';
       const result = await this.service.purchaseTickets(userId, {
         matchId: parseInt(matchId),
@@ -80,6 +97,23 @@ class OrderController {
 
       const { matchName, sectionName, quantity, totalAmount, paymentMethod, notes } = req.body;
       if (!matchName || !quantity) return res.status(400).json({ success: false, message: 'matchName and quantity required' });
+
+      // ── Enforce max_tickets_per_order from system_settings ──
+      const qty = parseInt(quantity);
+      try {
+        const [[maxRow]] = await this.db.query(
+          "SELECT setting_value FROM system_settings WHERE setting_key = 'max_tickets_per_order'"
+        );
+        const maxAllowed = parseInt(maxRow?.setting_value) || 10;
+        if (qty > maxAllowed) {
+          return res.status(400).json({
+            success: false,
+            message: `You can only buy up to ${maxAllowed} ticket(s) per order.`
+          });
+        }
+      } catch (settingsErr) {
+        console.warn('Could not read max_tickets_per_order setting:', settingsErr.message);
+      }
 
       const orderNumber = 'ORD-' + Date.now().toString(36).toUpperCase();
       const unitPrice = totalAmount ? totalAmount / parseInt(quantity) : 50;

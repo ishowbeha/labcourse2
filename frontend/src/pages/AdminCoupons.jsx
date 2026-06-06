@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import AdminNavbar from '../components/AdminNavbar';
 
 const AdminCoupons = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -34,19 +35,7 @@ const AdminCoupons = () => {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <header style={{ backgroundColor: '#2c3e50', color: 'white', padding: '20px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '24px' }}>🎫 Coupon Management</h1>
-            <Link to="/admin" style={{ color: '#bdc3c7', textDecoration: 'none', fontSize: '14px' }}>← Back to Dashboard</Link>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontWeight: 600 }}>{user?.first_name} {user?.last_name}</span>
-            <span style={{ backgroundColor: '#3498db', padding: '4px 12px', borderRadius: '12px', fontSize: '12px' }}>Administrator</span>
-            <button onClick={() => { logout(); navigate('/login'); }} style={{ backgroundColor: 'transparent', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>Logout</button>
-          </div>
-        </div>
-      </header>
+      <AdminNavbar title="🎫 Coupon Management" subtitle="Create and manage discount codes" />
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

@@ -50,8 +50,10 @@ export const AuthProvider = ({ children }) => {
   // Fetch user profile to get roles
   const fetchUserProfile = async () => {
     try {
+      // api interceptor returns response.data directly
+      // so response = { success, data: { user object } }
       const response = await api.get('/auth/profile');
-      return response.data;
+      return response;
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
       return null;
@@ -94,62 +96,8 @@ export const AuthProvider = ({ children }) => {
     
     initAuth();
 
-    // Listen for storage events (when token is deleted manually)
-    const handleStorageChange = async (e) => {
-      if (e.key === 'token' && !e.newValue && localStorage.getItem('user')) {
-        // Token was deleted but user data still exists - try to refresh
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-          // Refresh failed, clear user data
-          localStorage.removeItem('user');
-          setUser(null);
-          setToken(null);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check periodically if token is missing but user exists
-    const checkTokenInterval = setInterval(async () => {
-      const storedToken = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      
-      if (!storedToken && storedUser) {
-        // Token missing but user exists - try to refresh
-        const refreshed = await refreshAccessToken();
-        if (!refreshed) {
-          // Refresh failed, clear user data
-          localStorage.removeItem('user');
-          setUser(null);
-          setToken(null);
-        }
-      } else if (storedToken && storedUser) {
-        // Token exists but check if cookie is missing
-        try {
-          // Try to make a refresh call to test if cookie exists
-          const axios = (await import('axios')).default;
-          await axios.post(
-            `${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`,
-            {},
-            { withCredentials: true }
-          );
-          // Cookie exists, all good
-        } catch (error) {
-          // If refresh fails with 401, cookie is missing
-          if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setUser(null);
-            setToken(null);
-          }
-        }
-      }
-    }, 3000); // Check every 3 seconds
-
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkTokenInterval);
+      // cleanup (no active listeners to remove)
     };
   }, []);
 
@@ -166,6 +114,7 @@ export const AuthProvider = ({ children }) => {
       
       // Fetch full user profile with roles
       const profileResponse = await fetchUserProfile();
+      // profileResponse IS the user object (interceptor already unwrapped)
       const fullUserProfile = profileResponse?.data || profileResponse;
       
       if (fullUserProfile) {

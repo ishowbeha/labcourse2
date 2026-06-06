@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import OrderService from '../services/OrderService';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
+import AdminNavbar from '../components/AdminNavbar';
 import api from '../services/api';
 import axios from 'axios';
 
@@ -129,45 +130,7 @@ const AdminReports = () => {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <div>
-            <h1 style={styles.title}>📊 Reports & Analytics</h1>
-            <Link to="/admin" style={styles.backLink}>← Back to Dashboard</Link>
-          </div>
-          <div style={styles.userInfo}>
-            <span style={styles.userName}>{user?.first_name} {user?.last_name}</span>
-            <span style={styles.userRole}>Administrator</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-            <button onClick={toggleMobileMenu} style={screenSize === 'mobile' ? styles.hamburgerBtn : { display: 'none' }}>
-              <span style={styles.hamburgerLine}></span>
-              <span style={styles.hamburgerLine}></span>
-              <span style={styles.hamburgerLine}></span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {mobileMenuOpen && (
-        <div style={styles.mobileOverlay} onClick={closeMobileMenu}>
-          <div style={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.mobileMenuHeader}>
-              <span style={styles.mobileUserName}>{user?.first_name} {user?.last_name}</span>
-              <button onClick={handleLogout} style={styles.mobileLogoutBtn}>Logout</button>
-            </div>
-            <nav style={styles.mobileNav}>
-              <Link to="/admin/users" style={styles.mobileNavLink} onClick={closeMobileMenu}>👥 User Management</Link>
-              <Link to="/admin/stadiums" style={styles.mobileNavLink} onClick={closeMobileMenu}>🏟️ Stadium Management</Link>
-              <Link to="/admin/matches" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚽ Match Management</Link>
-              <Link to="/admin/tickets" style={styles.mobileNavLink} onClick={closeMobileMenu}>🎫 Ticket Management</Link>
-              <Link to="/admin/orders" style={styles.mobileNavLink} onClick={closeMobileMenu}>📋 Order Management</Link>
-              <Link to="/admin/payments" style={styles.mobileNavLink} onClick={closeMobileMenu}>💳 Payment Management</Link>
-              <Link to="/admin/reports" style={styles.mobileNavLink} onClick={closeMobileMenu}>📊 Reports & Analytics</Link>
-              <Link to="/admin/settings" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚙️ System Settings</Link>
-            </nav>
-          </div>
-        </div>
-      )}
+      <AdminNavbar title="📊 Reports & Analytics" subtitle="Sales, revenue and activity reports" />
 
       <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
         {error && <div style={styles.errorBanner}>{error}</div>}

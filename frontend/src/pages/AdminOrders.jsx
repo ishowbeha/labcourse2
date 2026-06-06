@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import useResponsiveStyles from '../hooks/useResponsiveStyles';
+import AdminNavbar from '../components/AdminNavbar';
 import axios from 'axios';
 
 const AdminOrders = () => {
@@ -163,50 +164,7 @@ const AdminOrders = () => {
 
   return (
     <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <div>
-            <h1 style={styles.title}>📋 Order Management</h1>
-            <p style={styles.welcome}>View and manage all ticket orders</p>
-          </div>
-          <div style={styles.userInfo}>
-            <Link to="/admin/dashboard" style={styles.homeBtn}>⬅ Dashboard</Link>
-            <span style={styles.userName}>{user?.first_name} {user?.last_name}</span>
-            <span style={styles.userRole}>Administrator</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>Logout</button>
-            <button 
-              className={`hamburger-btn ${mobileMenuOpen ? 'open' : ''}`} 
-              onClick={toggleMobileMenu}
-              style={screenSize === 'mobile' ? responsiveStyles.mobile.hamburgerBtn : styles.hamburgerBtn}
-              aria-label="Toggle admin menu"
-            >
-              <span style={styles.hamburgerLine}></span>
-              <span style={styles.hamburgerLine}></span>
-              <span style={styles.hamburgerLine}></span>
-            </button>
-          </div>
-        </div>
-        {mobileMenuOpen && (
-          <div style={styles.mobileOverlay} onClick={closeMobileMenu}>
-            <div style={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.mobileMenuHeader}>
-                <span style={styles.mobileUserName}>{user?.first_name} {user?.last_name}</span>
-                <button onClick={handleLogout} style={styles.mobileLogoutBtn}>Logout</button>
-              </div>
-              <nav style={styles.mobileNav}>
-                <Link to="/admin/users" style={styles.mobileNavLink} onClick={closeMobileMenu}>👥 User Management</Link>
-                <Link to="/admin/stadiums" style={styles.mobileNavLink} onClick={closeMobileMenu}>🏟️ Stadium Management</Link>
-                <Link to="/admin/matches" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚽ Match Management</Link>
-                <Link to="/admin/tickets" style={styles.mobileNavLink} onClick={closeMobileMenu}>🎫 Ticket Management</Link>
-                <Link to="/admin/orders" style={styles.mobileNavLink} onClick={closeMobileMenu}>📋 Order Management</Link>
-                <Link to="/admin/payments" style={styles.mobileNavLink} onClick={closeMobileMenu}>💳 Payment Management</Link>
-                <Link to="/admin/reports" style={styles.mobileNavLink} onClick={closeMobileMenu}>📊 Reports & Analytics</Link>
-                <Link to="/admin/settings" style={styles.mobileNavLink} onClick={closeMobileMenu}>⚙️ System Settings</Link>
-              </nav>
-            </div>
-          </div>
-        )}
-      </header>
+      <AdminNavbar title="📋 Order Management" subtitle="View and manage all ticket orders" />
 
       <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
         {error && (
