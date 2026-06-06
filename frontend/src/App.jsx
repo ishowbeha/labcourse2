@@ -15,6 +15,7 @@ const AdminOrders = lazy(() => import('./pages/AdminOrders'));
 const AdminCoupons = lazy(() => import('./pages/AdminCoupons'));
 const AdminReviews = lazy(() => import('./pages/AdminReviews'));
 const AdminMatches = lazy(() => import('./pages/AdminMatches'));
+const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Matches = lazy(() => import('./pages/Matches'));
 const Tickets = lazy(() => import('./pages/Tickets'));
 const Stadiums = lazy(() => import('./pages/Stadiums'));
@@ -236,7 +237,7 @@ function AppRoutes() {
           path="/admin/settings" 
           element={
             <AdminRoute>
-              <AdminPlaceholder title="System Settings" />
+              <AdminSettings />
             </AdminRoute>
           } 
         />
