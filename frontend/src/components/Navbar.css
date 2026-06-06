@@ -56,6 +56,18 @@
   color: #f39c12;
 }
 
+.nav-link.profile-link {
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.nav-link.profile-link:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
 .nav-actions {
   display: flex;
   align-items: center;
@@ -206,7 +218,17 @@
 }
 
 /* Responsive Styles */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+  .nav-links {
+    gap: 12px;
+  }
+  
+  .nav-link {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 990px) {
   .desktop-nav {
     display: none !important;
   }

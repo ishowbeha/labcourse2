@@ -11,6 +11,9 @@ const createUserRoutes = (db) => {
   // All user routes require authentication
   router.use(authenticate);
 
+  // User profile routes
+  router.put('/profile', (req, res) => userController.updateProfile(req, res));
+
   // User management routes
   router.get('/', (req, res) => userController.getAllUsers(req, res));
   router.get('/:id', (req, res) => userController.getUserById(req, res));

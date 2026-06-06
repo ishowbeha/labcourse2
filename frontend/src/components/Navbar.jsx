@@ -44,7 +44,7 @@ const Navbar = () => {
             </div>
             <div className="nav-actions">
               <NotificationBell />
-              <span className="user-name">{user?.firstName || user?.first_name}</span>
+              <a href="/profile" className="nav-link profile-link">👤 Profile</a>
               <button onClick={handleLogout} className="logout-btn">Logout</button>
             </div>
           </div>
@@ -77,6 +77,7 @@ const Navbar = () => {
             <a href="/favorites" className="mobile-nav-link" onClick={closeMobileMenu}>⭐ Favorites</a>
             <a href="/reviews" className="mobile-nav-link" onClick={closeMobileMenu}>⭐ Reviews</a>
             <a href="/orders" className="mobile-nav-link" onClick={closeMobileMenu}>📋 My Orders</a>
+            <a href="/profile" className="mobile-nav-link" onClick={closeMobileMenu}>👤 My Profile</a>
             {isAdmin() && (
               <a href="/admin/dashboard" className="mobile-nav-link admin-link" onClick={closeMobileMenu}>
                 👑 Admin Dashboard

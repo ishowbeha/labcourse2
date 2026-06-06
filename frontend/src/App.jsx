@@ -1,24 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Home from './pages/Home';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminUsers from './pages/AdminUsers';
-import AdminStadiums from './pages/AdminStadiums';
-import AdminReports from './pages/AdminReports';
-import AdminOrders from './pages/AdminOrders';
-import AdminCoupons from './pages/AdminCoupons';
-import AdminReviews from './pages/AdminReviews';
-import Favorites from './pages/Favorites';
-import MyReviews from './pages/MyReviews';
-import AdminMatches from './pages/AdminMatches';
-import Matches from './pages/Matches';
-import Tickets from './pages/Tickets';
-import Stadiums from './pages/Stadiums';
-import Orders from './pages/Orders';
+
+// Lazy load all page components for better performance
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Home = lazy(() => import('./pages/Home'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const AdminStadiums = lazy(() => import('./pages/AdminStadiums'));
+const AdminReports = lazy(() => import('./pages/AdminReports'));
+const AdminOrders = lazy(() => import('./pages/AdminOrders'));
+const AdminCoupons = lazy(() => import('./pages/AdminCoupons'));
+const AdminReviews = lazy(() => import('./pages/AdminReviews'));
+const AdminMatches = lazy(() => import('./pages/AdminMatches'));
+const Matches = lazy(() => import('./pages/Matches'));
+const Tickets = lazy(() => import('./pages/Tickets'));
+const Stadiums = lazy(() => import('./pages/Stadiums'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Favorites = lazy(() => import('./pages/Favorites'));
+const MyReviews = lazy(() => import('./pages/MyReviews'));
+const MyProfile = lazy(() => import('./pages/MyProfile'));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div style={loadingStyles.container}>
+    <div style={loadingStyles.spinner}></div>
+    <p style={loadingStyles.text}>Loading...</p>
+  </div>
+);
 
 // Custom hook for responsive styles
 const useResponsiveStyles = () => {
@@ -49,16 +60,7 @@ const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh' 
-      }}>
-        <p>Loading...</p>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
@@ -73,16 +75,7 @@ const AdminRoute = ({ children }) => {
   const { isAdmin, isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh' 
-      }}>
-        <p>Loading...</p>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
@@ -101,16 +94,7 @@ const PublicRoute = ({ children }) => {
   const { isAuthenticated, isAdmin, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '100vh' 
-      }}>
-        <p>Loading...</p>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (isAuthenticated) {
@@ -125,189 +109,201 @@ const PublicRoute = ({ children }) => {
 
 function AppRoutes() {
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route 
-        path="/login" 
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        } 
-      />
-      <Route 
-        path="/register" 
-        element={
-          <PublicRoute>
-            <Register />
-          </PublicRoute>
-        } 
-      />
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        {/* Public routes */}
+        <Route 
+          path="/login" 
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          } 
+        />
 
-      {/* Protected user routes */}
-      <Route 
-        path="/home" 
-        element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        } 
-      />
+        {/* Protected user routes */}
+        <Route 
+          path="/home" 
+          element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          } 
+        />
 
-      {/* Admin routes */}
-      <Route 
-        path="/admin/dashboard" 
-        element={
-          <AdminRoute>
-            <AdminDashboard />
-          </AdminRoute>
-        } 
-      />
+        {/* My Profile route - accessible by all authenticated users */}
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <MyProfile />
+            </ProtectedRoute>
+          } 
+        />
 
-      {/* Admin sub-pages */}
-      <Route 
-        path="/admin/users" 
-        element={
-          <AdminRoute>
-            <AdminUsers />
-          </AdminRoute>
-        } 
-      />
-      <Route 
-        path="/admin/stadiums" 
-        element={
-          <AdminRoute>
-            <AdminStadiums />
-          </AdminRoute>
-        } 
-      />
-      <Route 
-        path="/admin/matches" 
-        element={
-          <AdminRoute>
-            <AdminMatches />
-          </AdminRoute>
-        } 
-      />
-      <Route 
-        path="/admin/tickets" 
-        element={
-          <AdminRoute>
-            <AdminPlaceholder title="Ticket Management" />
-          </AdminRoute>
-        } 
-      />
-      <Route 
-        path="/admin/orders" 
-        element={
-          <AdminRoute>
-            <AdminOrders />
-          </AdminRoute>
-        } 
-      />
-      <Route 
-        path="/admin/payments" 
-        element={
-          <AdminRoute>
-            <AdminPlaceholder title="Payment Management" />
-          </AdminRoute>
-        } 
-      />
-      <Route
-        path="/admin/coupons"
-        element={
-          <AdminRoute>
-            <AdminCoupons />
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="/admin/reviews"
-        element={
-          <AdminRoute>
-            <AdminReviews />
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="/admin/reports"
-        element={
-          <AdminRoute>
-            <AdminReports />
-          </AdminRoute>
-        }
-      />
-      <Route 
-        path="/admin/settings" 
-        element={
-          <AdminRoute>
-            <AdminPlaceholder title="System Settings" />
-          </AdminRoute>
-        } 
-      />
+        {/* Admin routes */}
+        <Route 
+          path="/admin/dashboard" 
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          } 
+        />
 
-      {/* User pages - now with real content */}
-      <Route 
-        path="/matches" 
-        element={
-          <ProtectedRoute>
-            <Matches />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/tickets" 
-        element={
-          <ProtectedRoute>
-            <Tickets />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/stadiums" 
-        element={
-          <ProtectedRoute>
-            <Stadiums />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/orders" 
-        element={
-          <ProtectedRoute>
-            <Orders />
-          </ProtectedRoute>
-        } 
-      />
-      <Route
-        path="/favorites"
-        element={
-          <ProtectedRoute>
-            <Favorites />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reviews"
-        element={
-          <ProtectedRoute>
-            <MyReviews />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <ProtectedRoute>
-            <UserPage title="👥 User Management" description="Manage user accounts and roles." />
-          </ProtectedRoute>
-        }
-      />
+        {/* Admin sub-pages */}
+        <Route 
+          path="/admin/users" 
+          element={
+            <AdminRoute>
+              <AdminUsers />
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin/stadiums" 
+          element={
+            <AdminRoute>
+              <AdminStadiums />
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin/matches" 
+          element={
+            <AdminRoute>
+              <AdminMatches />
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin/tickets" 
+          element={
+            <AdminRoute>
+              <AdminPlaceholder title="Ticket Management" />
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin/orders" 
+          element={
+            <AdminRoute>
+              <AdminOrders />
+            </AdminRoute>
+          } 
+        />
+        <Route 
+          path="/admin/payments" 
+          element={
+            <AdminRoute>
+              <AdminPlaceholder title="Payment Management" />
+            </AdminRoute>
+          } 
+        />
+        <Route
+          path="/admin/coupons"
+          element={
+            <AdminRoute>
+              <AdminCoupons />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/reviews"
+          element={
+            <AdminRoute>
+              <AdminReviews />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <AdminRoute>
+              <AdminReports />
+            </AdminRoute>
+          }
+        />
+        <Route 
+          path="/admin/settings" 
+          element={
+            <AdminRoute>
+              <AdminPlaceholder title="System Settings" />
+            </AdminRoute>
+          } 
+        />
 
-      {/* Default redirect */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        {/* User pages */}
+        <Route 
+          path="/matches" 
+          element={
+            <ProtectedRoute>
+              <Matches />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/tickets" 
+          element={
+            <ProtectedRoute>
+              <Tickets />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/stadiums" 
+          element={
+            <ProtectedRoute>
+              <Stadiums />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/orders" 
+          element={
+            <ProtectedRoute>
+              <Orders />
+            </ProtectedRoute>
+          } 
+        />
+        <Route
+          path="/favorites"
+          element={
+            <ProtectedRoute>
+              <Favorites />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reviews"
+          element={
+            <ProtectedRoute>
+              <MyReviews />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute>
+              <UserPage title="👥 User Management" description="Manage user accounts and roles." />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Suspense>
   );
 }
 
@@ -529,6 +525,30 @@ const adminStyles = {
     borderRadius: '12px',
     textAlign: 'center',
     boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  },
+};
+
+// Loading styles
+const loadingStyles = {
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    gap: '16px',
+  },
+  spinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #3498db',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  text: {
+    color: '#7f8c8d',
+    fontSize: '16px',
   },
 };
 

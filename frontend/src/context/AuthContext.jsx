@@ -231,6 +231,12 @@ export const AuthProvider = ({ children }) => {
     return false;
   };
 
+  const updateUser = (updatedData) => {
+    const updatedUser = { ...user, ...updatedData };
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+  };
+
   const value = {
     user,
     token,
@@ -240,6 +246,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAdmin,
     hasRole,
+    updateUser,
     isAuthenticated: !!token && !!user,
   };
 

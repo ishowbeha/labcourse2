@@ -12,6 +12,8 @@ const Orders = () => {
   const screenSize = useResponsiveStyles();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -81,6 +83,69 @@ const Orders = () => {
     return orders
       .filter(o => o.status === 'confirmed' || o.status === 'completed')
       .reduce((sum, o) => sum + (o.total || 0), 0);
+  };
+
+  const handleViewDetails = (order) => {
+    setSelectedOrder(order);
+    setShowDetailsModal(true);
+  };
+
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedOrder(null);
+  };
+
+  const handleDownloadInvoice = (order) => {
+    // Create invoice content
+    const invoiceContent = `
+═══════════════════════════════════════════
+          STADIUM TICKETS INVOICE
+═══════════════════════════════════════════
+
+Invoice Number: ${order.orderNumber}
+Date: ${order.date}
+Status: ${order.status.toUpperCase()}
+
+───────────────────────────────────────────
+                 ORDER DETAILS
+───────────────────────────────────────────
+
+Match: ${order.match}
+Date: ${order.matchDate} ${order.matchTime ? `at ${order.matchTime}` : ''}
+Stadium: ${order.stadium}
+Competition: ${order.competition}
+
+Tickets: ${order.tickets}
+${order.seats?.length ? 'Seats: ' + order.seats.join(', ') : ''}
+
+───────────────────────────────────────────
+                  PAYMENT
+───────────────────────────────────────────
+
+Subtotal: €${(order.subtotal || 0).toFixed(2)}
+Fees: €${(order.fees || 0).toFixed(2)}
+${order.discount > 0 ? `Discount: -€${Number(order.discount).toFixed(2)}\n` : ''}
+───────────────────────────────────────────
+TOTAL: €${(order.total || 0).toFixed(2)}
+───────────────────────────────────────────
+
+Payment Method: ${order.paymentMethod}
+
+═══════════════════════════════════════════
+        Thank you for your purchase!
+═══════════════════════════════════════════
+    `;
+
+    // Create blob and download
+    const blob = new Blob([invoiceContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice_${order.orderNumber}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -169,9 +234,9 @@ const Orders = () => {
                 </div>
 
                 <div style={styles.orderActions}>
-                  <button style={styles.primaryBtn}>View Details</button>
+                  <button style={styles.primaryBtn} onClick={() => handleViewDetails(order)}>View Details</button>
                   {order.status === 'confirmed' && (
-                    <button style={styles.secondaryBtn}>Download Invoice</button>
+                    <button style={styles.secondaryBtn} onClick={() => handleDownloadInvoice(order)}>Download Invoice</button>
                   )}
                   {order.status === 'pending' && (
                     <button style={styles.payBtn}>Complete Payment</button>
