@@ -24,8 +24,7 @@ const Stadiums = () => {
   const [lastOrderNum, setLastOrderNum] = useState('');
   const [error, setError] = useState('');
 
-  const [showMapModal, setShowMapModal] = useState(false);
-  const [mapStadium, setMapStadium] = useState(null);
+  // showMapModal / mapStadium removed — View on Map now opens Google Maps directly
 
   const formatCardNumber = (value) => {
     const digits = value.replace(/\D/g, '').slice(0, 16);
@@ -39,8 +38,9 @@ const Stadiums = () => {
   };
 
   const handleViewMap = (stadium) => {
-    setMapStadium(stadium);
-    setShowMapModal(true);
+    if (stadium.mapsUrl) {
+      window.open(stadium.mapsUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleBuyPass = (stadium) => {
@@ -174,7 +174,7 @@ const Stadiums = () => {
     navigate('/login');
   };
 
-  // Complete stadium data — all 16 FIFA World Cup 2026 host stadiums
+  // Complete stadium data — all 26 stadiums with real Google Maps URLs
   const stadiums = [
     // ===== FIFA WORLD CUP 2026 — UNITED STATES (11 stadiums) =====
     {
@@ -185,6 +185,7 @@ const Stadiums = () => {
       capacity: 71000,
       opened: 2017,
       description: 'State-of-the-art retractable roof stadium hosting World Cup 2026 matches in Atlanta. Home of Atlanta United & Atlanta Falcons.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Mercedes-Benz+Stadium+Atlanta+Georgia',
       sections: [
         { name: 'VIP Suite', seats: 1800, priceMultiplier: 4.5 },
         { name: 'Club Level', seats: 8000, priceMultiplier: 3.0 },
@@ -200,6 +201,7 @@ const Stadiums = () => {
       capacity: 65878,
       opened: 2002,
       description: 'Home of the New England Patriots and New England Revolution. Hosting World Cup 2026 matches in the Boston area.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Gillette+Stadium+Foxborough+Massachusetts',
       sections: [
         { name: 'VIP Lounge', seats: 1200, priceMultiplier: 4.0 },
         { name: 'Club Seats', seats: 6000, priceMultiplier: 2.8 },
@@ -215,6 +217,7 @@ const Stadiums = () => {
       capacity: 80000,
       opened: 2009,
       description: 'Massive domed stadium hosting World Cup 2026 matches in the Dallas area. Home of the Dallas Cowboys.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=AT%26T+Stadium+Arlington+Texas',
       sections: [
         { name: 'Founders Club', seats: 1056, priceMultiplier: 4.0 },
         { name: 'Lower Level', seats: 20900, priceMultiplier: 2.5 },
@@ -230,6 +233,7 @@ const Stadiums = () => {
       capacity: 72220,
       opened: 2002,
       description: 'Iconic domed stadium hosting World Cup 2026 matches in Houston. Home of the Houston Texans.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=NRG+Stadium+Houston+Texas',
       sections: [
         { name: 'VIP Suite', seats: 1600, priceMultiplier: 4.0 },
         { name: 'Club Level', seats: 7500, priceMultiplier: 2.8 },
@@ -245,6 +249,7 @@ const Stadiums = () => {
       capacity: 76416,
       opened: 1972,
       description: 'One of the loudest stadiums in the world, hosting World Cup 2026 matches in Kansas City. Home of the Kansas City Chiefs.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Arrowhead+Stadium+Kansas+City+Missouri',
       sections: [
         { name: 'VIP Suite', seats: 1400, priceMultiplier: 4.0 },
         { name: 'Club Level', seats: 7000, priceMultiplier: 2.8 },
@@ -260,6 +265,7 @@ const Stadiums = () => {
       capacity: 70240,
       opened: 2020,
       description: 'State-of-the-art stadium hosting World Cup 2026 matches in Los Angeles. Home of the LA Rams & LA Chargers.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=SoFi+Stadium+Inglewood+California',
       sections: [
         { name: 'VIP Lounge', seats: 810, priceMultiplier: 4.5 },
         { name: 'Platinum Level', seats: 12500, priceMultiplier: 3.0 },
@@ -275,6 +281,7 @@ const Stadiums = () => {
       capacity: 65326,
       opened: 1987,
       description: 'Premier South Florida stadium hosting World Cup 2026 matches. Home of the Miami Dolphins and Miami Open.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Hard+Rock+Stadium+Miami+Gardens+Florida',
       sections: [
         { name: 'VIP Suite', seats: 1500, priceMultiplier: 4.0 },
         { name: 'Club Level', seats: 7000, priceMultiplier: 2.8 },
@@ -290,6 +297,7 @@ const Stadiums = () => {
       capacity: 82500,
       opened: 2010,
       description: 'Iconic stadium hosting World Cup 2026 matches in the New York/New Jersey area. Home of the NY Giants & NY Jets.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=MetLife+Stadium+East+Rutherford+New+Jersey',
       sections: [
         { name: 'VIP Suite', seats: 1000, priceMultiplier: 4.0 },
         { name: 'Lower Bowl', seats: 24000, priceMultiplier: 2.5 },
@@ -305,6 +313,7 @@ const Stadiums = () => {
       capacity: 69596,
       opened: 2003,
       description: 'Historic Philadelphia stadium hosting World Cup 2026 matches. Home of the Philadelphia Eagles.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Lincoln+Financial+Field+Philadelphia+Pennsylvania',
       sections: [
         { name: 'VIP Suite', seats: 1200, priceMultiplier: 4.0 },
         { name: 'Club Level', seats: 6500, priceMultiplier: 2.5 },
@@ -320,6 +329,7 @@ const Stadiums = () => {
       capacity: 68500,
       opened: 2014,
       description: 'Modern Silicon Valley stadium hosting World Cup 2026 matches in the San Francisco Bay Area. Home of the San Francisco 49ers.',
+      mapsUrl: "https://www.google.com/maps/search/?api=1&query=Levi's+Stadium+Santa+Clara+California",
       sections: [
         { name: 'VIP Suite', seats: 1300, priceMultiplier: 4.2 },
         { name: 'Club Level', seats: 8000, priceMultiplier: 2.8 },
@@ -335,6 +345,7 @@ const Stadiums = () => {
       capacity: 68740,
       opened: 2002,
       description: 'Iconic open-air stadium hosting World Cup 2026 matches in Seattle. Home of the Seattle Seahawks & Sounders.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Lumen+Field+Seattle+Washington',
       sections: [
         { name: 'VIP Suite', seats: 1100, priceMultiplier: 4.0 },
         { name: 'Club Level', seats: 7000, priceMultiplier: 2.8 },
@@ -352,6 +363,7 @@ const Stadiums = () => {
       capacity: 49325,
       opened: 2010,
       description: 'Modern stadium hosting World Cup 2026 matches in Guadalajara. Home of Club Deportivo Guadalajara (Chivas).',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Estadio+Akron+Zapopan+Jalisco+Mexico',
       sections: [
         { name: 'VIP Palco', seats: 800, priceMultiplier: 3.5 },
         { name: 'Platea', seats: 12000, priceMultiplier: 2.0 },
@@ -367,6 +379,7 @@ const Stadiums = () => {
       capacity: 87523,
       opened: 1966,
       description: "Legendary stadium hosting its third World Cup. The most iconic stadium in Mexico, home to Club América and Mexico's national team.",
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Estadio+Azteca+Mexico+City',
       sections: [
         { name: 'VIP Palco', seats: 600, priceMultiplier: 3.5 },
         { name: 'Platea', seats: 19250, priceMultiplier: 2.0 },
@@ -382,6 +395,7 @@ const Stadiums = () => {
       capacity: 53500,
       opened: 2015,
       description: 'State-of-the-art stadium hosting World Cup 2026 matches in Monterrey. Home of CF Monterrey (Rayados).',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Estadio+BBVA+Guadalupe+Nuevo+Leon+Mexico',
       sections: [
         { name: 'VIP Suite', seats: 900, priceMultiplier: 3.5 },
         { name: 'Platea', seats: 13000, priceMultiplier: 2.0 },
@@ -399,6 +413,7 @@ const Stadiums = () => {
       capacity: 54500,
       opened: 1983,
       description: "Canada's premier stadium hosting World Cup 2026 matches. Home of the Vancouver Whitecaps and BC Lions.",
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=BC+Place+Stadium+Vancouver+British+Columbia+Canada',
       sections: [
         { name: 'VIP Skybox', seats: 360, priceMultiplier: 3.5 },
         { name: 'Lower Bowl', seats: 13500, priceMultiplier: 2.0 },
@@ -413,6 +428,7 @@ const Stadiums = () => {
       capacity: 30000,
       opened: 2007,
       description: 'Major Canadian stadium hosting World Cup 2026 matches. Home of Toronto FC and Toronto Argonauts.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=BMO+Field+Toronto+Ontario+Canada',
       sections: [
         { name: 'VIP', seats: 250, priceMultiplier: 3.0 },
         { name: 'Main Stand', seats: 10000, priceMultiplier: 1.8 },
@@ -429,6 +445,7 @@ const Stadiums = () => {
       capacity: 22500,
       opened: 2019,
       description: 'The national stadium of Albania, home to the Albania national football team.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Air+Albania+Stadium+Tirana',
       sections: [
         { name: 'VIP North', seats: 2500, priceMultiplier: 3.0 },
         { name: 'East Stand', seats: 7000, priceMultiplier: 1.5 },
@@ -444,6 +461,7 @@ const Stadiums = () => {
       capacity: 16000,
       opened: 1953,
       description: 'Historic stadium in northern Albania, home to KF Vllaznia.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Loro+Borici+Stadium+Shkoder+Albania',
       sections: [
         { name: 'VIP', seats: 600, priceMultiplier: 2.5 },
         { name: 'Main Stand', seats: 4500, priceMultiplier: 1.3 },
@@ -459,6 +477,7 @@ const Stadiums = () => {
       capacity: 9500,
       opened: 1956,
       description: 'Historic stadium, home to KF Tirana.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Selman+Stermasi+Stadium+Tirana+Albania',
       sections: [
         { name: 'VIP', seats: 400, priceMultiplier: 2.0 },
         { name: 'Main Stand', seats: 4110, priceMultiplier: 1.3 },
@@ -473,6 +492,7 @@ const Stadiums = () => {
       capacity: 8500,
       opened: 2018,
       description: 'Home stadium of FK Partizani Tirana.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Partizani+Stadium+Tirana+Albania',
       sections: [
         { name: 'VIP', seats: 496, priceMultiplier: 2.5 },
         { name: 'North', seats: 3000, priceMultiplier: 1.2 },
@@ -487,6 +507,7 @@ const Stadiums = () => {
       capacity: 12000,
       opened: 1959,
       description: 'Home stadium of KF Skënderbeu Korçë.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Skenderbeu+Stadium+Korce+Albania',
       sections: [
         { name: 'VIP', seats: 600, priceMultiplier: 2.0 },
         { name: 'East', seats: 4200, priceMultiplier: 1.2 },
@@ -501,6 +522,7 @@ const Stadiums = () => {
       capacity: 8000,
       opened: 1970,
       description: 'Stadium in the historic city of Gjirokastër.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Shenkolli+Stadium+Gjirokaster+Albania',
       sections: [
         { name: 'VIP', seats: 240, priceMultiplier: 2.0 },
         { name: 'Main Stand', seats: 2400, priceMultiplier: 1.2 },
@@ -517,6 +539,7 @@ const Stadiums = () => {
       capacity: 13500,
       opened: 1953,
       description: 'Home stadium of the Kosova national team and FC Prishtina.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Fadil+Vokrri+Stadium+Pristina+Kosovo',
       sections: [
         { name: 'VIP', seats: 480, priceMultiplier: 2.5 },
         { name: 'West Stand', seats: 4000, priceMultiplier: 1.3 },
@@ -532,6 +555,7 @@ const Stadiums = () => {
       capacity: 8500,
       opened: 1972,
       description: 'Stadium in northern Kosova, home to KF Trepça.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Trepca+Stadium+Mitrovica+Kosovo',
       sections: [
         { name: 'Main Stand', seats: 1500, priceMultiplier: 1.5 },
         { name: 'East Stand', seats: 2400, priceMultiplier: 1.2 },
@@ -546,6 +570,7 @@ const Stadiums = () => {
       capacity: 6000,
       opened: 1980,
       description: 'Home of KF Ferizaj.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Ferizaj+Stadium+Kosovo',
       sections: [
         { name: 'Main Stand', seats: 960, priceMultiplier: 1.3 },
         { name: 'Open Stand', seats: 2500, priceMultiplier: 1.0 }
@@ -559,6 +584,7 @@ const Stadiums = () => {
       capacity: 7000,
       opened: 1978,
       description: 'Stadium in western Kosova, home of KF Besa Pejë.',
+      mapsUrl: 'https://www.google.com/maps/search/?api=1&query=Peja+Stadium+Pec+Kosovo',
       sections: [
         { name: 'Main Stand', seats: 1260, priceMultiplier: 1.3 },
         { name: 'Open Stand', seats: 3080, priceMultiplier: 1.0 }
@@ -617,8 +643,13 @@ const Stadiums = () => {
                   </div>
 
                   <div className="d-flex gap-2 mt-auto">
-                    <Button variant="outline-secondary" className="flex-fill" onClick={() => handleViewMap(stadium)}>
-                      🗺️ View Map
+                    <Button
+                      variant="outline-secondary"
+                      className="flex-fill"
+                      onClick={() => handleViewMap(stadium)}
+                      title={`Open ${stadium.name} on Google Maps`}
+                    >
+                      🗺️ View on Map
                     </Button>
                     <Button variant="success" className="flex-fill" onClick={() => handleBuyPass(stadium)}>
                       🎟️ Buy Season Pass
@@ -750,33 +781,7 @@ const Stadiums = () => {
         )}
       </Modal>
 
-      <Modal show={showMapModal && !!mapStadium} onHide={() => setShowMapModal(false)} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>🗺️ {mapStadium?.name} - Location Map</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {mapStadium && (
-            <>
-              <p className="fw-bold mb-1">{mapStadium.name}</p>
-              <p className="text-muted small mb-3">Location: {mapStadium.city}, {mapStadium.country}</p>
-
-              <div className="stadium-map-preview rounded border position-relative overflow-hidden d-flex align-items-center justify-content-center">
-                <div className="text-center position-relative z-1">
-                  <div className="display-4">🏟️</div>
-                  <Badge bg="dark" className="px-3 py-2 mt-2">{mapStadium.name}</Badge>
-                  <div className="map-marker-dot mx-auto mt-2" />
-                </div>
-                <Badge bg="light" text="dark" className="position-absolute bottom-0 end-0 m-2 font-monospace small">
-                  Lat: {(30 + mapStadium.id * 1.5).toFixed(4)}°, Lon: {(-90 - mapStadium.id * 2.3).toFixed(4)}°
-                </Badge>
-              </div>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="dark" onClick={() => setShowMapModal(false)}>Close Map</Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Map modal removed — View on Map now opens Google Maps directly in a new tab */}
     </div>
   );
 };
