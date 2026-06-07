@@ -104,21 +104,13 @@ export const SettingsProvider = ({ children }) => {
   const loadSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        // Not logged in — use defaults silently
-        setLoaded(true);
-        return;
-      }
-
-      // Only call /admin/settings if user is admin — avoids 403/500 for regular users
-      if (!isAdminUser()) {
-        setLoaded(true);
-        return;
-      }
+      // If we are logged in as admin, fetch all settings including secrets.
+      // Otherwise, fetch public settings.
+      const endpoint = (token && isAdminUser()) ? '/admin/settings' : '/settings';
 
       // api interceptor returns response.data directly
       // res = { success: true, data: { key: value, ... } }
-      const res = await api.get('/admin/settings');
+      const res = await api.get(endpoint);
       const raw = res?.data ?? res;
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
         setSettings({ ...DEFAULTS, ...raw });

@@ -5,6 +5,7 @@ import useResponsiveStyles from '../hooks/useResponsiveStyles';
 import Navbar from '../components/Navbar';
 import OrderService from '../services/OrderService';
 import axios from 'axios';
+import { jsPDF } from 'jspdf';
 
 const Orders = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -96,8 +97,110 @@ const Orders = () => {
   };
 
   const handleDownloadInvoice = (order) => {
-    // Create invoice content
-    const invoiceContent = `
+    try {
+      const doc = new jsPDF();
+      
+      // Title / Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(44, 62, 80); // #2c3e50
+      doc.text('STADIUM TICKETS INVOICE', 14, 20);
+      
+      // Separator Line
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(14, 26, 196, 26);
+      
+      // Invoice Meta Info
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(127, 140, 141); // #7f8c8d
+      doc.text(`Invoice Number: ${order.orderNumber}`, 14, 34);
+      doc.text(`Date: ${order.date}`, 14, 40);
+      doc.text(`Status: ${order.status.toUpperCase()}`, 14, 46);
+      
+      // Section Header: Order Details
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(44, 62, 80);
+      doc.text('ORDER DETAILS', 14, 58);
+      doc.line(14, 61, 196, 61);
+      
+      // Order details content
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(50, 50, 50);
+      doc.text(`Match:`, 14, 68);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${order.match}`, 45, 68);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Match Date:`, 14, 74);
+      doc.text(`${order.matchDate} ${order.matchTime ? `at ${order.matchTime}` : ''}`, 45, 74);
+      
+      doc.text(`Stadium:`, 14, 80);
+      doc.text(`${order.stadium}`, 45, 80);
+      
+      doc.text(`Competition:`, 14, 86);
+      doc.text(`${order.competition}`, 45, 86);
+      
+      doc.text(`Tickets Purchased:`, 14, 92);
+      doc.text(`${order.tickets}`, 45, 92);
+      
+      if (order.seats && order.seats.length > 0) {
+        doc.text(`Seats / Sections:`, 14, 98);
+        doc.text(`${order.seats.join(', ')}`, 45, 98);
+      }
+      
+      // Section Header: Payment Info
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(44, 62, 80);
+      doc.text('PAYMENT DETAILS', 14, 112);
+      doc.line(14, 115, 196, 115);
+      
+      // Payment content
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.setTextColor(50, 50, 50);
+      
+      doc.text(`Subtotal:`, 14, 122);
+      doc.text(`€${(order.subtotal || 0).toFixed(2)}`, 150, 122, { align: 'right' });
+      
+      doc.text(`Booking Fees:`, 14, 128);
+      doc.text(`€${(order.fees || 0).toFixed(2)}`, 150, 128, { align: 'right' });
+      
+      let nextY = 134;
+      if (order.discount > 0) {
+        doc.text(`Discount ${order.couponCode ? `(${order.couponCode})` : ''}:`, 14, 134);
+        doc.setTextColor(39, 174, 96); // green
+        doc.text(`-€${Number(order.discount).toFixed(2)}`, 150, 134, { align: 'right' });
+        doc.setTextColor(50, 50, 50);
+        nextY = 140;
+      }
+      
+      doc.line(14, nextY, 196, nextY);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`TOTAL AMOUNT PAID:`, 14, nextY + 8);
+      doc.text(`€${(order.total || 0).toFixed(2)}`, 150, nextY + 8, { align: 'right' });
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(127, 140, 141);
+      doc.text(`Payment Method: ${order.paymentMethod}`, 14, nextY + 18);
+      
+      // Footer Note
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(11);
+      doc.setTextColor(44, 62, 80);
+      doc.text('Thank you for your purchase!', 105, nextY + 35, { align: 'center' });
+      
+      // Save the PDF
+      doc.save(`Invoice_${order.orderNumber}.pdf`);
+    } catch (pdfError) {
+      console.error('PDF Generation failed:', pdfError);
+      // Fallback to text file download if PDF fails
+      const invoiceContent = `
 ═══════════════════════════════════════════
           STADIUM TICKETS INVOICE
 ═══════════════════════════════════════════
@@ -134,19 +237,19 @@ Payment Method: ${order.paymentMethod}
 ═══════════════════════════════════════════
         Thank you for your purchase!
 ═══════════════════════════════════════════
-    `;
-
-    // Create blob and download
-    const blob = new Blob([invoiceContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Invoice_${order.orderNumber}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      `;
+      const blob = new Blob([invoiceContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice_${order.orderNumber}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
+
 
   return (
     <div style={styles.container}>
@@ -235,7 +338,7 @@ Payment Method: ${order.paymentMethod}
 
                 <div style={styles.orderActions}>
                   <button style={styles.primaryBtn} onClick={() => handleViewDetails(order)}>View Details</button>
-                  {order.status === 'confirmed' && (
+                  {order.status !== 'pending' && (
                     <button style={styles.secondaryBtn} onClick={() => handleDownloadInvoice(order)}>Download Invoice</button>
                   )}
                   {order.status === 'pending' && (
@@ -244,6 +347,70 @@ Payment Method: ${order.paymentMethod}
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {showDetailsModal && selectedOrder && (
+          <div style={styles.modalOverlay} onClick={closeDetailsModal}>
+            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Order Details</h2>
+                <button style={styles.modalCloseBtn} onClick={closeDetailsModal}>&times;</button>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #eee' }}>
+                  <div>
+                    <span style={styles.orderNumber}>{selectedOrder.orderNumber}</span>
+                    <span style={styles.orderDate}>Placed on {selectedOrder.date}</span>
+                  </div>
+                  <span style={{...styles.status, backgroundColor: getStatusColor(selectedOrder.status)}}>
+                    {selectedOrder.status.toUpperCase()}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                  <h3 style={{ ...styles.matchTitle, margin: 0 }}>{selectedOrder.match}</h3>
+                  <p style={{ ...styles.matchDate, margin: 0 }}>📅 Match Date: {selectedOrder.matchDate} {selectedOrder.matchTime ? `at ${selectedOrder.matchTime}` : ''}</p>
+                  <p style={{ ...styles.matchStadium, margin: 0 }}>🏟️ {selectedOrder.stadium || 'TBD'}</p>
+                  <p style={{ ...styles.matchCompetition, margin: 0 }}>🏆 {selectedOrder.competition || 'Match'}</p>
+                  <p style={{ ...styles.ticketInfo, margin: 0 }}>🎫 {selectedOrder.tickets} ticket(s)</p>
+                  <div style={styles.seats}>
+                    {selectedOrder.seats?.map((seat, idx) => (
+                      <span key={idx} style={styles.seatTag}>{seat}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={styles.orderSummary}>
+                  <div style={styles.summaryRow}>
+                    <span>Subtotal</span>
+                    <span>€{(selectedOrder.subtotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div style={styles.summaryRow}>
+                    <span>Fees</span>
+                    <span>€{(selectedOrder.fees || 0).toFixed(2)}</span>
+                  </div>
+                  {selectedOrder.discount > 0 && (
+                    <div style={styles.summaryRow}>
+                      <span style={{ color: '#047857' }}>Discount {selectedOrder.couponCode ? `(${selectedOrder.couponCode})` : ''}</span>
+                      <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(selectedOrder.discount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{...styles.summaryRow, ...styles.totalRow}}>
+                    <span>Total</span>
+                    <span>€{(selectedOrder.total || 0).toFixed(2)}</span>
+                  </div>
+                  <p style={styles.paymentMethod}>Paid via {selectedOrder.paymentMethod}</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #eee' }}>
+                {selectedOrder.status !== 'pending' && (
+                  <button style={styles.secondaryBtn} onClick={() => handleDownloadInvoice(selectedOrder)}>Download Invoice</button>
+                )}
+                <button style={styles.primaryBtn} onClick={closeDetailsModal}>Close</button>
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -449,6 +616,53 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backdropFilter: 'blur(3px)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  modal: {
+    backgroundColor: 'white',
+    padding: '30px',
+    borderRadius: '16px',
+    width: '500px',
+    maxWidth: '90%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    position: 'relative',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px',
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  modalCloseBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '28px',
+    fontWeight: '300',
+    color: '#95a5a6',
+    cursor: 'pointer',
+    padding: '0 8px',
+    lineHeight: 1,
+    transition: 'color 0.2s',
   },
 };
 

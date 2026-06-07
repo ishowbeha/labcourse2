@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 
 const NotificationBell = () => {
   const { notifications, unreadCount, markNotificationRead, clearNotifications } = useSocket();
   const [showDropdown, setShowDropdown] = useState(false);
+  const navigate = useNavigate();
 
   const getNotificationIcon = (type) => {
     switch (type) {
@@ -32,6 +34,9 @@ const NotificationBell = () => {
   const handleNotificationClick = (notification) => {
     markNotificationRead(notification.id);
     setShowDropdown(false);
+    if (['refund', 'order_confirmed', 'order_pending', 'ticket_purchase'].includes(notification.type)) {
+      navigate('/orders');
+    }
   };
 
   return (

@@ -118,6 +118,32 @@ class SettingsController {
       next(error);
     }
   }
+
+  // GET /api/settings
+  // Returns non-sensitive settings (public)
+  async getPublicSettings(req, res, next) {
+    try {
+      const settings = await this.service.getAllSettings();
+      const sensitiveKeys = [
+        'stripe_secret_key',
+        'smtp_password',
+        'smtp_user',
+        'smtp_host',
+        'smtp_port',
+        'smtp_sender',
+        'admin_email'
+      ];
+      const publicSettings = {};
+      for (const [key, value] of Object.entries(settings)) {
+        if (!sensitiveKeys.includes(key)) {
+          publicSettings[key] = value;
+        }
+      }
+      res.json({ success: true, data: publicSettings });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = SettingsController;

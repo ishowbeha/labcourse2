@@ -99,6 +99,11 @@ const startServer = async () => {
     // Settings routes (admin only)
     app.use('/api/admin/settings', createSettingsRoutes(pool));
 
+    // Public settings route (non-sensitive keys only, accessible to guests and users)
+    const SettingsController = require('./controllers/SettingsController');
+    const settingsController = new SettingsController(pool);
+    app.get('/api/settings', (req, res, next) => settingsController.getPublicSettings(req, res, next));
+
     // Football routes still need Sequelize for sync service
     app.use('/api/football', createFootballRoutes(sequelize));
 
