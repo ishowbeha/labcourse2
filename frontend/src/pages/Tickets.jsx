@@ -35,10 +35,50 @@ const Tickets = () => {
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [step, setStep] = useState(1);
   const [lastOrderNum, setLastOrderNum] = useState('');
+  const [finalPaidAmount, setFinalPaidAmount] = useState(0);
 
+  const getMatchVipPrice = (matchData) => {
+    if (!matchData) return 150;
+    const basePrice = matchData.basePrice || matchData.base_price || 89;
+    const stadium = (matchData.stadiumName || matchData.stadium_name || '').toLowerCase();
+    
+    // Multipliers based on stadium name
+    let multiplier = 1.7; // default fallback
+    if (stadium.includes('mercedes-benz')) multiplier = 4.5;
+    else if (stadium.includes('gillette')) multiplier = 4.0;
+    else if (stadium.includes('at&t')) multiplier = 4.0;
+    else if (stadium.includes('nrg')) multiplier = 4.0;
+    else if (stadium.includes('arrowhead')) multiplier = 4.0;
+    else if (stadium.includes('sofi')) multiplier = 4.5;
+    else if (stadium.includes('hard rock')) multiplier = 4.0;
+    else if (stadium.includes('metlife')) multiplier = 4.0;
+    else if (stadium.includes('lincoln')) multiplier = 4.0;
+    else if (stadium.includes('levi')) multiplier = 4.2;
+    else if (stadium.includes('lumen')) multiplier = 4.0;
+    else if (stadium.includes('akron')) multiplier = 3.5;
+    else if (stadium.includes('azteca')) multiplier = 3.5;
+    else if (stadium.includes('bbva')) multiplier = 3.5;
+    else if (stadium.includes('bc place')) multiplier = 3.5;
+    else if (stadium.includes('bmo field')) multiplier = 3.0;
+    else if (stadium.includes('national stadium') || stadium.includes('air albania')) multiplier = 3.0;
+    else if (stadium.includes('loro')) multiplier = 2.5;
+    else if (stadium.includes('selman')) multiplier = 2.0;
+    else if (stadium.includes('partizani')) multiplier = 2.5;
+    else if (stadium.includes('skënderbeu') || stadium.includes('skenderbeu')) multiplier = 2.0;
+    else if (stadium.includes('gjirokastër') || stadium.includes('gjirokaster')) multiplier = 2.0;
+    else if (stadium.includes('fadil')) multiplier = 2.5;
+    else if (stadium.includes('mitrovica')) multiplier = 1.5;
+    else if (stadium.includes('ferizaj')) multiplier = 1.3;
+    else if (stadium.includes('peja')) multiplier = 1.3;
+    
+    const calculated = basePrice * multiplier;
+    return Math.min(150, Math.round(calculated * 100) / 100);
+  };
+
+  const vipPrice = match ? getMatchVipPrice(match) : 150;
   const sections = [
-    { id: 'vip-north', name: 'VIP North', price: 150, capacity: 50 },
-    { id: 'vip-south', name: 'VIP South', price: 150, capacity: 50 },
+    { id: 'vip-north', name: 'VIP North', price: vipPrice, capacity: 50 },
+    { id: 'vip-south', name: 'VIP South', price: vipPrice, capacity: 50 },
     { id: 'east-stand', name: 'East Stand', price: 60, capacity: 200 },
     { id: 'west-stand', name: 'West Stand', price: 60, capacity: 200 },
     { id: 'north-stand', name: 'North Stand', price: 40, capacity: 300 },
@@ -150,12 +190,22 @@ const Tickets = () => {
       const selectedSectionData = sections.find(s => s.id === selectedSection);
       const totalPrice = selectedSectionData.price * selectedQuantity;
       const fees = Math.round(totalPrice * 0.05);
+      const isFamilyPack = selectedQuantity === 4 && selectedSectionData && (selectedSectionData.id === 'vip-north' || selectedSectionData.id === 'vip-south');
+      const familyDiscount = isFamilyPack ? (totalPrice * 0.25) : 0;
       const discountAmount = couponDiscount;
-      const grandTotalAfterDiscount = Math.max(0, totalPrice + fees - discountAmount);
+      const grandTotalAfterDiscount = Math.max(0, totalPrice + fees - discountAmount - familyDiscount);
       const pmName = paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod;
 
       let orderNumber = '';
       let apiPurchaseSucceeded = false;
+
+      const noteDetails = [];
+      if (appliedCoupon?.code) noteDetails.push(`Coupon: ${appliedCoupon.code}`);
+      if (familyDiscount > 0) noteDetails.push(`Family Pack Discount (25%)`);
+      noteDetails.push(`Subtotal: ${totalPrice}`);
+      noteDetails.push(`Fees: ${fees}`);
+      noteDetails.push(`Discount: ${discountAmount + familyDiscount}`);
+      const notesStr = noteDetails.join(' | ');
 
       // Save order to backend via simple-purchase (works for all matches)
       try {
@@ -166,7 +216,7 @@ const Tickets = () => {
           quantity: selectedQuantity,
           totalAmount: grandTotalAfterDiscount,
           paymentMethod: paymentMethod,
-          notes: appliedCoupon?.code ? `Coupon: ${appliedCoupon.code}` : undefined,
+          notes: notesStr,
           status: 'confirmed'
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -201,15 +251,17 @@ const Tickets = () => {
         seats: Array(selectedQuantity).fill(`${selectedSectionData.name}`),
         subtotal: totalPrice,
         fees: fees,
-        discount: discountAmount,
+        discount: discountAmount + familyDiscount,
         couponCode: appliedCoupon?.code || null,
         total: grandTotalAfterDiscount,
         status: 'confirmed',
-        paymentMethod: pmName
+        paymentMethod: pmName,
+        notes: notesStr
       };
       OrderService.saveOrder(order);
 
       setLastOrderNum(orderNumber);
+      setFinalPaidAmount(grandTotalAfterDiscount);
 
       // Log purchase activity
       try {
@@ -299,7 +351,7 @@ const Tickets = () => {
             <div style={styles.successOrderInfo}>
               <p style={styles.successOrderNumber}>Order: {lastOrderNum}</p>
               <p style={styles.successDetails}>
-                Tickets: {selectedQuantity} | €{selectedQuantity * (sections.find(s => s.id === selectedSection)?.price || 0) + Math.round(selectedQuantity * (sections.find(s => s.id === selectedSection)?.price || 0) * 0.05)}
+                Tickets: {selectedQuantity} | €{Number(finalPaidAmount).toFixed(2)}
               </p>
               <p style={styles.successPayment}>Paid via: {paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod}</p>
             </div>
@@ -319,6 +371,8 @@ const Tickets = () => {
 
   const selectedSectionData = sections.find(s => s.id === selectedSection);
   const totalPrice = selectedSectionData ? selectedSectionData.price * selectedQuantity : 0;
+  const isFamilyPack = selectedQuantity === 4 && selectedSectionData && (selectedSectionData.id === 'vip-north' || selectedSectionData.id === 'vip-south');
+  const familyDiscount = isFamilyPack ? (totalPrice * 0.25) : 0;
   const fees = Math.round(totalPrice * 0.05);
   const grandTotal = totalPrice + fees;
 
@@ -535,7 +589,7 @@ const Tickets = () => {
                   if (!couponCode) return;
                   try {
                     const token = localStorage.getItem('token');
-                    const rResponse = await axios.post('/api/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal }, {
+                    const rResponse = await axios.post('/api/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal - familyDiscount }, {
                       headers: token ? { Authorization: `Bearer ${token}` } : {},
                       withCredentials: true
                     });
@@ -560,12 +614,21 @@ const Tickets = () => {
             <div style={styles.priceBreakdown}>
               <div style={styles.summaryRow}><span>Subtotal</span><span>€{totalPrice}</span></div>
               <div style={styles.summaryRow}><span>Booking Fee (5%)</span><span>€{fees}</span></div>
+              {familyDiscount > 0 && (
+                <div style={styles.summaryRow}>
+                  <span style={{ color: '#047857' }}>Family Pack Discount (25%)</span>
+                  <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(familyDiscount).toFixed(2)}</span>
+                </div>
+              )}
               {couponDiscount > 0 && (
-                <div style={styles.summaryRow}><span style={{ color: '#047857' }}>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span><span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(couponDiscount).toFixed(2)}</span></div>
+                <div style={styles.summaryRow}>
+                  <span style={{ color: '#047857' }}>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
+                  <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(couponDiscount).toFixed(2)}</span>
+                </div>
               )}
               <div style={{ ...styles.summaryRow, ...styles.totalRow }}>
                 <span>Total</span>
-                <span>€{Math.max(0, grandTotal - couponDiscount).toFixed(2)}</span>
+                <span>€{Math.max(0, grandTotal - couponDiscount - familyDiscount).toFixed(2)}</span>
               </div>
             </div>
 
@@ -576,7 +639,7 @@ const Tickets = () => {
                 onClick={handlePurchase}
                 disabled={purchasing}
               >
-                {purchasing ? '⏳ Processing Payment...' : `✅ Pay €${Math.max(0, grandTotal - couponDiscount).toFixed(2)}`}
+                {purchasing ? '⏳ Processing Payment...' : `✅ Pay €${Math.max(0, grandTotal - couponDiscount - familyDiscount).toFixed(2)}`}
               </button>
             </div>
           </div>

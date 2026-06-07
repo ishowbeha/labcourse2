@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Navbar from '../components/Navbar';
 import MatchService from '../services/MatchService';
 import FootballService from '../services/FootballService';
 import { getFlagEmoji } from '../utils/flags';
+import axios from 'axios';
+import OrderService from '../services/OrderService';
 
 // Custom hook for responsive styles
 const useResponsiveStyles = () => {
@@ -36,6 +39,270 @@ const Home = () => {
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
   const screenSize = useResponsiveStyles();
+  const navigate = useNavigate();
+
+  const [showVipModal, setShowVipModal] = useState(false);
+  const [vipMatchId, setVipMatchId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [lastOrderNum, setLastOrderNum] = useState('');
+  const [error, setError] = useState('');
+  const [userOrders, setUserOrders] = useState([]);
+  const [allUpcomingMatches, setAllUpcomingMatches] = useState([]);
+
+  // Fetch orders from API and localStorage
+  const fetchUserOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('/api/orders', {
+        params: { limit: 50 },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        withCredentials: true
+      });
+      const responseData = response.data;
+      if (responseData?.success && responseData?.data?.orders) {
+        setUserOrders(responseData.data.orders);
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch orders from API in Home.jsx:', err);
+    }
+    // Fallback to localStorage
+    const localOrders = OrderService.getOrders();
+    setUserOrders(localOrders || []);
+  };
+
+  useEffect(() => {
+    fetchUserOrders();
+  }, []);
+
+  const formatCardNumber = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatExpiry = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+  };
+
+  // Determine if the user has already bought a VIP pass this calendar month
+  const today = new Date();
+  const currentYearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  
+  const hasVipThisMonth = userOrders.some(order => {
+    const notesStr = order.notes || '';
+    const isVipPass = notesStr.includes('VIP Match Experience');
+    if (!isVipPass) return false;
+    
+    const dateStr = order.created_at || order.date || '';
+    return dateStr.startsWith(currentYearMonth);
+  });
+
+  const getMatchVipPrice = (matchData) => {
+    if (!matchData) return 150;
+    const basePrice = matchData.basePrice || matchData.base_price || 89;
+    const stadium = (matchData.stadiumName || matchData.stadium_name || '').toLowerCase();
+    
+    // Multipliers based on stadium name
+    let multiplier = 1.7; // default fallback
+    if (stadium.includes('mercedes-benz')) multiplier = 4.5;
+    else if (stadium.includes('gillette')) multiplier = 4.0;
+    else if (stadium.includes('at&t')) multiplier = 4.0;
+    else if (stadium.includes('nrg')) multiplier = 4.0;
+    else if (stadium.includes('arrowhead')) multiplier = 4.0;
+    else if (stadium.includes('sofi')) multiplier = 4.5;
+    else if (stadium.includes('hard rock')) multiplier = 4.0;
+    else if (stadium.includes('metlife')) multiplier = 4.0;
+    else if (stadium.includes('lincoln')) multiplier = 4.0;
+    else if (stadium.includes('levi')) multiplier = 4.2;
+    else if (stadium.includes('lumen')) multiplier = 4.0;
+    else if (stadium.includes('akron')) multiplier = 3.5;
+    else if (stadium.includes('azteca')) multiplier = 3.5;
+    else if (stadium.includes('bbva')) multiplier = 3.5;
+    else if (stadium.includes('bc place')) multiplier = 3.5;
+    else if (stadium.includes('bmo field')) multiplier = 3.0;
+    else if (stadium.includes('national stadium') || stadium.includes('air albania')) multiplier = 3.0;
+    else if (stadium.includes('loro')) multiplier = 2.5;
+    else if (stadium.includes('selman')) multiplier = 2.0;
+    else if (stadium.includes('partizani')) multiplier = 2.5;
+    else if (stadium.includes('skënderbeu') || stadium.includes('skenderbeu')) multiplier = 2.0;
+    else if (stadium.includes('gjirokastër') || stadium.includes('gjirokaster')) multiplier = 2.0;
+    else if (stadium.includes('fadil')) multiplier = 2.5;
+    else if (stadium.includes('mitrovica')) multiplier = 1.5;
+    else if (stadium.includes('ferizaj')) multiplier = 1.3;
+    else if (stadium.includes('peja')) multiplier = 1.3;
+    
+    const calculated = basePrice * multiplier;
+    return Math.min(150, Math.round(calculated * 100) / 100);
+  };
+
+  const handleBuyVipExperience = () => {
+    // Refresh orders to make sure constraint check is up-to-date
+    fetchUserOrders();
+    setVipMatchId(allUpcomingMatches[0]?.id || '');
+    setPaymentMethod('');
+    setCardNumber('');
+    setCardName('');
+    setCardExpiry('');
+    setCardCvc('');
+    setError('');
+    setPurchaseSuccess(false);
+    setShowVipModal(true);
+  };
+
+  const handleConfirmVipPurchase = async () => {
+    if (hasVipThisMonth) {
+      setError('You have already purchased a VIP Match Experience this calendar month. Limit: 1 per month.');
+      return;
+    }
+    if (!vipMatchId) {
+      setError('Please select a match');
+      return;
+    }
+    if (!paymentMethod) {
+      setError('Please select a payment method');
+      return;
+    }
+    if (paymentMethod === 'credit-card' && (!cardNumber || !cardName || !cardExpiry || !cardCvc)) {
+      setError('Please fill in all card details');
+      return;
+    }
+
+    setPurchasing(true);
+    setError('');
+
+    try {
+      const selectedMatch = allUpcomingMatches.find(m => m.id === vipMatchId);
+      const matchName = selectedMatch ? `${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}` : 'World Cup Match';
+      const stadiumName = selectedMatch ? selectedMatch.stadiumName : 'Host Stadium';
+
+      const originalPrice = selectedMatch ? getMatchVipPrice(selectedMatch) : 150.00;
+      const discountAmount = Math.round(originalPrice * 0.28 * 100) / 100;
+      const finalPrice = Math.round((originalPrice - discountAmount) * 100) / 100;
+      
+      const pmName = [
+        { id: 'credit-card', name: 'Credit Card' },
+        { id: 'paypal', name: 'PayPal' },
+        { id: 'bank-transfer', name: 'Bank Transfer' }
+      ].find(p => p.id === paymentMethod)?.name || paymentMethod;
+
+      const noteDetails = [
+        `VIP Match Experience`,
+        `Subtotal: ${originalPrice.toFixed(2)}`,
+        `Fees: 0.00`,
+        `Discount: ${discountAmount.toFixed(2)}`
+      ];
+      const notesStr = noteDetails.join(' | ');
+
+      let orderNumber = '';
+      let apiPurchaseSucceeded = false;
+
+      // Save order to backend
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.post('/api/orders/simple-purchase', {
+          matchName: `VIP Experience - ${matchName}`,
+          sectionName: 'VIP Seating & Lounge',
+          quantity: 1,
+          totalAmount: finalPrice,
+          paymentMethod: paymentMethod,
+          notes: notesStr,
+          status: 'confirmed'
+        }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true
+        });
+        const data = response.data;
+        if (data?.success && data?.data?.orderNumber) {
+          orderNumber = data.data.orderNumber;
+          apiPurchaseSucceeded = true;
+        }
+      } catch (apiErr) {
+        console.warn('Backend simple-purchase failed for VIP experience:', apiErr);
+      }
+
+      if (!apiPurchaseSucceeded) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        orderNumber = OrderService.generateOrderNumber();
+      }
+
+      // Save order to localStorage
+      const order = {
+        id: Date.now() + Math.random(),
+        orderNumber,
+        date: new Date().toISOString().split('T')[0],
+        match: `VIP Experience - ${matchName}`,
+        matchDate: selectedMatch?.matchDate || new Date().toISOString().split('T')[0],
+        matchTime: selectedMatch?.matchTime || '',
+        stadium: stadiumName,
+        competition: selectedMatch?.competition || 'FIFA World Cup 2026',
+        tickets: 1,
+        seats: ['VIP Seating & Lounge'],
+        subtotal: originalPrice,
+        fees: 0,
+        discount: discountAmount,
+        couponCode: null,
+        total: finalPrice,
+        status: 'confirmed',
+        paymentMethod: pmName,
+        notes: notesStr
+      };
+      OrderService.saveOrder(order);
+
+      // Log activity
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post('/api/logs/activity', {
+          action: 'purchase_vip',
+          description: `Bought VIP match experience for ${matchName}`,
+          resourceType: 'vip_pass',
+          resourceId: orderNumber,
+          metadata: { match: matchName }
+        }, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true
+        });
+      } catch (e) {}
+
+      // Refresh orders immediately so hasVipThisMonth is updated
+      fetchUserOrders();
+      setLastOrderNum(orderNumber);
+      setPurchaseSuccess(true);
+    } catch (err) {
+      console.error('Purchase VIP experience failed:', err);
+      setError(err.message || 'Purchase failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const getRealStadium = (homeTeam, stadiumName) => {
+    if (stadiumName && stadiumName !== 'To Be Announced' && stadiumName !== 'TBA' && stadiumName !== 'TBD') {
+      return stadiumName;
+    }
+    const h = (homeTeam || '').toLowerCase();
+    if (h.includes('canada')) return 'BC Place Stadium';
+    if (h.includes('mexico')) return 'Estadio Azteca';
+    if (h.includes('argentina') || h.includes('nigeria')) return 'Mercedes-Benz Stadium';
+    if (h.includes('germany') || h.includes('japan')) return 'Gillette Stadium';
+    if (h.includes('brazil')) return 'AT&T Stadium';
+    if (h.includes('france')) return 'NRG Stadium';
+    if (h.includes('england')) return 'Arrowhead Stadium';
+    if (h.includes('spain')) return 'SoFi Stadium';
+    if (h.includes('portugal')) return 'Hard Rock Stadium';
+    if (h.includes('netherlands')) return 'MetLife Stadium';
+    if (h.includes('belgium')) return 'Lincoln Financial Field';
+    if (h.includes('croatia')) return 'Levi\'s Stadium';
+    if (h.includes('uruguay')) return 'Lumen Field';
+    return 'MetLife Stadium';
+  };
 
   const handleLogout = () => {
     logout();
@@ -84,14 +351,16 @@ const Home = () => {
         const key = `${apiMatch.homeTeam?.name}-${apiMatch.awayTeam?.name}`;
         if (!localKeys.has(key)) {
           const matchDate = apiMatch.date ? apiMatch.date.split('T')[0] : null;
+          const home = apiMatch.homeTeam?.name || 'Home';
+          const venue = getRealStadium(home, apiMatch.venue);
           allMatches.push({
             id: `api-${apiMatch.id}`,
-            homeTeam: apiMatch.homeTeam?.name || 'Home',
+            homeTeam: home,
             awayTeam: apiMatch.awayTeam?.name || 'Away',
             matchDate,
             matchTime: apiMatch.date ? new Date(apiMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
             competition: 'FIFA World Cup 2026',
-            stadiumName: apiMatch.venue || 'TBD',
+            stadiumName: venue,
             basePrice: 89,
             _sortDate: matchDate || ''
           });
@@ -119,10 +388,10 @@ const Home = () => {
           if (!a._sortDate) return 1;
           if (!b._sortDate) return -1;
           return a._sortDate.localeCompare(b._sortDate);
-        })
-        .slice(0, 3);
+        });
 
-      setUpcomingMatches(upcomingSorted);
+      setAllUpcomingMatches(upcomingSorted);
+      setUpcomingMatches(upcomingSorted.slice(0, 3));
     } catch (error) {
       console.error('Failed to fetch upcoming matches:', error);
     } finally {
@@ -131,13 +400,20 @@ const Home = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString || dateString === 'TBD' || dateString === 'TBA') return 'To Be Announced';
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'To Be Announced';
     return date.toLocaleDateString('en-US', { 
       weekday: 'short', 
       month: 'short', 
       day: 'numeric' 
     });
   };
+
+  const selectedMatch = allUpcomingMatches.find(m => m.id === vipMatchId);
+  const currentVipPrice = selectedMatch ? getMatchVipPrice(selectedMatch) : 150;
+  const currentDiscount = Math.round(currentVipPrice * 0.28 * 100) / 100;
+  const currentTotal = Math.round((currentVipPrice - currentDiscount) * 100) / 100;
 
   return (
     <div style={styles.container}>
@@ -198,10 +474,13 @@ const Home = () => {
                     <span style={styles.matchCompetition}>🏆 {match.competition || 'FIFA World Cup 2026'}</span>
                   </div>
                   <div style={styles.matchFooter}>
-                    <span style={styles.matchStadium}>{match.stadiumName || 'TBA'}</span>
-                    <a href={`/matches`} style={styles.buyTicketsBtn}>
+                    <span style={styles.matchStadium}>{getRealStadium(match.homeTeam, match.stadiumName)}</span>
+                    <button
+                      onClick={() => navigate(`/tickets?matchId=${match.id}`, { state: { match } })}
+                      style={styles.buyTicketsBtn}
+                    >
                       Get Tickets →
-                    </a>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -237,9 +516,9 @@ const Home = () => {
                 <div style={styles.offerFeature}>✓ 10% off merchandise</div>
                 <div style={styles.offerFeature}>✓ Exclusive fan events</div>
               </div>
-              <a href="/stadiums" style={styles.offerBtn}>
+              <button onClick={() => navigate('/stadiums')} style={styles.offerBtn}>
                 Choose Your Stadium →
-              </a>
+              </button>
             </div>
 
             {/* Family Package */}
@@ -264,9 +543,9 @@ const Home = () => {
                 <div style={styles.offerFeature}>✓ Kids activity pack</div>
                 <div style={styles.offerFeature}>✓ Flexible date selection</div>
               </div>
-              <a href="/tickets" style={styles.offerBtn}>
+              <button onClick={() => navigate('/matches')} style={styles.offerBtn}>
                 Book Now →
-              </a>
+              </button>
             </div>
 
             {/* VIP Experience */}
@@ -281,8 +560,8 @@ const Home = () => {
                 Premium seating, hospitality lounge, and meet & greet opportunities.
               </p>
               <div style={styles.offerPricing}>
-                <span style={styles.offerOriginalPrice}>€250.00</span>
-                <span style={styles.offerCurrentPrice}>€179.99/match</span>
+                <span style={styles.offerOriginalPrice}>€150.00</span>
+                <span style={styles.offerCurrentPrice}>€108.00/match</span>
                 <span style={styles.offerDiscount}>Save 28%</span>
               </div>
               <div style={styles.offerFeatures}>
@@ -291,9 +570,9 @@ const Home = () => {
                 <div style={styles.offerFeature}>✓ Gourmet dining</div>
                 <div style={styles.offerFeature}>✓ Free parking</div>
               </div>
-              <a href="/tickets" style={styles.offerBtn}>
+              <button onClick={handleBuyVipExperience} style={styles.offerBtn}>
                 Upgrade Your Experience →
-              </a>
+              </button>
             </div>
           </div>
         </div>
@@ -320,6 +599,163 @@ const Home = () => {
             </a>
           </div>
         </div>
+
+        {/* VIP Match Experience Modal */}
+        {showVipModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowVipModal(false)}>
+            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>⭐ VIP Match Experience Upgrade</h2>
+                <button style={styles.modalCloseBtn} onClick={() => setShowVipModal(false)}>&times;</button>
+              </div>
+
+              {!purchaseSuccess ? (
+                <>
+                  <div style={styles.summaryBox}>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50' }}>🎁 VIP Premium Benefits</h4>
+                    <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
+                      <li>Access to VIP hospitality lounge & gourmet dining</li>
+                      <li>Best category seat selection at the stadium</li>
+                      <li>Free stadium parking voucher & activity guide</li>
+                      <li>VIP fast-track security access lanes</li>
+                    </ul>
+                  </div>
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <h4 style={styles.sectionsTitle}>Select Match for VIP Upgrade</h4>
+                    {allUpcomingMatches.length > 0 ? (
+                      <select
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e9ecef',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          color: '#2c3e50',
+                          backgroundColor: '#f8f9fa',
+                          fontWeight: '600',
+                          outline: 'none',
+                          cursor: 'pointer'
+                        }}
+                        value={vipMatchId}
+                        onChange={(e) => setVipMatchId(e.target.value)}
+                      >
+                        {allUpcomingMatches.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.homeTeam} vs {m.awayTeam} ({formatDate(m.matchDate)})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p style={{ margin: 0, color: '#e74c3c', fontSize: '14px', fontWeight: '600' }}>No upcoming matches available for VIP upgrade.</p>
+                    )}
+                  </div>
+
+                  {hasVipThisMonth && (
+                    <div style={{ ...styles.errorBanner, margin: '0 0 20px 0', backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
+                      ⚠️ <strong>Monthly Limit Exceeded:</strong> You have already purchased a VIP Match Experience this calendar month. Limit: 1 per month.
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: '20px' }}>
+                    <h4 style={styles.sectionsTitle}>Select Payment Method</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {[
+                        { id: 'credit-card', name: 'Credit Card', icon: '💳' },
+                        { id: 'paypal', name: 'PayPal', icon: '🅿️' },
+                        { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' }
+                      ].map(pm => (
+                        <div
+                          key={pm.id}
+                          style={{
+                            ...styles.paymentCard,
+                            borderColor: paymentMethod === pm.id ? '#2c3e50' : '#e9ecef',
+                            backgroundColor: paymentMethod === pm.id ? '#f0f4f8' : 'white',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            border: '2px solid #e9ecef',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}
+                          onClick={() => {
+                            if (!hasVipThisMonth) setPaymentMethod(pm.id);
+                          }}
+                        >
+                          <span>{pm.icon}</span>
+                          <span style={{ fontWeight: '600', fontSize: '14px' }}>{pm.name}</span>
+                          {paymentMethod === pm.id && <span style={{ marginLeft: 'auto', color: '#27ae60', fontWeight: 'bold' }}>✓</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {paymentMethod === 'credit-card' && !hasVipThisMonth && (
+                    <div style={{ ...styles.cardForm, padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={styles.formLabel}>Card Number</label>
+                        <input style={styles.formInput} placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
+                      </div>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={styles.formLabel}>Cardholder Name</label>
+                        <input style={styles.formInput} placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={styles.formLabel}>Expiry Date</label>
+                          <input style={styles.formInput} placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={styles.formLabel}>CVC</label>
+                          <input style={styles.formInput} placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && <div style={{ ...styles.errorBanner, margin: '10px 0' }}>{error}</div>}
+
+                  <div style={{ ...styles.priceBreakdown, padding: '12px', borderRadius: '8px', backgroundColor: '#f8f9fa', marginBottom: '20px' }}>
+                    <div style={styles.summaryRow}><span>Original Price</span><span style={{ textDecoration: 'line-through', color: '#999' }}>€{currentVipPrice.toFixed(2)}</span></div>
+                    <div style={styles.summaryRow}><span style={{ color: '#27ae60' }}>VIP Package Discount (28%)</span><span style={{ color: '#27ae60', fontWeight: 'bold' }}>-€{currentDiscount.toFixed(2)}</span></div>
+                    <div style={{ ...styles.summaryRow, ...styles.totalRow, borderTop: '1px solid #ddd', paddingTop: '8px', marginTop: '8px' }}>
+                      <span>Total Price</span>
+                      <span style={{ fontWeight: 'bold', fontSize: '18px', color: '#2c3e50' }}>€{currentTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button style={{ ...styles.secondaryBtn, flex: 1 }} onClick={() => setShowVipModal(false)}>Cancel</button>
+                    <button
+                      style={{ ...styles.primaryBtn, backgroundColor: '#27ae60', flex: 1.5, opacity: purchasing || !paymentMethod || hasVipThisMonth ? 0.6 : 1 }}
+                      onClick={handleConfirmVipPurchase}
+                      disabled={purchasing || !paymentMethod || hasVipThisMonth}
+                    >
+                      {purchasing ? '⏳ Processing...' : `✅ Purchase VIP Pass (€${currentTotal.toFixed(2)})`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <span style={{ fontSize: '64px' }}>✅</span>
+                  <h3 style={{ color: '#27ae60', margin: '16px 0 8px 0' }}>VIP Upgrade Activated!</h3>
+                  <p style={{ color: '#555', fontSize: '14px', lineHeight: '1.5' }}>
+                    Congratulations! You have successfully upgraded to the VIP Match Experience for <strong>{allUpcomingMatches.find(m => m.id === vipMatchId) ? `${allUpcomingMatches.find(m => m.id === vipMatchId).homeTeam} vs ${allUpcomingMatches.find(m => m.id === vipMatchId).awayTeam}` : 'your selected match'}</strong>.
+                  </p>
+                  <div style={{ backgroundColor: '#f8f9fa', padding: '12px', borderRadius: '8px', margin: '20px 0', fontSize: '14px' }}>
+                    <p style={{ margin: '0 0 6px 0', fontWeight: '600' }}>Order Number: {lastOrderNum}</p>
+                    <p style={{ margin: 0 }}>VIP Pass status: Active</p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    <button style={styles.primaryBtn} onClick={() => { setShowVipModal(false); navigate('/orders'); }}>View My Orders</button>
+                    <button style={styles.secondaryBtn} onClick={() => { setShowVipModal(false); setPurchaseSuccess(false); }}>Close</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
@@ -525,6 +961,8 @@ const styles = {
     fontSize: '13px',
     fontWeight: '600',
     transition: 'background-color 0.2s',
+    border: 'none',
+    cursor: 'pointer',
   },
   quickActions: {
     display: 'grid',
@@ -664,6 +1102,9 @@ const styles = {
   },
   offerBtn: {
     display: 'block',
+    width: '100%',
+    border: 'none',
+    cursor: 'pointer',
     textAlign: 'center',
     backgroundColor: '#2c3e50',
     color: 'white',
@@ -673,6 +1114,136 @@ const styles = {
     fontWeight: '600',
     fontSize: '14px',
     transition: 'background-color 0.2s',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backdropFilter: 'blur(3px)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  modal: {
+    backgroundColor: 'white',
+    padding: '24px',
+    borderRadius: '16px',
+    width: '500px',
+    maxWidth: '90%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
+    position: 'relative',
+    textAlign: 'left',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px',
+    borderBottom: '1px solid #eee',
+    paddingBottom: '12px',
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  modalCloseBtn: {
+    background: 'none',
+    border: 'none',
+    fontSize: '28px',
+    fontWeight: '300',
+    color: '#95a5a6',
+    cursor: 'pointer',
+    padding: '0 8px',
+    lineHeight: 1,
+    transition: 'color 0.2s',
+  },
+  summaryBox: {
+    backgroundColor: '#f8f9fa',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    marginBottom: '16px',
+    border: '1px solid #e9ecef',
+  },
+  sectionsTitle: {
+    margin: '0 0 8px 0',
+    fontSize: '14px',
+    color: '#2c3e50',
+    fontWeight: '600'
+  },
+  paymentCard: {
+    transition: 'all 0.2s',
+  },
+  cardForm: {
+    backgroundColor: '#fff',
+    border: '1px solid #e9ecef',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+  },
+  formLabel: {
+    display: 'block',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: '4px',
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    fontSize: '14px',
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  errorBanner: {
+    backgroundColor: '#fee2e2',
+    color: '#dc2626',
+    padding: '10px 12px',
+    borderRadius: '6px',
+    fontSize: '13px',
+    textAlign: 'center',
+  },
+  priceBreakdown: {
+    border: '1px solid #e9ecef',
+  },
+  summaryRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '4px 0',
+    fontSize: '13px',
+    color: '#555',
+  },
+  totalRow: {
+    fontWeight: 'bold',
+    fontSize: '15px',
+    color: '#2c3e50',
+  },
+  primaryBtn: {
+    padding: '10px 16px',
+    backgroundColor: '#2c3e50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+  },
+  secondaryBtn: {
+    padding: '10px 16px',
+    backgroundColor: 'transparent',
+    color: '#2c3e50',
+    border: '1px solid #2c3e50',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
   },
 };
 

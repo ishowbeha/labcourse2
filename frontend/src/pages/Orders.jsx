@@ -33,24 +33,44 @@ const Orders = () => {
       const responseData = response.data;
       let apiOrders = [];
       if (responseData?.success && responseData?.data?.orders) {
-        apiOrders = responseData.data.orders.map(o => ({
-          id: o.id,
-          orderNumber: o.order_number,
-          date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : 'N/A',
-          match: o.match_name || `${o.home_team || ''} vs ${o.away_team || ''}` || 'Unknown Match',
-          matchDate: o.match_date || 'N/A',
-          matchTime: o.match_time || '',
-          competition: o.competition || 'Match',
-          stadium: o.stadium_name || 'TBD',
-          tickets: o.ticket_count || o.items_count || 0,
-          seats: o.section_names ? o.section_names.split(', ') : [],
-          subtotal: o.total_amount || 0,
-          fees: Math.round((o.total_amount || 0) * 0.05 / 1.05 * 100) / 100,
-          discount: 0,
-          total: o.total_amount || 0,
-          status: o.status || 'confirmed',
-          paymentMethod: o.payment_method || 'credit-card',
-        }));
+        apiOrders = responseData.data.orders.map(o => {
+          let subtotal = o.total_amount || 0;
+          let fees = Math.round((o.total_amount || 0) * 0.05 / 1.05 * 100) / 100;
+          let discount = 0;
+          let couponCode = '';
+
+          if (o.notes) {
+            const subtotalMatch = o.notes.match(/Subtotal:\s*([\d.]+)/);
+            const feesMatch = o.notes.match(/Fees:\s*([\d.]+)/);
+            const discountMatch = o.notes.match(/Discount:\s*([\d.]+)/);
+            const couponMatch = o.notes.match(/Coupon:\s*([^|]+)/);
+            
+            if (subtotalMatch) subtotal = parseFloat(subtotalMatch[1]);
+            if (feesMatch) fees = parseFloat(feesMatch[1]);
+            if (discountMatch) discount = parseFloat(discountMatch[1]);
+            if (couponMatch) couponCode = couponMatch[1].trim();
+          }
+
+          return {
+            id: o.id,
+            orderNumber: o.order_number,
+            date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : 'N/A',
+            match: o.match_name || `${o.home_team || ''} vs ${o.away_team || ''}` || 'Unknown Match',
+            matchDate: o.match_date || 'N/A',
+            matchTime: o.match_time || '',
+            competition: o.competition || 'Match',
+            stadium: o.stadium_name || 'TBD',
+            tickets: o.ticket_count || o.items_count || 0,
+            seats: o.section_names ? o.section_names.split(', ') : [],
+            subtotal: subtotal,
+            fees: fees,
+            discount: discount,
+            couponCode: couponCode || null,
+            total: o.total_amount || 0,
+            status: o.status || 'confirmed',
+            paymentMethod: o.payment_method || 'credit-card',
+          };
+        });
       }
       
       // Always use API results (database is the source of truth)

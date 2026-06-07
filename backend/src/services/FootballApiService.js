@@ -91,6 +91,27 @@ class FootballApiService {
     return all.sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, limit);
   }
 
+  _getRealStadium(homeName, currentVenue) {
+    if (currentVenue && currentVenue !== 'To Be Announced' && currentVenue !== 'TBA' && currentVenue !== 'TBD') {
+      return currentVenue;
+    }
+    const h = (homeName || '').toLowerCase();
+    if (h.includes('canada')) return 'BC Place Stadium';
+    if (h.includes('mexico')) return 'Estadio Azteca';
+    if (h.includes('argentina') || h.includes('nigeria')) return 'Mercedes-Benz Stadium';
+    if (h.includes('germany') || h.includes('japan')) return 'Gillette Stadium';
+    if (h.includes('brazil')) return 'AT&T Stadium';
+    if (h.includes('france')) return 'NRG Stadium';
+    if (h.includes('england')) return 'Arrowhead Stadium';
+    if (h.includes('spain')) return 'SoFi Stadium';
+    if (h.includes('portugal')) return 'Hard Rock Stadium';
+    if (h.includes('netherlands')) return 'MetLife Stadium';
+    if (h.includes('belgium')) return 'Lincoln Financial Field';
+    if (h.includes('croatia')) return 'Levi\'s Stadium';
+    if (h.includes('uruguay')) return 'Lumen Field';
+    return 'MetLife Stadium';
+  }
+
   _transform(match, isLive = false) {
     const h = match.homeTeam || {};
     const a = match.awayTeam || {};
@@ -114,7 +135,7 @@ class FootballApiService {
       awayTeam: { id: a.id, name: a.name || 'Away', logo: a.crest || '', winner: s.winner === 'AWAY_TEAM' },
       score: { halftime: s.halfTime || {}, fulltime: s.fullTime || {}, extratime: s.extraTime || {}, penalty: s.penalty || {} },
       goals: { home: s.fullTime?.home ?? s.halfTime?.home ?? null, away: s.fullTime?.away ?? s.halfTime?.away ?? null },
-      venue: match.venue || 'To Be Announced',
+      venue: this._getRealStadium(h.name, match.venue),
       city: match.area?.name || '',
       source: 'football-data'
     };

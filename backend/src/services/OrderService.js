@@ -184,7 +184,8 @@ class OrderService {
         stadium_name: stadiumName,
         section_names: sectionNames,
         items_count: order.items_count,
-        ticket_count: ticketCount
+        ticket_count: ticketCount,
+        notes: order.notes
       };
     });
 
