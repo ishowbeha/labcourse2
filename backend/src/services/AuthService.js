@@ -10,6 +10,19 @@ class AuthService {
     this.refreshTokenExpiresIn = 30; // days
   }
 
+  /**
+   * Best-effort MongoDB activity logging (never throws)
+   */
+  async _logToMongo(userId, action, resourceType, resourceId, description, metadata = {}) {
+    try {
+      const MongoLogService = require('./MongoLogService');
+      const service = new MongoLogService();
+      await service.logActivity(userId, action, resourceType, resourceId, description, metadata);
+    } catch (error) {
+      // MongoDB logging is best-effort — silently ignore failures
+    }
+  }
+
   // Register new user
   async register(userData) {
     const { firstName, lastName, email, password, role = 'user' } = userData;
@@ -42,7 +55,7 @@ class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user.id);
 
-    // Log audit
+    // Log audit to MySQL
     await this.authRepository.logAudit(
       user.id,
       'register',
@@ -52,6 +65,16 @@ class AuthService {
       { email: user.email },
       null,
       null
+    );
+
+    // Log to MongoDB
+    await this._logToMongo(
+      user.id,
+      'register',
+      'user',
+      user.id,
+      `User registered: ${user.email}`,
+      { email: user.email }
     );
 
     return {
@@ -93,7 +116,7 @@ class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user.id);
 
-    // Log audit
+    // Log audit to MySQL
     await this.authRepository.logAudit(
       user.id,
       'login',
@@ -103,6 +126,16 @@ class AuthService {
       null,
       null,
       null
+    );
+
+    // Log to MongoDB
+    await this._logToMongo(
+      user.id,
+      'login',
+      'user',
+      user.id,
+      `User logged in: ${user.email}`,
+      { email: user.email }
     );
 
     return {

@@ -9,6 +9,8 @@ const DatabaseConfig = require('../config/database');
 const { sequelize } = require('../config/mysql');
 const connectMongoDB = require('../config/mongodb');
 const errorHandler = require('./middleware/errorHandler');
+const MongoLogService = require('./services/MongoLogService');
+const MongoAnalyticsService = require('./services/MongoAnalyticsService');
 const createAuthRoutes = require('./routes/authRoutes');
 const createUserRoutes = require('./routes/userRoutes');
 const createMatchRoutes = require('./routes/matchRoutes');
@@ -18,6 +20,7 @@ const createFootballRoutes = require('./routes/footballRoutes');
 const createOrderRoutes = require('./routes/orderRoutes');
 const createReportRoutes = require('./routes/reportRoutes');
 const createLogRoutes = require('./routes/logRoutes');
+const createAnalyticsRoutes = require('./routes/analyticsRoutes');
 const createReviewRoutes = require('./routes/reviewRoutes');
 const createNotificationRoutes = require('./routes/notificationRoutes');
 const createChatRoutes = require('./routes/chatRoutes');
@@ -75,6 +78,13 @@ const startServer = async () => {
     // Initialize MongoDB (for flexible data - logs, analytics)
     await connectMongoDB();
 
+    // Instantiate MongoDB services and attach to app
+    const mongoLogService = new MongoLogService();
+    const mongoAnalyticsService = new MongoAnalyticsService();
+    app.set('mongoLogService', mongoLogService);
+    app.set('mongoAnalyticsService', mongoAnalyticsService);
+    console.log('✅ MongoDB services initialized (ActivityLog + Analytics)');
+
     // Setup WebSocket handlers (pass the MySQL pool)
     setupWebSocket(io, pool);
 
@@ -87,10 +97,13 @@ const startServer = async () => {
     // Order routes (purchase tickets)
     app.use('/api/orders', createOrderRoutes(pool));
 
-    // Log routes (frontend activity logging)
+    // Log routes (MongoDB activity logging with MySQL audit_logs fallback)
     app.use('/api/logs', createLogRoutes(pool));
 
-    // Report routes (activity logs)
+    // Analytics routes (MongoDB) — admin-only
+    app.use('/api/analytics', createAnalyticsRoutes());
+
+    // Report routes (activity logs from MySQL)
     app.use('/api/reports', createReportRoutes(pool));
     app.use('/api/reviews', createReviewRoutes(pool));
 
@@ -110,6 +123,57 @@ const startServer = async () => {
 
     // Football routes still need Sequelize for sync service
     app.use('/api/football', createFootballRoutes(sequelize));
+
+    // TEST endpoint: Verify MongoDB is writing data (open in browser or Compass)
+    app.get('/api/mongo-test', async (req, res) => {
+      try {
+        const mongoLog = req.app.get('mongoLogService');
+        const mongoAnalytics = req.app.get('mongoAnalyticsService');
+
+        if (!mongoLog || !mongoAnalytics || mongoose.connection.readyState !== 1) {
+          return res.json({
+            success: false,
+            message: 'MongoDB is not connected. Check that MongoDB is running on your machine.',
+            mongodbStatus: mongoose.connection.readyState === 1 ? 'Connected' : 'Not connected',
+            hint: 'Open MongoDB Compass and connect to mongodb://localhost:27017 — the "stadium_tickets" database should appear after this test.'
+          });
+        }
+
+        // Write a test activity log
+        await mongoLog.logActivity(
+          'test-user',
+          'test_action',
+          'test',
+          'test-123',
+          'MongoDB test write from server startup',
+          { test: true, timestamp: new Date().toISOString() }
+        );
+
+        // Write a test analytics event
+        await mongoAnalytics.trackPageView('/api/mongo-test', null, 'test-session');
+
+        // Read back what we wrote
+        const activities = await mongoLog.getRecentActivities(5, 0);
+        const metrics = await mongoAnalytics.getAnalytics(30);
+
+        res.json({
+          success: true,
+          message: '✅ MongoDB is working! Data written and read successfully.',
+          mongodbStatus: 'Connected',
+          whatHappened: 'A test activity log + analytics event were written to MongoDB',
+          howToVerify: 'Open MongoDB Compass → Connect to localhost:27017 → Look for database "stadium_tickets" with collections: activity_logs, analytics, systeminfos',
+          recentActivities: activities,
+          analyticsMetrics: metrics
+        });
+      } catch (error) {
+        res.json({
+          success: false,
+          message: 'MongoDB test failed. See error below.',
+          error: error.message,
+          hint: 'Make sure MongoDB is running on your machine (mongod service)'
+        });
+      }
+    });
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {

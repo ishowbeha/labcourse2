@@ -80,6 +80,19 @@ class OrderController {
         console.log('Audit log write failed:', logErr.message);
       }
 
+      // Track in MongoDB Analytics
+      try {
+        const mongoAnalytics = req.app.get('mongoAnalyticsService');
+        if (mongoAnalytics) {
+          const matchName = result?.match || '';
+          const parts = matchName.split(' vs ');
+          await mongoAnalytics.trackTicketSale(matchId, matchName, quantity, result?.totalAmount || 0, userId);
+          await mongoAnalytics.trackRevenue(result?.totalAmount || 0, 'ticket_purchase', userId);
+        }
+      } catch (analyticsErr) {
+        // Analytics tracking is best-effort
+      }
+
       res.status(201).json({
         success: true,
         data: result,
