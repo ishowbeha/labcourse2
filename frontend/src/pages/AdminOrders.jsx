@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container, Row, Col, Card, Button, Form, Table, Alert, Badge, Spinner, Modal,
+} from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
-import AdminNavbar from '../components/AdminNavbar';
+import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 import axios from 'axios';
 
 const AdminOrders = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const screenSize = useResponsiveStyles();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ const AdminOrders = () => {
       const params = { page, limit: 20 };
       if (statusFilter) params.status = statusFilter;
       if (searchQuery) params.search = searchQuery;
-      
+
       const response = await AdminService.getOrders(params);
       if (response.success) {
         setOrders(response.data?.orders || response.data || []);
@@ -85,7 +86,7 @@ const AdminOrders = () => {
     try {
       setUpdatingStatus(orderId);
       const token = localStorage.getItem('token');
-      const res = await axios.patch(`/api/admin/orders/${orderId}/status`, 
+      const res = await axios.patch(`/api/admin/orders/${orderId}/status`,
         { status: newStatus },
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -94,7 +95,6 @@ const AdminOrders = () => {
       );
       if (res.data?.success) {
         fetchOrders();
-        // Update order details if modal is open
         if (showDetailsModal && orderDetails?.id === orderId) {
           setOrderDetails(res.data.data);
         }
@@ -135,14 +135,14 @@ const AdminOrders = () => {
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const getStatusColor = (status) => {
-    switch(status?.toLowerCase()) {
-      case 'confirmed': return '#27ae60';
-      case 'pending': return '#f39c12';
-      case 'completed': return '#3498db';
-      case 'cancelled': return '#e74c3c';
-      case 'refunded': return '#9b59b6';
-      default: return '#7f8c8d';
+  const getStatusVariant = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmed': return 'success';
+      case 'pending': return 'warning';
+      case 'completed': return 'primary';
+      case 'cancelled': return 'danger';
+      case 'refunded': return 'secondary';
+      default: return 'secondary';
     }
   };
 
@@ -163,208 +163,202 @@ const AdminOrders = () => {
   if (!isAdmin()) return null;
 
   return (
-    <div style={styles.container}>
-      <AdminNavbar title="📋 Order Management" subtitle="View and manage all ticket orders" />
+    <div className="min-vh-100 bg-light">
+      <LazyAdminNavbar title="📋 Order Management" subtitle="View and manage all ticket orders" />
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
+      <Container className="py-4">
         {error && (
-          <div style={styles.errorBanner}>
+          <Alert variant="danger" className="d-flex justify-content-between align-items-center">
             {error}
-            <button onClick={() => setError(null)} style={styles.retryBtn}>Dismiss</button>
-          </div>
+            <Button variant="danger" size="sm" onClick={() => setError(null)}>Dismiss</Button>
+          </Alert>
         )}
 
-        {/* Filters */}
-        <div style={styles.filterBar}>
-          <form onSubmit={handleSearch} style={styles.searchGroup}>
-            <input
-              type="text"
-              placeholder="Search by order #, customer name, email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={styles.searchInput}
-            />
-            <button type="submit" style={styles.searchBtn}>🔍 Search</button>
-            {searchQuery && (
-              <button 
-                type="button" 
-                onClick={() => { setSearchQuery(''); setPage(1); fetchOrders(); }}
-                style={styles.clearSearchBtn}
-              >
-                ✕ Clear
-              </button>
-            )}
-          </form>
-          <div style={styles.filterGroup}>
-            <label style={styles.filterLabel}>Status:</label>
-            <select 
-              value={statusFilter} 
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              style={styles.filterSelect}
-            >
-              <option value="">All Orders</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="refunded">Refunded</option>
-            </select>
-          </div>
-          <span style={styles.orderCount}>{orders.length} order(s)</span>
-        </div>
+        <Card className="shadow-sm mb-4">
+          <Card.Body>
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
+              <Form onSubmit={handleSearch} className="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
+                <Form.Control
+                  type="text"
+                  placeholder="Search by order #, customer name, email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-grow-1"
+                />
+                <Button type="submit" variant="primary">🔍 Search</Button>
+                {searchQuery && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => { setSearchQuery(''); setPage(1); fetchOrders(); }}
+                  >
+                    ✕ Clear
+                  </Button>
+                )}
+              </Form>
+              <div className="d-flex align-items-center gap-2">
+                <Form.Label className="mb-0 fw-semibold small">Status:</Form.Label>
+                <Form.Select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                  className="w-auto"
+                >
+                  <option value="">All Orders</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="refunded">Refunded</option>
+                </Form.Select>
+              </div>
+              <span className="text-muted small">{orders.length} order(s)</span>
+            </div>
+          </Card.Body>
+        </Card>
 
         {loading ? (
-          <div style={styles.loadingContainer}>
-            <div style={styles.spinner}></div>
-            <p>Loading orders...</p>
+          <div className="d-flex flex-column align-items-center justify-content-center py-5 gap-3">
+            <Spinner animation="border" variant="primary" />
+            <p className="text-muted mb-0">Loading orders...</p>
           </div>
         ) : orders.length === 0 ? (
-          <div style={styles.emptyState}>
-            <span style={{ fontSize: '48px' }}>📋</span>
-            <h2>No Orders Found</h2>
-            <p>There are no orders matching your criteria.</p>
-          </div>
+          <Card className="shadow-sm text-center py-5">
+            <Card.Body>
+              <div className="display-4 mb-3">📋</div>
+              <h2 className="h5">No Orders Found</h2>
+              <p className="text-muted mb-0">There are no orders matching your criteria.</p>
+            </Card.Body>
+          </Card>
         ) : (
           <>
-            <div style={styles.tableContainer}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Order #</th>
-                    <th style={styles.th}>Customer</th>
-                    <th style={styles.th}>Match</th>
-                    <th style={styles.th}>Qty</th>
-                    <th style={styles.th}>Total</th>
-                    <th style={styles.th}>Date</th>
-                    <th style={styles.th}>Payment</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(order => {
-                    const orderId = order.id || order.order_id;
-                    const isDeleting = deletingId === orderId;
-                    const showConfirm = confirmDelete === orderId;
-                    return (
-                      <tr key={orderId} style={styles.tr}>
-                        <td style={styles.td}>
-                          <strong>{order.order_number || `#${orderId}`}</strong>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.customerInfo}>
-                            <span>{order.customer_name || order.first_name || order.user_name || '-'}</span>
-                            <span style={styles.customerEmail}>{order.customer_email || order.email || ''}</span>
-                          </div>
-                        </td>
-                        <td style={styles.td}>{order.match_name || order.match || '-'}</td>
-                        <td style={{...styles.td, textAlign: 'center'}}>{order.quantity || order.items_count || order.tickets || 0}</td>
-                        <td style={{...styles.td, fontWeight: '600', color: '#27ae60'}}>{formatCurrency(order.total_amount || order.total)}</td>
-                        <td style={styles.td}>{formatDate(order.created_at || order.date)}</td>
-                        <td style={styles.td}>{order.payment_method || order.paymentMethod || '-'}</td>
-                        <td style={styles.td}>
-                          <span style={{...styles.statusBadge, backgroundColor: getStatusColor(order.status)}}>
-                            {(order.status || '').toUpperCase()}
-                          </span>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.actionGroup}>
-                            <button 
-                              style={styles.viewBtn}
-                              onClick={() => handleViewDetails(orderId)}
-                              disabled={selectedOrder === orderId}
-                            >
-                              {selectedOrder === orderId ? '...' : '👁 View'}
-                            </button>
-                            <button 
-                              style={styles.refundBtn}
-                              onClick={async () => {
-                                setRefundingId(orderId);
-                                try {
-                                  await AdminService.refundOrder(orderId);
-                                  fetchOrders();
-                                } catch (err) {
-                                  setError('Failed to refund order: ' + err.message);
-                                }
-                                setRefundingId(null);
-                              }}
-                              disabled={refundingId === orderId || order.status === 'refunded' || order.status === 'cancelled'}
-                            >
-                              {refundingId === orderId ? '...' : '💰 Refund'}
-                            </button>
-                            {confirmPermanentDelete === orderId ? (
-                              <div style={styles.confirmGroup}>
-                                <button 
-                                  style={styles.confirmDeleteBtn}
-                                  onClick={() => handleDeleteOrder(orderId)}
-                                  disabled={isDeleting}
-                                >
-                                  {isDeleting ? '...' : '✓ Yes'}
-                                </button>
-                                <button 
-                                  style={styles.cancelDeleteBtn}
-                                  onClick={() => setConfirmPermanentDelete(null)}
-                                >
-                                  ✕ No
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                style={styles.permanentDeleteBtn}
-                                onClick={() => setConfirmPermanentDelete(orderId)}
+            <Card className="shadow-sm">
+              <div className="table-responsive">
+                <Table hover className="mb-0 align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Order #</th>
+                      <th>Customer</th>
+                      <th>Match</th>
+                      <th className="text-center">Qty</th>
+                      <th>Total</th>
+                      <th>Date</th>
+                      <th>Payment</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map(order => {
+                      const orderId = order.id || order.order_id;
+                      const isDeleting = deletingId === orderId;
+                      return (
+                        <tr key={orderId}>
+                          <td><strong>{order.order_number || `#${orderId}`}</strong></td>
+                          <td>
+                            <div>{order.customer_name || order.first_name || order.user_name || '-'}</div>
+                            <div className="text-muted small">{order.customer_email || order.email || ''}</div>
+                          </td>
+                          <td>{order.match_name || order.match || '-'}</td>
+                          <td className="text-center">{order.quantity || order.items_count || order.tickets || 0}</td>
+                          <td className="fw-semibold text-success">{formatCurrency(order.total_amount || order.total)}</td>
+                          <td>{formatDate(order.created_at || order.date)}</td>
+                          <td>{order.payment_method || order.paymentMethod || '-'}</td>
+                          <td>
+                            <Badge bg={getStatusVariant(order.status)}>
+                              {(order.status || '').toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td>
+                            <div className="d-flex flex-nowrap gap-1">
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleViewDetails(orderId)}
+                                disabled={selectedOrder === orderId}
                               >
-                                🗑 Delete
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                                {selectedOrder === orderId ? '...' : '👁 View'}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={async () => {
+                                  setRefundingId(orderId);
+                                  try {
+                                    await AdminService.refundOrder(orderId);
+                                    fetchOrders();
+                                  } catch (err) {
+                                    setError('Failed to refund order: ' + err.message);
+                                  }
+                                  setRefundingId(null);
+                                }}
+                                disabled={refundingId === orderId || order.status === 'refunded' || order.status === 'cancelled'}
+                              >
+                                {refundingId === orderId ? '...' : '💰 Refund'}
+                              </Button>
+                              {confirmPermanentDelete === orderId ? (
+                                <div className="d-flex gap-1">
+                                  <Button
+                                    variant="success"
+                                    size="sm"
+                                    onClick={() => handleDeleteOrder(orderId)}
+                                    disabled={isDeleting}
+                                  >
+                                    {isDeleting ? '...' : '✓ Yes'}
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setConfirmPermanentDelete(null)}
+                                  >
+                                    ✕ No
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => setConfirmPermanentDelete(orderId)}
+                                >
+                                  🗑 Delete
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </div>
+            </Card>
 
             {totalPages > 1 && (
-              <div style={styles.pagination}>
-                <button 
-                  style={styles.pageBtn}
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => p - 1)}
-                >
+              <div className="d-flex justify-content-center align-items-center gap-3 mt-4">
+                <Button variant="outline-secondary" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
                   ← Previous
-                </button>
-                <span style={styles.pageInfo}>Page {page} of {totalPages}</span>
-                <button 
-                  style={styles.pageBtn}
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => p + 1)}
-                >
+                </Button>
+                <span className="text-muted small">Page {page} of {totalPages}</span>
+                <Button variant="outline-secondary" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
                   Next →
-                </button>
+                </Button>
               </div>
             )}
           </>
         )}
-      </main>
+      </Container>
 
-      {/* Order Details Modal */}
-      {showDetailsModal && orderDetails && (
-        <div style={styles.modalOverlay} onClick={closeDetailsModal}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>
-                📋 Order {orderDetails.order_number}
-              </h2>
-              <button style={styles.modalCloseBtn} onClick={closeDetailsModal}>✕</button>
-            </div>
-            <div style={styles.modalBody}>
-              {/* Status Update Section */}
-              <div style={styles.detailSection}>
-                <div style={styles.detailSectionTitle}>Update Status</div>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <select 
-                    style={styles.statusSelect}
+      <Modal show={showDetailsModal && !!orderDetails} onHide={closeDetailsModal} size="lg" scrollable>
+        {orderDetails && (
+          <>
+            <Modal.Header closeButton className="bg-light">
+              <Modal.Title className="h5">📋 Order {orderDetails.order_number}</Modal.Title>
+            </Modal.Header>
+            <Modal.Body>
+              <div className="mb-4">
+                <h6 className="text-muted text-uppercase small fw-semibold mb-3">Update Status</h6>
+                <div className="d-flex align-items-center gap-2">
+                  <Form.Select
+                    className="w-auto"
                     value={orderDetails.status || ''}
                     onChange={(e) => handleStatusChange(orderDetails.id, e.target.value)}
                     disabled={updatingStatus === orderDetails.id}
@@ -374,204 +368,120 @@ const AdminOrders = () => {
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                     <option value="refunded">Refunded</option>
-                  </select>
-                  <button 
-                    style={styles.updateStatusBtn}
+                  </Form.Select>
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() => handleStatusChange(orderDetails.id, orderDetails.status)}
                     disabled={updatingStatus === orderDetails.id}
                   >
                     {updatingStatus === orderDetails.id ? 'Updating...' : 'Update'}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
-              {/* Order Information */}
-              <div style={styles.detailSection}>
-                <div style={styles.detailSectionTitle}>Order Information</div>
-                <div style={styles.detailGrid}>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Order Number</span>
-                    <span style={styles.detailValue}>{orderDetails.order_number || '-'}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Status</span>
-                    <span style={{...styles.detailValue, color: getStatusColor(orderDetails.status)}}>
+              <div className="mb-4">
+                <h6 className="text-muted text-uppercase small fw-semibold mb-3">Order Information</h6>
+                <Row className="g-3">
+                  <Col sm={6}>
+                    <div className="text-muted small">Order Number</div>
+                    <div className="fw-medium">{orderDetails.order_number || '-'}</div>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">Status</div>
+                    <Badge bg={getStatusVariant(orderDetails.status)}>
                       {(orderDetails.status || '').toUpperCase()}
-                    </span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Total Amount</span>
-                    <span style={{...styles.detailValue, color: '#27ae60'}}>{formatCurrency(orderDetails.total_amount)}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Payment Method</span>
-                    <span style={styles.detailValue}>{orderDetails.payment_method || '-'}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Created At</span>
-                    <span style={styles.detailValue}>{formatDate(orderDetails.created_at)}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Updated At</span>
-                    <span style={styles.detailValue}>{formatDate(orderDetails.updated_at)}</span>
-                  </div>
-                </div>
+                    </Badge>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">Total Amount</div>
+                    <div className="fw-medium text-success">{formatCurrency(orderDetails.total_amount)}</div>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">Payment Method</div>
+                    <div className="fw-medium">{orderDetails.payment_method || '-'}</div>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">Created At</div>
+                    <div className="fw-medium">{formatDate(orderDetails.created_at)}</div>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">Updated At</div>
+                    <div className="fw-medium">{formatDate(orderDetails.updated_at)}</div>
+                  </Col>
+                </Row>
               </div>
 
-              {/* Customer Information */}
-              <div style={styles.detailSection}>
-                <div style={styles.detailSectionTitle}>Customer Information</div>
-                <div style={styles.detailGrid}>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Name</span>
-                    <span style={styles.detailValue}>{orderDetails.first_name} {orderDetails.last_name || '-'}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>Email</span>
-                    <span style={styles.detailValue}>{orderDetails.email || '-'}</span>
-                  </div>
-                  <div style={styles.detailItem}>
-                    <span style={styles.detailLabel}>User ID</span>
-                    <span style={styles.detailValue}>{orderDetails.user_id || '-'}</span>
-                  </div>
-                </div>
+              <div className="mb-4">
+                <h6 className="text-muted text-uppercase small fw-semibold mb-3">Customer Information</h6>
+                <Row className="g-3">
+                  <Col sm={6}>
+                    <div className="text-muted small">Name</div>
+                    <div className="fw-medium">{orderDetails.first_name} {orderDetails.last_name || '-'}</div>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">Email</div>
+                    <div className="fw-medium">{orderDetails.email || '-'}</div>
+                  </Col>
+                  <Col sm={6}>
+                    <div className="text-muted small">User ID</div>
+                    <div className="fw-medium">{orderDetails.user_id || '-'}</div>
+                  </Col>
+                </Row>
               </div>
 
-              {/* Order Items */}
               {orderDetails.items && orderDetails.items.length > 0 && (
-                <div style={styles.detailSection}>
-                  <div style={styles.detailSectionTitle}>Order Items</div>
-                  <table style={styles.itemsTable}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Item</th>
-                        <th style={styles.th}>Quantity</th>
-                        <th style={styles.th}>Unit Price</th>
-                        <th style={styles.th}>Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {orderDetails.items.map((item, idx) => (
-                        <tr key={idx} style={styles.tr}>
-                          <td style={styles.td}>
-                            {item.home_team && item.away_team 
-                              ? `${item.home_team} vs ${item.away_team}`
-                              : `Ticket #${item.ticket_id || '-'}`
-                            }
-                            {item.row_number && item.seat_number && (
-                              <div style={{fontSize: '12px', color: '#7f8c8d'}}>
-                                Row: {item.row_number}, Seat: {item.seat_number}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{...styles.td, textAlign: 'center'}}>{item.quantity || 1}</td>
-                          <td style={styles.td}>{formatCurrency(item.unit_price)}</td>
-                          <td style={{...styles.td, fontWeight: '600', color: '#27ae60'}}>{formatCurrency(item.subtotal)}</td>
+                <div className="mb-4">
+                  <h6 className="text-muted text-uppercase small fw-semibold mb-3">Order Items</h6>
+                  <div className="table-responsive">
+                    <Table size="sm" className="mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th>Item</th>
+                          <th className="text-center">Quantity</th>
+                          <th>Unit Price</th>
+                          <th>Subtotal</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {orderDetails.items.map((item, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              {item.home_team && item.away_team
+                                ? `${item.home_team} vs ${item.away_team}`
+                                : `Ticket #${item.ticket_id || '-'}`
+                              }
+                              {item.row_number && item.seat_number && (
+                                <div className="text-muted small">
+                                  Row: {item.row_number}, Seat: {item.seat_number}
+                                </div>
+                              )}
+                            </td>
+                            <td className="text-center">{item.quantity || 1}</td>
+                            <td>{formatCurrency(item.unit_price)}</td>
+                            <td className="fw-semibold text-success">{formatCurrency(item.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  </div>
                 </div>
               )}
 
-              {/* Notes */}
               {orderDetails.notes && (
-                <div style={styles.detailSection}>
-                  <div style={styles.detailSectionTitle}>Notes</div>
-                  <div style={{padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '6px', fontSize: '14px', color: '#2c3e50', whiteSpace: 'pre-wrap'}}>
+                <div>
+                  <h6 className="text-muted text-uppercase small fw-semibold mb-3">Notes</h6>
+                  <div className="bg-light rounded p-3 small text-dark text-pre-wrap">
                     {orderDetails.notes}
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            </Modal.Body>
+          </>
+        )}
+      </Modal>
     </div>
   );
-};
-
-const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#f5f5f5' },
-  header: { backgroundColor: '#2c3e50', color: 'white', padding: '20px 0', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' },
-  headerContent: { maxWidth: '1200px', margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  title: { margin: '0', fontSize: '28px' },
-  welcome: { margin: '5px 0 0 0', color: '#bdc3c7', fontSize: '14px' },
-  userInfo: { display: 'flex', alignItems: 'center', gap: '16px' },
-  homeBtn: { backgroundColor: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' },
-  userName: { fontWeight: '600' },
-  userRole: { backgroundColor: '#3498db', padding: '4px 12px', borderRadius: '12px', fontSize: '12px' },
-  logoutBtn: { backgroundColor: 'transparent', border: '1px solid white', color: 'white', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
-  hamburgerBtn: { display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '5px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', padding: '5px', zIndex: 1001 },
-  hamburgerLine: { width: '25px', height: '3px', backgroundColor: 'white', borderRadius: '2px', transition: 'transform 0.3s, opacity 0.3s' },
-  mobileOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 999, opacity: 1, visibility: 'visible' },
-  mobileMenu: { position: 'fixed', top: 0, right: 0, width: '280px', height: '100%', backgroundColor: '#2c3e50', zIndex: 1000, padding: '20px', boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)', overflowY: 'auto' },
-  mobileMenuHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', paddingBottom: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' },
-  mobileUserName: { color: 'white', fontSize: '16px', fontWeight: '600' },
-  mobileLogoutBtn: { backgroundColor: 'transparent', border: '1px solid rgba(255, 255, 255, 0.3)', color: 'white', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
-  mobileNav: { display: 'flex', flexDirection: 'column', gap: '10px' },
-  mobileNavLink: { color: 'white', textDecoration: 'none', fontSize: '16px', padding: '12px 16px', borderRadius: '8px' },
-  main: { maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' },
-  loadingContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '40vh', gap: '16px' },
-  spinner: { width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #3498db', borderRadius: '50%', animation: 'spin 1s linear infinite' },
-  errorBanner: { backgroundColor: '#fee2e2', border: '1px solid #ef4444', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  retryBtn: { backgroundColor: '#dc2626', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer' },
-  filterBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', backgroundColor: 'white', padding: '16px 20px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
-  filterGroup: { display: 'flex', alignItems: 'center', gap: '12px' },
-  filterLabel: { fontSize: '14px', fontWeight: '600', color: '#2c3e50' },
-  filterSelect: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', backgroundColor: 'white', cursor: 'pointer', outline: 'none' },
-  orderCount: { fontSize: '14px', color: '#7f8c8d' },
-  emptyState: { textAlign: 'center', padding: '80px 20px', color: '#555', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
-  tableContainer: { backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', overflow: 'hidden' },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { backgroundColor: '#f8f9fa', padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#7f8c8d', borderBottom: '2px solid #eee', whiteSpace: 'nowrap' },
-  tr: { borderBottom: '1px solid #eee', transition: 'background-color 0.2s' },
-  td: { padding: '14px 16px', fontSize: '14px', color: '#2c3e50', verticalAlign: 'middle' },
-  customerInfo: { display: 'flex', flexDirection: 'column', gap: '2px' },
-  customerEmail: { fontSize: '12px', color: '#7f8c8d' },
-  statusBadge: { fontSize: '11px', color: 'white', padding: '4px 10px', borderRadius: '4px', fontWeight: '600', display: 'inline-block' },
-  actionGroup: { display: 'flex', gap: '4px', flexWrap: 'nowrap' },
-  refundBtn: { padding: '6px 10px', backgroundColor: '#9b59b6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' },
-  permanentDeleteBtn: { padding: '6px 10px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600' },
-  deleteBtn: { padding: '6px 12px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
-  confirmGroup: { display: 'flex', gap: '4px' },
-  confirmDeleteBtn: { padding: '6px 10px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
-  cancelDeleteBtn: { padding: '6px 10px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' },
-  pagination: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginTop: '24px' },
-  pageBtn: { padding: '8px 20px', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', color: '#2c3e50' },
-  pageInfo: { fontSize: '14px', color: '#7f8c8d' },
-  searchGroup: { display: 'flex', alignItems: 'center', gap: '8px', flex: '1', maxWidth: '500px' },
-  searchInput: { flex: '1', padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', outline: 'none' },
-  searchBtn: { padding: '8px 16px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', whiteSpace: 'nowrap' },
-  clearSearchBtn: { padding: '8px 12px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' },
-  viewBtn: { padding: '6px 10px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' },
-  // Modal styles
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' },
-  modalContent: { backgroundColor: 'white', borderRadius: '12px', maxWidth: '700px', width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' },
-  modalHeader: { padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8f9fa' },
-  modalTitle: { margin: 0, fontSize: '20px', color: '#2c3e50' },
-  modalCloseBtn: { backgroundColor: 'transparent', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#7f8c8d', padding: '4px 8px' },
-  modalBody: { padding: '24px' },
-  detailSection: { marginBottom: '20px' },
-  detailSectionTitle: { fontSize: '14px', fontWeight: '600', color: '#7f8c8d', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' },
-  detailItem: { display: 'flex', flexDirection: 'column', gap: '4px' },
-  detailLabel: { fontSize: '12px', color: '#7f8c8d' },
-  detailValue: { fontSize: '15px', color: '#2c3e50', fontWeight: '500' },
-  itemsTable: { width: '100%', borderCollapse: 'collapse', marginTop: '12px' },
-  statusSelect: { padding: '8px 12px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px', backgroundColor: 'white', cursor: 'pointer', outline: 'none', marginRight: '8px' },
-  updateStatusBtn: { padding: '8px 16px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' },
-};
-
-const responsiveStyles = {
-  mobile: {
-    main: { ...styles.main, padding: '20px 15px' },
-    hamburgerBtn: { display: 'flex' },
-  },
-  tablet: {
-    main: { ...styles.main, padding: '30px 15px' },
-    hamburgerBtn: { display: 'none' },
-  }
 };
 
 export default AdminOrders;

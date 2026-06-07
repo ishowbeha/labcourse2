@@ -30,8 +30,8 @@ class SettingsController {
       }
 
       // Strip any unknown keys (only update keys that exist in the DB)
-      const [existingRows] = await this.db.query('SELECT setting_key FROM system_settings');
-      const validKeys = new Set(existingRows.map(r => r.setting_key));
+      const [existingRows] = await this.db.query('SELECT `key` FROM settings');
+      const validKeys = new Set(existingRows.map(r => r.key));
       const filtered = {};
       for (const [k, v] of Object.entries(settingsMap)) {
         if (validKeys.has(k)) filtered[k] = v;
@@ -96,9 +96,9 @@ class SettingsController {
   async sendTestEmail(req, res, next) {
     try {
       const [[row]] = await this.db.query(
-        "SELECT setting_value FROM system_settings WHERE setting_key = 'admin_email'"
+        "SELECT value FROM settings WHERE `key` = 'admin_email'"
       );
-      const adminEmail = row?.setting_value || '';
+      const adminEmail = row?.value || '';
       if (!adminEmail) {
         return res.json({
           success: false,

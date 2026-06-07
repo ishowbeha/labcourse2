@@ -5,17 +5,21 @@ class SettingsService {
     this.db = db; // MySQL pool
   }
 
-  // ─── helpers ──────────────────────────────────────────────────────────────
   _parse(row) {
     if (!row) return null;
-    const { setting_value, setting_type } = row;
-    if (setting_value === null) return null;
-    switch (setting_type) {
-      case 'boolean': return setting_value === 'true' || setting_value === '1';
-      case 'number':  return parseFloat(setting_value);
-      case 'json':    try { return JSON.parse(setting_value); } catch { return setting_value; }
-      default:        return setting_value;
+    const value = row.value ?? row.setting_value;
+    const type = row.type ?? row.setting_type ?? 'string';
+    if (value === null) return null;
+    switch (type) {
+      case 'boolean': return value === 'true' || value === '1';
+      case 'number':  return parseFloat(value);
+      case 'json':    try { return JSON.parse(value); } catch { return value; }
+      default:        return value;
     }
+  }
+
+  _key(row) {
+    return row.key ?? row.setting_key;
   }
 
   _serialize(value) {
@@ -24,26 +28,26 @@ class SettingsService {
     return String(value);
   }
 
-  // ─── GET all settings as flat { key: value } map ─────────────────────────
   async getAllSettings() {
-    const [rows] = await this.db.query('SELECT * FROM system_settings ORDER BY category, setting_key');
+    const [rows] = await this.db.query('SELECT * FROM settings ORDER BY category, `key`');
     const result = {};
     for (const row of rows) {
-      result[row.setting_key] = this._parse(row);
+      result[this._key(row)] = this._parse(row);
     }
     return result;
   }
 
-  // ─── GET settings metadata (with category info for the UI) ───────────────
   async getAllSettingsWithMeta() {
-    const [rows] = await this.db.query('SELECT * FROM system_settings ORDER BY category, setting_key');
-    return rows.map(row => ({
+    const [rows] = await this.db.query('SELECT * FROM settings ORDER BY category, `key`');
+    return rows.map((row) => ({
       ...row,
-      parsed_value: this._parse(row)
+      setting_key: row.key,
+      setting_value: row.value,
+      setting_type: row.type,
+      parsed_value: this._parse(row),
     }));
   }
 
-  // ─── UPDATE one or many settings at once ─────────────────────────────────
   async updateSettings(settingsMap, updatedBy = null) {
     if (!settingsMap || typeof settingsMap !== 'object') {
       throw new Error('Settings must be a key-value object');
@@ -56,7 +60,7 @@ class SettingsService {
     for (const [key, value] of entries) {
       const serialized = this._serialize(value);
       const [result] = await this.db.query(
-        'UPDATE system_settings SET setting_value = ?, updated_by = ?, updated_at = NOW() WHERE setting_key = ?',
+        'UPDATE settings SET value = ?, updated_by = ?, updated_at = NOW() WHERE `key` = ?',
         [serialized, updatedBy, key]
       );
       if (result.affectedRows > 0) updated++;
@@ -65,7 +69,6 @@ class SettingsService {
     return { updated };
   }
 
-  // ─── RESET all settings to defaults ─────────────────────────────────────
   async resetToDefaults(updatedBy = null) {
     const defaults = {
       site_name:                   'Stadium Tickets',
@@ -101,12 +104,11 @@ class SettingsService {
     return this.updateSettings(defaults, updatedBy);
   }
 
-  // ─── SYSTEM INFO (real data from DBs + runtime) ──────────────────────────
   async getSystemInfo() {
     const info = {
       nodeVersion:    process.version,
       platform:       process.platform,
-      uptime:         process.uptime(),            // seconds
+      uptime:         process.uptime(),
       memoryUsage:    process.memoryUsage(),
       environment:    process.env.NODE_ENV || 'development',
       appVersion:     'v1.0.0',
@@ -115,14 +117,13 @@ class SettingsService {
       lastSettingsSaved: null,
     };
 
-    // MySQL real status
     try {
       const [[versionRow]]   = await this.db.query('SELECT VERSION() as version');
       const [[tableRow]]     = await this.db.query(
         `SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE()`
       );
       const [[settingsRow]]  = await this.db.query(
-        'SELECT MAX(updated_at) as last_saved FROM system_settings'
+        'SELECT MAX(updated_at) as last_saved FROM settings'
       );
       info.mysql.status     = 'online';
       info.mysql.version    = versionRow?.version || 'MySQL';
@@ -133,9 +134,7 @@ class SettingsService {
       info.mysql.error  = e.message;
     }
 
-    // MongoDB real status
     const mongoState = mongoose.connection.readyState;
-    // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
     const mongoStateMap = { 0: 'offline', 1: 'online', 2: 'connecting', 3: 'disconnecting' };
     info.mongodb.status = mongoStateMap[mongoState] || 'unknown';
     if (mongoState === 1) {

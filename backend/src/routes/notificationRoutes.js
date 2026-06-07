@@ -12,7 +12,7 @@ const createNotificationRoutes = (pool) => {
     try {
       const userId = req.user?.userId || req.user?.id;
       const [rows] = await pool.query(
-        'SELECT id, type, title, message, is_read, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
+        'SELECT id, type, title, message, is_read, created_at, created_by FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
         [userId]
       );
       res.json({
@@ -23,7 +23,8 @@ const createNotificationRoutes = (pool) => {
           title: n.title,
           message: n.message,
           isRead: !!n.is_read,
-          timestamp: n.created_at
+          timestamp: n.created_at,
+          fromUserId: n.type === 'message' ? n.created_by : null,
         }))
       });
     } catch (error) {

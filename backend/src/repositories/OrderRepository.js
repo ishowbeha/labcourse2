@@ -18,11 +18,11 @@ class OrderRepository {
     return result.insertId;
   }
 
-  async addOrderItem(orderId, ticketId, unitPrice, quantity, subtotal) {
+  async addOrderItem(orderId, ticketId, unitPrice, quantity, subtotal, createdBy = null) {
     const [result] = await this.pool.query(
-      `INSERT INTO order_items (order_id, ticket_id, unit_price, quantity, subtotal, created_at)
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [orderId, ticketId, unitPrice, quantity, subtotal]
+      `INSERT INTO order_items (order_id, ticket_id, unit_price, quantity, subtotal, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [orderId, ticketId, unitPrice, quantity, subtotal, createdBy, createdBy]
     );
     return result.insertId;
   }

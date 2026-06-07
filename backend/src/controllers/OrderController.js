@@ -29,9 +29,9 @@ class OrderController {
       const qty = parseInt(quantity);
       try {
         const [[maxRow]] = await this.db.query(
-          "SELECT setting_value FROM system_settings WHERE setting_key = 'max_tickets_per_order'"
+          "SELECT value FROM settings WHERE `key` = 'max_tickets_per_order'"
         );
-        const maxAllowed = parseInt(maxRow?.setting_value) || 10;
+        const maxAllowed = parseInt(maxRow?.value) || 10;
         if (qty > maxAllowed) {
           return res.status(400).json({
             success: false,
@@ -102,9 +102,9 @@ class OrderController {
       const qty = parseInt(quantity);
       try {
         const [[maxRow]] = await this.db.query(
-          "SELECT setting_value FROM system_settings WHERE setting_key = 'max_tickets_per_order'"
+          "SELECT value FROM settings WHERE `key` = 'max_tickets_per_order'"
         );
-        const maxAllowed = parseInt(maxRow?.setting_value) || 10;
+        const maxAllowed = parseInt(maxRow?.value) || 10;
         if (qty > maxAllowed) {
           return res.status(400).json({
             success: false,
@@ -127,8 +127,8 @@ class OrderController {
 
       // Store purchase info in order_items (ticket_id is nullable now)
       await this.db.query(
-        'INSERT INTO order_items (order_id, ticket_id, quantity, unit_price, subtotal, created_at) VALUES (?, NULL, ?, ?, ?, NOW())',
-        [result.insertId, parseInt(quantity), unitPrice, total]
+        'INSERT INTO order_items (order_id, ticket_id, quantity, unit_price, subtotal, created_by, updated_by, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, NOW(), NOW())',
+        [result.insertId, parseInt(quantity), unitPrice, total, userId, userId]
       );
 
       res.status(201).json({

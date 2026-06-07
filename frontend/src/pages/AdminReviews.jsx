@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Container, Row, Col, Card, Button, Table, Badge, Spinner } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import AdminNavbar from '../components/AdminNavbar';
+import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 
 const AdminReviews = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -28,8 +29,10 @@ const AdminReviews = () => {
   };
 
   const StarDisplay = ({ value }) => (
-    <span style={{ fontSize: '20px' }}>
-      {[1,2,3,4,5].map(s => <span key={s} style={{ color: s <= value ? '#f39c12' : '#ddd' }}>★</span>)}
+    <span className="fs-5">
+      {[1, 2, 3, 4, 5].map(s => (
+        <span key={s} className={s <= value ? 'text-warning' : 'text-muted'}>★</span>
+      ))}
     </span>
   );
 
@@ -37,78 +40,86 @@ const AdminReviews = () => {
   const pendingReviews = reviews.filter(r => !r.is_approved);
   const avgRating = approvedReviews.length ? (approvedReviews.reduce((s, r) => s + r.rating, 0) / approvedReviews.length).toFixed(1) : '0';
 
-  return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
-      <AdminNavbar title="⭐ Reviews Management" subtitle="Approve and moderate user reviews" />
+  const summaryStats = [
+    { value: reviews.length, label: 'Total Reviews', borderClass: 'border-primary' },
+    { value: approvedReviews.length, label: 'Approved', borderClass: 'border-success' },
+    { value: pendingReviews.length, label: 'Pending', borderClass: 'border-warning' },
+    { value: avgRating, label: 'Avg Rating', borderClass: 'border-warning', valueClass: 'text-warning' },
+  ];
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '150px', padding: '20px', backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', textAlign: 'center', borderTop: '4px solid #3498db' }}>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#2c3e50' }}>{reviews.length}</div>
-            <div style={{ fontSize: '13px', color: '#555' }}>Total Reviews</div>
-          </div>
-          <div style={{ flex: 1, minWidth: '150px', padding: '20px', backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', textAlign: 'center', borderTop: '4px solid #27ae60' }}>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#2c3e50' }}>{approvedReviews.length}</div>
-            <div style={{ fontSize: '13px', color: '#555' }}>Approved</div>
-          </div>
-          <div style={{ flex: 1, minWidth: '150px', padding: '20px', backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', textAlign: 'center', borderTop: '4px solid #f39c12' }}>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#2c3e50' }}>{pendingReviews.length}</div>
-            <div style={{ fontSize: '13px', color: '#555' }}>Pending</div>
-          </div>
-          <div style={{ flex: 1, minWidth: '150px', padding: '20px', backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', textAlign: 'center', borderTop: '4px solid #f39c12' }}>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: '#f39c12' }}>{avgRating}</div>
-            <div style={{ fontSize: '13px', color: '#555' }}>Avg Rating</div>
-          </div>
-        </div>
+  return (
+    <div className="min-vh-100 bg-light">
+      <LazyAdminNavbar title="⭐ Reviews Management" subtitle="Approve and moderate user reviews" />
+
+      <Container className="py-4">
+        <Row className="g-3 mb-4">
+          {summaryStats.map((stat, index) => (
+            <Col key={index} xs={12} sm={6} lg={3}>
+              <Card className={`h-100 shadow-sm border-top border-4 ${stat.borderClass}`}>
+                <Card.Body className="text-center">
+                  <div className={`fs-3 fw-bold ${stat.valueClass || 'text-dark'}`}>{stat.value}</div>
+                  <div className="text-muted small">{stat.label}</div>
+                </Card.Body>
+              </Card>
+            </Col>
+          ))}
+        </Row>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#555' }}>Loading...</div>
+          <div className="text-center py-5">
+            <Spinner animation="border" variant="primary" />
+            <p className="text-muted mt-2 mb-0">Loading...</p>
+          </div>
         ) : reviews.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>⭐</div>
-            <p style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>No reviews yet</p>
-          </div>
+          <Card className="shadow-sm text-center py-5">
+            <Card.Body>
+              <div className="display-4 mb-3">⭐</div>
+              <p className="fw-semibold mb-0">No reviews yet</p>
+            </Card.Body>
+          </Card>
         ) : (
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #eee' }}>
-                  <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555' }}>User</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555' }}>Rating</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555' }}>Comment</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555' }}>Status</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555' }}>Date</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#555' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reviews.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '14px 16px', fontSize: '14px' }}>
-                      <strong style={{ color: '#2c3e50' }}>{r.first_name} {r.last_name}</strong>
-                      <div style={{ fontSize: '12px', color: '#7f8c8d' }}>{r.email}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}><StarDisplay value={r.rating} /></td>
-                    <td style={{ padding: '14px 16px', fontSize: '14px', color: '#555', maxWidth: '250px' }}>{r.comment || '\u2014'}</td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, backgroundColor: r.is_approved ? '#d1fae5' : '#fef3c7', color: r.is_approved ? '#047857' : '#92400e' }}>
-                        {r.is_approved ? 'Approved' : 'Pending'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px', fontSize: '13px', color: '#555' }}>{r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
-                    <td style={{ padding: '14px 16px' }}>
-                      {!r.is_approved && (
-                        <button onClick={() => approveReview(r.id)} style={{ padding: '6px 12px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, marginRight: '6px' }}>Approve</button>
-                      )}
-                      <button onClick={() => deleteReview(r.id)} style={{ padding: '6px 12px', backgroundColor: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 600 }}>Delete</button>
-                    </td>
+          <Card className="shadow-sm">
+            <div className="table-responsive">
+              <Table hover className="mb-0 align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th>User</th>
+                    <th>Rating</th>
+                    <th>Comment</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {reviews.map(r => (
+                    <tr key={r.id}>
+                      <td>
+                        <strong className="text-dark">{r.first_name} {r.last_name}</strong>
+                        <div className="text-muted small">{r.email}</div>
+                      </td>
+                      <td><StarDisplay value={r.rating} /></td>
+                      <td className="text-muted small">{r.comment || '\u2014'}</td>
+                      <td>
+                        <Badge bg={r.is_approved ? 'success' : 'warning'} text={r.is_approved ? undefined : 'dark'}>
+                          {r.is_approved ? 'Approved' : 'Pending'}
+                        </Badge>
+                      </td>
+                      <td className="text-muted small">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ''}</td>
+                      <td>
+                        {!r.is_approved && (
+                          <Button variant="success" size="sm" className="me-1" onClick={() => approveReview(r.id)}>Approve</Button>
+                        )}
+                        <Button variant="danger" size="sm" onClick={() => deleteReview(r.id)}>Delete</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </div>
+          </Card>
         )}
-      </main>
+      </Container>
     </div>
   );
 };

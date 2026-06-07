@@ -526,30 +526,6 @@ module.exports = {
       }
     }
 
-    // Create system settings (skip if already exist by unique key)
-    const settingsData = [
-      { key: 'site_name', value: 'Stadium Tickets', description: 'Website name', type: 'string' },
-      { key: 'currency', value: 'EUR', description: 'Default currency', type: 'string' },
-      { key: 'tax_rate', value: '20', description: 'Default tax rate (%)', type: 'number' },
-      { key: 'ticket_booking_fee', value: '2.50', description: 'Booking fee per ticket', type: 'number' },
-      { key: 'max_tickets_per_order', value: '10', description: 'Maximum tickets per order', type: 'number' }
-    ];
-
-    for (const setting of settingsData) {
-      const [existingSetting] = await queryInterface.sequelize.query(
-        `SELECT id FROM settings WHERE \`key\` = '${setting.key}' LIMIT 1`
-      );
-      if (existingSetting.length === 0) {
-        await queryInterface.bulkInsert('settings', [{
-          ...setting,
-          created_by: adminUserId,
-          updated_by: adminUserId,
-          created_at: new Date(),
-          updated_at: new Date()
-        }], {});
-      }
-    }
-
     console.log('✅ Seed data created successfully');
     console.log('📧 Admin user: admin@stadium.com / admin123');
   },
@@ -558,7 +534,6 @@ module.exports = {
     await queryInterface.bulkDelete('sections', null, {});
     await queryInterface.bulkDelete('role_permissions', null, {});
     await queryInterface.bulkDelete('user_roles', null, {});
-    await queryInterface.bulkDelete('settings', null, {});
     await queryInterface.bulkDelete('matches', null, {});
     await queryInterface.bulkDelete('stadiums', null, {});
     await queryInterface.bulkDelete('permissions', null, {});

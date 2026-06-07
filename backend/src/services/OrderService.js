@@ -56,7 +56,7 @@ class OrderService {
     for (let i = 0; i < quantity && i < availableTickets.length; i++) {
       const ticket = availableTickets[i];
       await this.repository.markTicketSold(ticket.id, userId);
-      await this.repository.addOrderItem(orderId, ticket.id, unitPrice, 1, unitPrice);
+      await this.repository.addOrderItem(orderId, ticket.id, unitPrice, 1, unitPrice, userId);
     }
 
     // Return the order summary

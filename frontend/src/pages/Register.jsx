@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const Register = () => {
-  const screenSize = useResponsiveStyles();
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -28,7 +27,6 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -58,225 +56,110 @@ const Register = () => {
   };
 
   return (
-    <div style={screenSize === 'mobile' ? responsiveStyles.mobile.container : styles.container}>
-      <div style={screenSize === 'mobile' ? responsiveStyles.mobile.card : styles.card}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>🏟️ Stadium Tickets</h1>
-          <p style={styles.subtitle}>Create your account</p>
-        </div>
+    <div className="min-vh-100 d-flex align-items-center bg-light py-4">
+      <Container>
+        <Row className="justify-content-center">
+          <Col xs={12} sm={10} md={8} lg={6} xl={5}>
+            <Card className="shadow border-0">
+              <Card.Body className="p-4 p-md-5">
+                <div className="text-center mb-4">
+                  <h1 className="h3 text-dark">🏟️ Stadium Tickets</h1>
+                  <p className="text-muted mb-0">Create your account</p>
+                </div>
 
-        {error && (
-          <div style={styles.error}>
-            {error}
-          </div>
-        )}
+                {error && <Alert variant="danger">{error}</Alert>}
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.formRow : styles.formRow}>
-            <div style={styles.formGroup}>
-              <label style={styles.label} htmlFor="first_name">First Name</label>
-              <input
-                id="first_name"
-                type="text"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleChange}
-                placeholder="First name"
-                style={styles.input}
-                required
-              />
-            </div>
+                <Form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+                  <Row className="g-3">
+                    <Col xs={12} md={6}>
+                      <Form.Group>
+                        <Form.Label htmlFor="first_name">First Name</Form.Label>
+                        <Form.Control
+                          id="first_name"
+                          type="text"
+                          name="first_name"
+                          value={formData.first_name}
+                          onChange={handleChange}
+                          placeholder="First name"
+                          required
+                        />
+                      </Form.Group>
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Form.Group>
+                        <Form.Label htmlFor="last_name">Last Name</Form.Label>
+                        <Form.Control
+                          id="last_name"
+                          type="text"
+                          name="last_name"
+                          value={formData.last_name}
+                          onChange={handleChange}
+                          placeholder="Last name"
+                          required
+                        />
+                      </Form.Group>
+                    </Col>
+                  </Row>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label} htmlFor="last_name">Last Name</label>
-              <input
-                id="last_name"
-                type="text"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleChange}
-                placeholder="Last name"
-                style={styles.input}
-                required
-              />
-            </div>
-          </div>
+                  <Form.Group>
+                    <Form.Label htmlFor="email">Email</Form.Label>
+                    <Form.Control
+                      id="email"
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </Form.Group>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Enter your email"
-              style={styles.input}
-              required
-            />
-          </div>
+                  <Form.Group>
+                    <Form.Label htmlFor="password">Password</Form.Label>
+                    <Form.Control
+                      id="password"
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Create a password"
+                      required
+                    />
+                  </Form.Group>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Create a password"
-              style={styles.input}
-              required
-            />
-          </div>
+                  <Form.Group>
+                    <Form.Label htmlFor="confirmPassword">Confirm Password</Form.Label>
+                    <Form.Control
+                      id="confirmPassword"
+                      type="password"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      placeholder="Confirm your password"
+                      required
+                    />
+                  </Form.Group>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="confirmPassword">Confirm Password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="Confirm your password"
-              style={styles.input}
-              required
-            />
-          </div>
+                  <Button type="submit" variant="dark" size="lg" disabled={loading} className="mt-2">
+                    {loading ? 'Creating Account...' : 'Create Account'}
+                  </Button>
+                </Form>
 
-          <button
-            type="submit"
-            style={styles.button}
-            disabled={loading}
-          >
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <div style={styles.footer}>
-          <p>
-            Already have an account?{' '}
-            <Link to="/login" style={styles.link}>Sign In</Link>
-          </p>
-        </div>
-      </div>
+                <div className="text-center mt-4 pt-4 border-top text-muted">
+                  <p className="mb-0">
+                    Already have an account?{' '}
+                    <Link to="/login" className="fw-semibold text-dark text-decoration-none">
+                      Sign In
+                    </Link>
+                  </p>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: '20px',
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    padding: '32px',
-    width: '100%',
-    maxWidth: '420px',
-    boxSizing: 'border-box',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px',
-  },
-  title: {
-    margin: '0 0 10px 0',
-    fontSize: '28px',
-    color: '#2c3e50',
-  },
-  subtitle: {
-    margin: '0',
-    color: '#7f8c8d',
-    fontSize: '16px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  formRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '12px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  input: {
-    padding: '10px 14px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color 0.2s',
-    width: '100%',
-    boxSizing: 'border-box',
-  },
-  button: {
-    padding: '14px 24px',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    marginTop: '10px',
-  },
-  error: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  footer: {
-    textAlign: 'center',
-    marginTop: '24px',
-    paddingTop: '24px',
-    borderTop: '1px solid #eee',
-    color: '#7f8c8d',
-  },
-  link: {
-    color: '#2c3e50',
-    fontWeight: '600',
-    textDecoration: 'none',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    container: {
-      ...styles.container,
-      padding: '15px',
-    },
-    card: {
-      ...styles.card,
-      padding: '24px',
-      maxWidth: '100%',
-    },
-    formRow: {
-      ...styles.formRow,
-      gridTemplateColumns: '1fr',
-    },
-  },
 };
 
 export default Register;

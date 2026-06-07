@@ -52,15 +52,15 @@ class ReviewController {
       );
       if (existing.length > 0) {
         await this.db.query(
-          'UPDATE reviews SET rating = ?, comment = ?, is_approved = 0, updated_at = NOW() WHERE id = ?',
-          [rating, comment || null, existing[0].id]
+          'UPDATE reviews SET rating = ?, comment = ?, is_approved = 0, updated_by = ?, updated_at = NOW() WHERE id = ?',
+          [rating, comment || null, userId, existing[0].id]
         );
         return res.json({ success: true, message: 'Review updated' });
       }
 
       await this.db.query(
-        'INSERT INTO reviews (user_id, rating, comment, is_approved) VALUES (?, ?, ?, 0)',
-        [userId, rating, comment || null]
+        'INSERT INTO reviews (user_id, rating, comment, is_approved, created_by, updated_by) VALUES (?, ?, ?, 0, ?, ?)',
+        [userId, rating, comment || null, userId, userId]
       );
       res.status(201).json({ success: true, message: 'Review submitted for approval' });
     } catch (error) { next(error); }
@@ -92,7 +92,11 @@ class ReviewController {
   // Admin: approve review
   async approveReview(req, res, next) {
     try {
-      await this.db.query('UPDATE reviews SET is_approved = 1 WHERE id = ?', [req.params.id]);
+      const adminId = req.user?.userId || req.user?.id;
+      await this.db.query(
+        'UPDATE reviews SET is_approved = 1, updated_by = ?, updated_at = NOW() WHERE id = ?',
+        [adminId, req.params.id]
+      );
       res.json({ success: true, message: 'Review approved' });
     } catch (error) { next(error); }
   }

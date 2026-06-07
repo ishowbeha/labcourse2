@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Container, Row, Col, Card, Button, Alert, Form, Spinner } from 'react-bootstrap';
 import { useSettings } from '../context/SettingsContext';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
-import Navbar from '../components/Navbar';
+import LazyNavbar from '../components/layout/LazyNavbar';
 import OrderService from '../services/OrderService';
 import axios from 'axios';
 import { getFlagEmoji } from '../utils/flags';
 
 const Tickets = () => {
-  const { user } = useAuth();
-  const { maxTicketsPerOrder, formatPrice, currencySymbol } = useSettings();
+  const { maxTicketsPerOrder } = useSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const screenSize = useResponsiveStyles();
   const matchId = searchParams.get('matchId');
 
   const [match, setMatch] = useState(null);
@@ -308,64 +305,67 @@ const Tickets = () => {
     return digits;
   };
 
+  const pageWrapper = (content) => (
+    <div className="min-vh-100 bg-light">
+      <LazyNavbar />
+      <Container className="py-4 py-md-5">
+        <Row className="justify-content-center">
+          <Col lg={8} xl={7}>
+            {content}
+          </Col>
+        </Row>
+      </Container>
+    </div>
+  );
+
   if (!matchId) {
-    return (
-      <div style={styles.container}>
-        <Navbar />
-        <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
-          <div style={styles.emptyState}>
-            <span style={{ fontSize: '48px' }}>🎫</span>
-            <h2>No Match Selected</h2>
-            <p>Please go to the matches page and click "Buy Tickets" on a match.</p>
-            <button style={styles.backBtn} onClick={() => navigate('/matches')}>
-              Browse Matches
-            </button>
-          </div>
-        </main>
-      </div>
+    return pageWrapper(
+      <Card className="text-center shadow-sm border-0 p-4 p-md-5">
+        <div className="display-3 mb-3">🎫</div>
+        <h2 className="h4">No Match Selected</h2>
+        <p className="text-muted mb-4">Please go to the matches page and click &quot;Buy Tickets&quot; on a match.</p>
+        <Button variant="primary" size="lg" onClick={() => navigate('/matches')}>
+          Browse Matches
+        </Button>
+      </Card>
     );
   }
 
   if (loading) {
-    return (
-      <div style={styles.container}>
-        <Navbar />
-        <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
-          <div style={styles.loading}>Loading match details...</div>
-        </main>
+    return pageWrapper(
+      <div className="text-center py-5 text-muted">
+        <Spinner animation="border" size="sm" className="me-2" />
+        Loading match details...
       </div>
     );
   }
 
   if (purchaseSuccess) {
-    return (
-      <div style={styles.container}>
-        <Navbar />
-        <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
-          <div style={styles.successContainer}>
-            <span style={{ fontSize: '64px' }}>✅</span>
-            <h1 style={styles.successTitle}>Payment Successful!</h1>
-            <p style={styles.successText}>
-              You have successfully purchased tickets for {match?.homeTeam} vs {match?.awayTeam}.
-            </p>
-            <div style={styles.successOrderInfo}>
-              <p style={styles.successOrderNumber}>Order: {lastOrderNum}</p>
-              <p style={styles.successDetails}>
-                Tickets: {selectedQuantity} | €{Number(finalPaidAmount).toFixed(2)}
-              </p>
-              <p style={styles.successPayment}>Paid via: {paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod}</p>
-            </div>
-            <div style={styles.successActions}>
-              <button style={styles.backBtn} onClick={() => navigate('/orders')}>
-                View My Orders
-              </button>
-              <button style={styles.continueBtn} onClick={() => navigate('/matches')}>
-                Browse More Matches
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
+    return pageWrapper(
+      <Card className="text-center shadow-sm border-0 p-4 p-md-5">
+        <div className="display-1 mb-3">✅</div>
+        <h1 className="h2 text-success">Payment Successful!</h1>
+        <p className="text-muted mt-3">
+          You have successfully purchased tickets for {match?.homeTeam} vs {match?.awayTeam}.
+        </p>
+        <div className="bg-light rounded p-3 mt-4">
+          <p className="small text-muted fw-semibold mb-1">Order: {lastOrderNum}</p>
+          <p className="fw-semibold text-dark mb-1">
+            Tickets: {selectedQuantity} | €{Number(finalPaidAmount).toFixed(2)}
+          </p>
+          <p className="small text-success mb-0">
+            Paid via: {paymentMethods.find(p => p.id === paymentMethod)?.name || paymentMethod}
+          </p>
+        </div>
+        <div className="d-flex flex-wrap gap-3 justify-content-center mt-4">
+          <Button variant="primary" size="lg" onClick={() => navigate('/orders')}>
+            View My Orders
+          </Button>
+          <Button variant="info" size="lg" onClick={() => navigate('/matches')}>
+            Browse More Matches
+          </Button>
+        </div>
+      </Card>
     );
   }
 
@@ -382,342 +382,316 @@ const Tickets = () => {
     { id: 3, label: 'Confirm & Pay' }
   ];
 
-  return (
-    <div style={styles.container}>
-      <Navbar />
+  return pageWrapper(
+    <>
+      <div className="text-center mb-4">
+        <h1 className="h2 text-dark">🎫 Buy Tickets</h1>
+        <p className="text-muted mb-0">{match?.homeTeam} vs {match?.awayTeam}</p>
+      </div>
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : styles.main}>
-        <div style={styles.header}>
-          <h1>🎫 Buy Tickets</h1>
-          <p>{match?.homeTeam} vs {match?.awayTeam}</p>
-        </div>
-
-        <div style={styles.progressBar}>
-          {steps.map(s => (
-            <div key={s.id} style={styles.progressStep}>
-              <div style={{
-                ...styles.progressCircle,
-                backgroundColor: step >= s.id ? '#2c3e50' : '#ddd',
-                color: step >= s.id ? 'white' : '#999'
-              }}>
-                {s.id}
-              </div>
-              <span style={{
-                ...styles.progressLabel,
-                color: step >= s.id ? '#2c3e50' : '#999'
-              }}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-
-        {error && (
-          <div style={styles.errorBanner}>{error}</div>
-        )}
-
-        {step === 1 && (
-          <>
-            <div style={styles.matchCard}>
-              <div style={styles.matchTeams}>
-                <span style={styles.team}>{getFlagEmoji(match?.homeTeam)} {match?.homeTeam}</span>
-                <span style={styles.vs}>VS</span>
-                <span style={styles.team}>{getFlagEmoji(match?.awayTeam)} {match?.awayTeam}</span>
-              </div>
-              <div style={styles.matchInfo}>
-                <p>📅 {formatDate(match?.matchDate)} {match?.matchTime ? `at ${match?.matchTime}` : ''}</p>
-                <p>🏟️ {match?.stadiumName || 'TBD'}</p>
-                <p>🏆 {match?.competition || 'Match'}</p>
-              </div>
-            </div>
-
-            <div style={styles.sectionSection}>
-              <h2 style={styles.sectionTitle}>Select Section</h2>
-              <div style={styles.sectionGrid}>
-                {sections.map(section => (
-                  <div
-                    key={section.id}
-                    style={{
-                      ...styles.sectionCard,
-                      borderColor: selectedSection === section.id ? '#2c3e50' : '#e9ecef',
-                      backgroundColor: selectedSection === section.id ? '#f0f4f8' : 'white',
-                    }}
-                    onClick={() => setSelectedSection(section.id)}
-                  >
-                    <span style={styles.sectionName}>{section.name}</span>
-                    <span style={styles.sectionPrice}>€{section.price}</span>
-                    <span style={styles.sectionCapacity}>{section.capacity} seats</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={styles.quantitySection}>
-              <h2 style={styles.sectionTitle}>Number of Tickets</h2>
-              <div style={styles.quantityControls}>
-                <button 
-                  style={styles.qtyBtn} 
-                  onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
-                >
-                  −
-                </button>
-                <span style={styles.qtyValue}>{selectedQuantity}</span>
-                <button 
-                  style={{ ...styles.qtyBtn, opacity: selectedQuantity >= maxTicketsPerOrder ? 0.4 : 1 }}
-                  onClick={() => setSelectedQuantity(Math.min(maxTicketsPerOrder, selectedQuantity + 1))}
-                  disabled={selectedQuantity >= maxTicketsPerOrder}
-                >
-                  +
-                </button>
-              </div>
-              <p style={{ textAlign: 'center', fontSize: '13px', color: '#7f8c8d', marginTop: '8px' }}>
-                Max {maxTicketsPerOrder} ticket{maxTicketsPerOrder !== 1 ? 's' : ''} per order
-              </p>
-            </div>
-
-            <button 
-              style={{ ...styles.nextBtn, opacity: !selectedSection ? 0.6 : 1 }}
-              disabled={!selectedSection}
-              onClick={() => setStep(2)}
+      <div className="d-flex justify-content-center gap-3 gap-md-5 mb-4 p-3">
+        {steps.map(s => (
+          <div key={s.id} className="text-center">
+            <Button
+              variant={step >= s.id ? 'dark' : 'secondary'}
+              className="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center"
+              disabled
+              tabIndex={-1}
             >
-              Continue to Payment →
-            </button>
-          </>
-        )}
-
-        {step === 2 && (
-          <div style={styles.paymentSection}>
-            <h2 style={styles.sectionTitle}>Select Payment Method</h2>
-            
-            <div style={styles.paymentMethods}>
-              {paymentMethods.map(pm => (
-                <div
-                  key={pm.id}
-                  style={{
-                    ...styles.paymentCard,
-                    borderColor: paymentMethod === pm.id ? '#2c3e50' : '#e9ecef',
-                    backgroundColor: paymentMethod === pm.id ? '#f0f4f8' : 'white',
-                  }}
-                  onClick={() => {
-                    setPaymentMethod(pm.id);
-                    if (pm.id !== 'credit-card') {
-                      setCardNumber('');
-                      setCardName('');
-                      setCardExpiry('');
-                      setCardCvc('');
-                    }
-                  }}
-                >
-                  <span style={styles.paymentIcon}>{pm.icon}</span>
-                  <span style={styles.paymentName}>{pm.name}</span>
-                  {paymentMethod === pm.id && <span style={styles.checkmark}>✓</span>}
-                </div>
-              ))}
-            </div>
-
-            {paymentMethod === 'credit-card' && (
-              <div style={styles.cardForm}>
-                <h3 style={styles.formTitle}>Card Details</h3>
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Card Number</label>
-                  <input style={styles.formInput} placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.formLabel}>Cardholder Name</label>
-                  <input style={styles.formInput} placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
-                </div>
-                <div style={styles.formRow}>
-                  <div style={{ flex: 1 }}>
-                    <label style={styles.formLabel}>Expiry Date</label>
-                    <input style={styles.formInput} placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={styles.formLabel}>CVC</label>
-                    <input style={styles.formInput} placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div style={styles.navButtons}>
-              <button style={styles.backBtnInline} onClick={() => setStep(1)}>← Back</button>
-              <button 
-                style={{ ...styles.nextBtn, opacity: !paymentMethod ? 0.6 : 1, flex: 1 }}
-                disabled={!paymentMethod}
-                onClick={() => setStep(3)}
-              >
-                Review Order →
-              </button>
-            </div>
+              {s.id}
+            </Button>
+            <span className={`small fw-semibold ${step >= s.id ? 'text-dark' : 'text-muted'}`}>
+              {s.label}
+            </span>
           </div>
-        )}
+        ))}
+      </div>
 
-        {step === 3 && (
-          <div style={styles.summaryCard}>
-            <h2 style={styles.sectionTitle}>Order Summary</h2>
+      {error && (
+        <Alert variant="danger" className="text-center">{error}</Alert>
+      )}
+
+      {step === 1 && (
+        <>
+          <Card className="shadow-sm border-0 mb-4">
+            <Card.Body className="text-center">
+              <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
+                <span className="fs-5 fw-bold">{getFlagEmoji(match?.homeTeam)} {match?.homeTeam}</span>
+                <span className="text-danger fw-bold">VS</span>
+                <span className="fs-5 fw-bold">{getFlagEmoji(match?.awayTeam)} {match?.awayTeam}</span>
+              </div>
+              <div className="text-muted">
+                <p className="mb-1">📅 {formatDate(match?.matchDate)} {match?.matchTime ? `at ${match.matchTime}` : ''}</p>
+                <p className="mb-1">🏟️ {match?.stadiumName || 'TBD'}</p>
+                <p className="mb-0">🏆 {match?.competition || 'Match'}</p>
+              </div>
+            </Card.Body>
+          </Card>
+
+          <div className="mb-4">
+            <h2 className="h5 text-dark mb-3">Select Section</h2>
+            <Row className="g-2">
+              {sections.map(section => (
+                <Col key={section.id} xs={12} sm={6} md={4}>
+                  <Card
+                    className={`text-center h-100 cursor-pointer ${selectedSection === section.id ? 'border-primary border-2 bg-light' : 'border'}`}
+                    onClick={() => setSelectedSection(section.id)}
+                    role="button"
+                  >
+                    <Card.Body>
+                      <div className="fw-semibold small text-dark mb-2">{section.name}</div>
+                      <div className="fs-4 fw-bold text-danger mb-1">€{section.price}</div>
+                      <div className="small text-muted">{section.capacity} seats</div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </div>
+
+          <div className="mb-4">
+            <h2 className="h5 text-dark mb-3">Number of Tickets</h2>
+            <div className="d-flex align-items-center justify-content-center gap-3 p-3">
+              <Button
+                variant="outline-dark"
+                size="lg"
+                className="rounded-circle d-flex align-items-center justify-content-center p-0 lh-1"
+                onClick={() => setSelectedQuantity(Math.max(1, selectedQuantity - 1))}
+              >
+                −
+              </Button>
+              <span className="fs-3 fw-bold text-dark">{selectedQuantity}</span>
+              <Button
+                variant="outline-dark"
+                size="lg"
+                className="rounded-circle d-flex align-items-center justify-content-center p-0 lh-1"
+                onClick={() => setSelectedQuantity(Math.min(maxTicketsPerOrder, selectedQuantity + 1))}
+                disabled={selectedQuantity >= maxTicketsPerOrder}
+              >
+                +
+              </Button>
+            </div>
+            <p className="text-center small text-muted mb-0">
+              Max {maxTicketsPerOrder} ticket{maxTicketsPerOrder !== 1 ? 's' : ''} per order
+            </p>
+          </div>
+
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-100"
+            disabled={!selectedSection}
+            onClick={() => setStep(2)}
+          >
+            Continue to Payment →
+          </Button>
+        </>
+      )}
+
+      {step === 2 && (
+        <div className="mb-4">
+          <h2 className="h5 text-dark mb-3">Select Payment Method</h2>
+          
+          <div className="d-flex flex-column gap-2 mb-4">
+            {paymentMethods.map(pm => (
+              <Card
+                key={pm.id}
+                className={`${paymentMethod === pm.id ? 'border-primary border-2 bg-light' : 'border'} cursor-pointer`}
+                onClick={() => {
+                  setPaymentMethod(pm.id);
+                  if (pm.id !== 'credit-card') {
+                    setCardNumber('');
+                    setCardName('');
+                    setCardExpiry('');
+                    setCardCvc('');
+                  }
+                }}
+                role="button"
+              >
+                <Card.Body className="d-flex align-items-center gap-3 position-relative">
+                  <span className="fs-3">{pm.icon}</span>
+                  <span className="fw-semibold">{pm.name}</span>
+                  {paymentMethod === pm.id && (
+                    <span className="position-absolute end-0 me-3 text-success fw-bold fs-5">✓</span>
+                  )}
+                </Card.Body>
+              </Card>
+            ))}
+          </div>
+
+          {paymentMethod === 'credit-card' && (
+            <Card className="shadow-sm border-0 mb-4">
+              <Card.Body>
+                <h3 className="h6 text-dark mb-3">Card Details</h3>
+                <Form.Group className="mb-3">
+                  <Form.Label>Card Number</Form.Label>
+                  <Form.Control
+                    placeholder="1234 5678 9012 3456"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                  />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Cardholder Name</Form.Label>
+                  <Form.Control
+                    placeholder="John Doe"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                  />
+                </Form.Group>
+                <Row className="g-3">
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Expiry Date</Form.Label>
+                      <Form.Control
+                        placeholder="MM/YY"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>CVC</Form.Label>
+                      <Form.Control
+                        placeholder="123"
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          )}
+
+          <div className="d-flex gap-2">
+            <Button variant="outline-dark" onClick={() => setStep(1)}>← Back</Button>
+            <Button
+              variant="primary"
+              className="flex-grow-1"
+              disabled={!paymentMethod}
+              onClick={() => setStep(3)}
+            >
+              Review Order →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <Card className="shadow-sm border-0 mb-4">
+          <Card.Body>
+            <h2 className="h5 text-dark mb-4">Order Summary</h2>
             
-            <div style={styles.summarySection}>
-              <h4 style={styles.summarySubtitle}>🎫 Match</h4>
-              <div style={styles.summaryRow}><span>{match?.homeTeam} vs {match?.awayTeam}</span></div>
-              <div style={styles.summaryRow}><span style={{ color: '#7f8c8d' }}>{formatDate(match?.matchDate)}</span></div>
-              <div style={styles.summaryRow}><span style={{ color: '#7f8c8d' }}>{match?.stadiumName || 'TBD'}</span></div>
+            <div className="border-bottom pb-3 mb-3">
+              <h4 className="h6 text-dark mb-2">🎫 Match</h4>
+              <div className="d-flex justify-content-between">{match?.homeTeam} vs {match?.awayTeam}</div>
+              <div className="text-muted small">{formatDate(match?.matchDate)}</div>
+              <div className="text-muted small">{match?.stadiumName || 'TBD'}</div>
             </div>
 
-            <div style={styles.summarySection}>
-              <h4 style={styles.summarySubtitle}>🪑 Seating</h4>
+            <div className="border-bottom pb-3 mb-3">
+              <h4 className="h6 text-dark mb-2">🪑 Seating</h4>
               {selectedSectionData && (
-                <div style={styles.summaryRow}>
+                <div className="d-flex justify-content-between">
                   <span>{selectedSectionData.name}</span>
                   <span>€{selectedSectionData.price} × {selectedQuantity}</span>
                 </div>
               )}
             </div>
 
-            <div style={styles.summarySection}>
-              <h4 style={styles.summarySubtitle}>💳 Payment</h4>
-              <div style={styles.summaryRow}>
+            <div className="border-bottom pb-3 mb-3">
+              <h4 className="h6 text-dark mb-2">💳 Payment</h4>
+              <div className="d-flex justify-content-between">
                 <span>Method</span>
                 <span>{paymentMethods.find(p => p.id === paymentMethod)?.icon} {paymentMethods.find(p => p.id === paymentMethod)?.name}</span>
               </div>
             </div>
 
-            {/* Promo Code */}
-            <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '10px' }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: '14px', color: '#2c3e50', fontWeight: 600 }}>🎟️ Promo Code</h4>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input value={couponCode} onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponMsg(''); setCouponDiscount(0); setAppliedCoupon(null); }}
-                  placeholder="Enter code" style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', fontFamily: 'monospace' }} />
-                <button onClick={async () => {
-                  if (!couponCode) return;
-                  try {
-                    const token = localStorage.getItem('token');
-                    const rResponse = await axios.post('/api/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal - familyDiscount }, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
-                      withCredentials: true
-                    });
-                    const r = rResponse.data;
-                    if (r.success) {
-                      setCouponDiscount(r.data.discount);
-                      setAppliedCoupon(r.data);
-                      setCouponMsg(`✅ ${r.data.description || 'Discount applied!'}`);
-                    } else {
-                      setCouponMsg('❌ ' + (r.message || 'Invalid code'));
-                      setCouponDiscount(0);
-                      setAppliedCoupon(null);
-                    }
-                  } catch (e) { setCouponMsg('❌ Failed to validate'); setCouponDiscount(0); setAppliedCoupon(null); }
-                }} style={{ padding: '10px 16px', backgroundColor: couponDiscount ? '#27ae60' : '#3498db', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+            <div className="bg-light rounded p-3 mb-4">
+              <h4 className="h6 text-dark fw-semibold mb-2">🎟️ Promo Code</h4>
+              <div className="d-flex gap-2">
+                <Form.Control
+                  value={couponCode}
+                  onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponMsg(''); setCouponDiscount(0); setAppliedCoupon(null); }}
+                  placeholder="Enter code"
+                  className="font-monospace"
+                />
+                <Button
+                  variant={couponDiscount ? 'success' : 'primary'}
+                  onClick={async () => {
+                    if (!couponCode) return;
+                    try {
+                      const token = localStorage.getItem('token');
+                      const rResponse = await axios.post('/api/admin/coupons/validate', { code: couponCode, orderTotal: grandTotal - familyDiscount }, {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        withCredentials: true
+                      });
+                      const r = rResponse.data;
+                      if (r.success) {
+                        setCouponDiscount(r.data.discount);
+                        setAppliedCoupon(r.data);
+                        setCouponMsg(`✅ ${r.data.description || 'Discount applied!'}`);
+                      } else {
+                        setCouponMsg('❌ ' + (r.message || 'Invalid code'));
+                        setCouponDiscount(0);
+                        setAppliedCoupon(null);
+                      }
+                    } catch (e) { setCouponMsg('❌ Failed to validate'); setCouponDiscount(0); setAppliedCoupon(null); }
+                  }}
+                >
                   {appliedCoupon ? 'Applied' : 'Apply'}
-                </button>
+                </Button>
               </div>
-              {couponMsg && <p style={{ margin: '6px 0 0', fontSize: '13px', color: couponMsg.includes('✅') ? '#047857' : '#dc2626' }}>{couponMsg}</p>}
+              {couponMsg && (
+                <p className={`small mt-2 mb-0 ${couponMsg.includes('✅') ? 'text-success' : 'text-danger'}`}>
+                  {couponMsg}
+                </p>
+              )}
             </div>
 
-            <div style={styles.priceBreakdown}>
-              <div style={styles.summaryRow}><span>Subtotal</span><span>€{totalPrice}</span></div>
-              <div style={styles.summaryRow}><span>Booking Fee (5%)</span><span>€{fees}</span></div>
+            <div className="bg-light rounded p-3 mb-4">
+              <div className="d-flex justify-content-between mb-2">
+                <span>Subtotal</span><span>€{totalPrice}</span>
+              </div>
+              <div className="d-flex justify-content-between mb-2">
+                <span>Booking Fee (5%)</span><span>€{fees}</span>
+              </div>
               {familyDiscount > 0 && (
-                <div style={styles.summaryRow}>
-                  <span style={{ color: '#047857' }}>Family Pack Discount (25%)</span>
-                  <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(familyDiscount).toFixed(2)}</span>
+                <div className="d-flex justify-content-between text-success mb-2">
+                  <span>Family Pack Discount (25%)</span>
+                  <span className="fw-semibold">-€{Number(familyDiscount).toFixed(2)}</span>
                 </div>
               )}
               {couponDiscount > 0 && (
-                <div style={styles.summaryRow}>
-                  <span style={{ color: '#047857' }}>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
-                  <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(couponDiscount).toFixed(2)}</span>
+                <div className="d-flex justify-content-between text-success mb-2">
+                  <span>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
+                  <span className="fw-semibold">-€{Number(couponDiscount).toFixed(2)}</span>
                 </div>
               )}
-              <div style={{ ...styles.summaryRow, ...styles.totalRow }}>
+              <div className="d-flex justify-content-between fw-bold border-top pt-3 mt-2 fs-5">
                 <span>Total</span>
                 <span>€{Math.max(0, grandTotal - couponDiscount - familyDiscount).toFixed(2)}</span>
               </div>
             </div>
 
-            <div style={styles.navButtons}>
-              <button style={styles.backBtnInline} onClick={() => setStep(2)}>← Back</button>
-              <button 
-                style={{ ...styles.payBtn, opacity: purchasing ? 0.6 : 1, flex: 1 }}
+            <div className="d-flex gap-2">
+              <Button variant="outline-dark" onClick={() => setStep(2)}>← Back</Button>
+              <Button
+                variant="success"
+                className="flex-grow-1"
                 onClick={handlePurchase}
                 disabled={purchasing}
               >
                 {purchasing ? '⏳ Processing Payment...' : `✅ Pay €${Math.max(0, grandTotal - couponDiscount - familyDiscount).toFixed(2)}`}
-              </button>
+              </Button>
             </div>
-          </div>
-        )}
-      </main>
-    </div>
+          </Card.Body>
+        </Card>
+      )}
+    </>
   );
-};
-
-const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#f5f5f5' },
-  main: { maxWidth: '800px', margin: '0 auto', padding: '40px 20px' },
-  header: { textAlign: 'center', marginBottom: '30px' },
-  loading: { textAlign: 'center', padding: '60px 20px', color: '#7f8c8d', fontSize: '18px' },
-  emptyState: { textAlign: 'center', padding: '80px 20px', color: '#555' },
-  errorBanner: { backgroundColor: '#fee2e2', color: '#dc2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '20px', textAlign: 'center' },
-  backBtn: { padding: '12px 24px', backgroundColor: '#2c3e50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '16px' },
-  continueBtn: { padding: '12px 24px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', marginTop: '16px' },
-  progressBar: { display: 'flex', justifyContent: 'center', gap: '40px', marginBottom: '30px', padding: '20px' },
-  progressStep: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
-  progressCircle: { width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '16px' },
-  progressLabel: { fontSize: '12px', fontWeight: '600', textAlign: 'center' },
-  matchCard: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: '24px' },
-  matchTeams: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '16px' },
-  team: { fontSize: '22px', fontWeight: 'bold', color: '#2c3e50' },
-  vs: { fontSize: '18px', color: '#e74c3c', fontWeight: '800' },
-  matchInfo: { textAlign: 'center', fontSize: '15px', color: '#7f8c8d', lineHeight: '1.8' },
-  sectionSection: { marginBottom: '24px' },
-  sectionTitle: { fontSize: '20px', color: '#2c3e50', marginBottom: '16px' },
-  sectionGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' },
-  sectionCard: { padding: '20px', borderRadius: '10px', border: '2px solid #e9ecef', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' },
-  sectionName: { display: 'block', fontSize: '14px', fontWeight: '600', color: '#2c3e50', marginBottom: '8px' },
-  sectionPrice: { display: 'block', fontSize: '22px', fontWeight: 'bold', color: '#e74c3c', marginBottom: '4px' },
-  sectionCapacity: { display: 'block', fontSize: '12px', color: '#95a5a6' },
-  quantitySection: { marginBottom: '24px' },
-  quantityControls: { display: 'flex', alignItems: 'center', gap: '16px', justifyContent: 'center', padding: '16px' },
-  qtyBtn: { width: '44px', height: '44px', borderRadius: '50%', border: '2px solid #2c3e50', backgroundColor: 'white', color: '#2c3e50', fontSize: '22px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  qtyValue: { fontSize: '28px', fontWeight: 'bold', color: '#2c3e50', minWidth: '40px', textAlign: 'center' },
-  paymentSection: { marginBottom: '24px' },
-  paymentMethods: { display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' },
-  paymentCard: { display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', borderRadius: '10px', border: '2px solid #e9ecef', cursor: 'pointer', transition: 'all 0.2s', position: 'relative' },
-  paymentIcon: { fontSize: '28px' },
-  paymentName: { fontSize: '16px', fontWeight: '600', color: '#2c3e50' },
-  checkmark: { position: 'absolute', right: '20px', fontSize: '20px', color: '#27ae60', fontWeight: 'bold' },
-  cardForm: { backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: '24px' },
-  formTitle: { margin: '0 0 16px 0', fontSize: '16px', color: '#2c3e50' },
-  formGroup: { marginBottom: '16px' },
-  formLabel: { display: 'block', fontSize: '13px', fontWeight: '600', color: '#2c3e50', marginBottom: '6px' },
-  formInput: { width: '100%', padding: '12px 14px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '15px', outline: 'none', boxSizing: 'border-box' },
-  formRow: { display: 'flex', gap: '16px' },
-  navButtons: { display: 'flex', gap: '12px', marginTop: '20px' },
-  backBtnInline: { padding: '14px 24px', backgroundColor: 'transparent', color: '#2c3e50', border: '2px solid #2c3e50', borderRadius: '8px', fontSize: '15px', fontWeight: '600', cursor: 'pointer' },
-  nextBtn: { width: '100%', padding: '16px', backgroundColor: '#2c3e50', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' },
-  payBtn: { padding: '16px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' },
-  summaryCard: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: '24px' },
-  summarySection: { marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #eee' },
-  summarySubtitle: { margin: '0 0 12px 0', fontSize: '15px', color: '#2c3e50' },
-  summaryRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: '15px', color: '#555' },
-  priceBreakdown: { padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '10px', marginBottom: '20px' },
-  totalRow: { fontSize: '18px', fontWeight: 'bold', color: '#2c3e50', paddingTop: '12px', marginTop: '8px', borderTop: '2px solid #ddd' },
-  successContainer: { textAlign: 'center', padding: '60px 20px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' },
-  successTitle: { color: '#27ae60', marginTop: '20px' },
-  successText: { fontSize: '16px', color: '#555', marginTop: '12px' },
-  successOrderInfo: { marginTop: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px' },
-  successOrderNumber: { fontSize: '14px', color: '#7f8c8d', fontWeight: '600' },
-  successDetails: { fontSize: '15px', color: '#2c3e50', fontWeight: '600', marginTop: '8px' },
-  successPayment: { fontSize: '14px', color: '#27ae60', marginTop: '8px' },
-  successActions: { display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '24px', flexWrap: 'wrap' },
-};
-
-const responsiveStyles = {
-  mobile: {
-    main: { ...styles.main, padding: '20px 15px' },
-    progressBar: { ...styles.progressBar, gap: '20px' },
-    progressLabel: { fontSize: '10px' },
-    formRow: { ...styles.formRow, flexDirection: 'column' },
-  },
-  tablet: {},
 };
 
 export default Tickets;

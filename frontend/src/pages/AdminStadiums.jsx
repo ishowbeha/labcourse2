@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container, Row, Col, Form, Button, Alert, Table, Badge, Modal, Spinner,
+} from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
-import AdminNavbar from '../components/AdminNavbar';
+import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 
 const AdminStadiums = () => {
-  const screenSize = useResponsiveStyles();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  // Stadium state
   const [stadiums, setStadiums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
@@ -31,7 +31,6 @@ const AdminStadiums = () => {
     isActive: 1
   });
 
-  // Section state
   const [selectedStadium, setSelectedStadium] = useState(null);
   const [sections, setSections] = useState([]);
   const [showSectionModal, setShowSectionModal] = useState(false);
@@ -129,7 +128,6 @@ const AdminStadiums = () => {
     setPagination({ ...pagination, page: 1 });
   };
 
-  // Stadium CRUD operations
   const openCreateStadiumModal = () => {
     setEditingStadium(null);
     setStadiumFormData({
@@ -228,7 +226,6 @@ const AdminStadiums = () => {
     }
   };
 
-  // Section CRUD operations
   const openStadiumSections = async (stadium) => {
     setSelectedStadium(stadium);
     await fetchSections(stadium.id);
@@ -332,808 +329,306 @@ const AdminStadiums = () => {
   }
 
   return (
-    <div style={styles.container}>
-      <AdminNavbar title="🏟️ Stadium Management" subtitle="Manage venues and seating sections" />
+    <div className="min-vh-100 bg-light">
+      <LazyAdminNavbar title="🏟️ Stadium Management" subtitle="Manage venues and seating sections" />
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
-        {error && <div style={styles.alertError}>{error}</div>}
-        {success && <div style={styles.alertSuccess}>{success}</div>}
+      <Container className="py-4">
+        {error && <Alert variant="danger">{error}</Alert>}
+        {success && <Alert variant="success">{success}</Alert>}
 
-        {/* If viewing sections of a stadium */}
         {selectedStadium ? (
           <div>
-            <div style={styles.sectionHeader}>
-              <button onClick={closeStadiumSections} style={styles.backBtn}>
+            <div className="d-flex flex-wrap align-items-center gap-3 mb-4">
+              <Button variant="secondary" onClick={closeStadiumSections}>
                 ← Back to Stadiums
-              </button>
-              <h2 style={styles.sectionTitle}>
+              </Button>
+              <h2 className="h4 mb-0 flex-grow-1">
                 {selectedStadium.name} - Sections
               </h2>
-              <button onClick={openCreateSectionModal} style={styles.createBtn}>
+              <Button variant="success" onClick={openCreateSectionModal}>
                 + Add Section
-              </button>
+              </Button>
             </div>
 
             {loading ? (
-              <div style={styles.loading}>Loading sections...</div>
+              <div className="text-center py-5">
+                <Spinner animation="border" role="status" />
+                <p className="text-muted mt-2 mb-0">Loading sections...</p>
+              </div>
             ) : (
-              <>
-                <div style={styles.tableContainer}>
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>ID</th>
-                        <th style={styles.th}>Name</th>
-                        <th style={styles.th}>Rows</th>
-                        <th style={styles.th}>Seats/Row</th>
-                        <th style={styles.th}>Total Seats</th>
-                        <th style={styles.th}>Price Multiplier</th>
-                        <th style={styles.th}>Description</th>
-                        <th style={styles.th}>Actions</th>
+              <div className="table-responsive bg-white rounded shadow-sm">
+                <Table hover className="mb-0 align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Rows</th>
+                      <th>Seats/Row</th>
+                      <th>Total Seats</th>
+                      <th>Price Multiplier</th>
+                      <th>Description</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sections.map(section => (
+                      <tr key={section.id}>
+                        <td>{section.id}</td>
+                        <td>{section.name}</td>
+                        <td>{section.row_count}</td>
+                        <td>{section.seats_per_row}</td>
+                        <td>{section.row_count * section.seats_per_row}</td>
+                        <td>x{section.price_multiplier}</td>
+                        <td>{section.description || '-'}</td>
+                        <td>
+                          <Button size="sm" variant="primary" className="me-2" onClick={() => openEditSectionModal(section)}>
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => handleDeleteSection(section.id)}>
+                            Delete
+                          </Button>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {sections.map(section => (
-                        <tr key={section.id}>
-                          <td style={styles.td}>{section.id}</td>
-                          <td style={styles.td}>{section.name}</td>
-                          <td style={styles.td}>{section.row_count}</td>
-                          <td style={styles.td}>{section.seats_per_row}</td>
-                          <td style={styles.td}>{section.row_count * section.seats_per_row}</td>
-                          <td style={styles.td}>x{section.price_multiplier}</td>
-                          <td style={styles.td}>{section.description || '-'}</td>
-                          <td style={styles.td}>
-                            <button
-                              onClick={() => openEditSectionModal(section)}
-                              style={styles.actionBtn}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSection(section.id)}
-                              style={{ ...styles.actionBtn, backgroundColor: '#e74c3c' }}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {sections.length === 0 && (
-                        <tr>
-                          <td colSpan="8" style={{ ...styles.td, textAlign: 'center' }}>
-                            No sections found. Click "Add Section" to create one.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                    ))}
+                    {sections.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="text-center text-muted py-4">
+                          No sections found. Click &quot;Add Section&quot; to create one.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </Table>
+              </div>
             )}
           </div>
         ) : (
-          /* Stadium List View */
           <div>
-            {/* Filters */}
-            <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : screenSize === 'tablet' ? responsiveStyles.tablet.filters : styles.filters}>
-              <form onSubmit={handleSearch} style={styles.searchForm}>
-                <input
-                  type="text"
-                  placeholder="Search by name, city, or address..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={styles.searchInput}
-                />
-                <button type="submit" style={styles.searchBtn}>Search</button>
-              </form>
-              <select
-                value={selectedCity}
-                onChange={handleCityFilter}
-                style={styles.roleSelect}
-              >
-                <option value="">All Cities</option>
-                {cities.map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-              <button onClick={openCreateStadiumModal} style={styles.createBtn}>
-                + Add Stadium
-              </button>
-            </div>
+            <Row className="g-3 mb-4 align-items-center">
+              <Col xs={12} lg>
+                <Form onSubmit={handleSearch} className="d-flex gap-2">
+                  <Form.Control
+                    type="text"
+                    placeholder="Search by name, city, or address..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  <Button type="submit" variant="primary">Search</Button>
+                </Form>
+              </Col>
+              <Col xs={12} sm={6} md={4} lg="auto">
+                <Form.Select value={selectedCity} onChange={handleCityFilter}>
+                  <option value="">All Cities</option>
+                  {cities.map(city => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col xs={12} sm={6} md="auto">
+                <Button variant="success" onClick={openCreateStadiumModal} className="w-100">
+                  + Add Stadium
+                </Button>
+              </Col>
+            </Row>
 
-            {/* Stadiums Table */}
             {loading ? (
-              <div style={styles.loading}>Loading stadiums...</div>
+              <div className="text-center py-5">
+                <Spinner animation="border" role="status" />
+                <p className="text-muted mt-2 mb-0">Loading stadiums...</p>
+              </div>
             ) : (
               <>
-                <div style={styles.tableContainer}>
-                  <table style={styles.table}>
-                    <thead>
+                <div className="table-responsive bg-white rounded shadow-sm">
+                  <Table hover className="mb-0 align-middle">
+                    <thead className="table-light">
                       <tr>
-                        <th style={styles.th}>ID</th>
-                        <th style={styles.th}>Name</th>
-                        <th style={styles.th}>City</th>
-                        <th style={styles.th}>Country</th>
-                        <th style={styles.th}>Capacity</th>
-                        <th style={styles.th}>Status</th>
-                        <th style={styles.th}>Actions</th>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>City</th>
+                        <th>Country</th>
+                        <th>Capacity</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {stadiums.map(stadium => (
                         <tr key={stadium.id}>
-                          <td style={styles.td}>{stadium.id}</td>
-                          <td style={styles.td}>{stadium.name}</td>
-                          <td style={styles.td}>{stadium.city}</td>
-                          <td style={styles.td}>{stadium.country}</td>
-                          <td style={styles.td}>{stadium.capacity.toLocaleString()}</td>
-                          <td style={styles.td}>
-                            <span style={{
-                              ...styles.statusBadge,
-                              backgroundColor: stadium.is_active ? '#2ecc71' : '#e74c3c'
-                            }}>
+                          <td>{stadium.id}</td>
+                          <td>{stadium.name}</td>
+                          <td>{stadium.city}</td>
+                          <td>{stadium.country}</td>
+                          <td>{stadium.capacity.toLocaleString()}</td>
+                          <td>
+                            <Badge bg={stadium.is_active ? 'success' : 'danger'}>
                               {stadium.is_active ? 'Active' : 'Inactive'}
-                            </span>
+                            </Badge>
                           </td>
-                          <td style={styles.td}>
-                            <button
-                              onClick={() => openStadiumSections(stadium)}
-                              style={styles.actionBtn}
-                            >
+                          <td>
+                            <Button size="sm" variant="primary" className="me-1 mb-1" onClick={() => openStadiumSections(stadium)}>
                               Sections
-                            </button>
-                            <button
-                              onClick={() => openEditStadiumModal(stadium)}
-                              style={styles.actionBtn}
-                            >
+                            </Button>
+                            <Button size="sm" variant="primary" className="me-1 mb-1" onClick={() => openEditStadiumModal(stadium)}>
                               Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStadium(stadium.id)}
-                              style={{ ...styles.actionBtn, backgroundColor: '#e74c3c' }}
-                            >
+                            </Button>
+                            <Button size="sm" variant="danger" className="mb-1" onClick={() => handleDeleteStadium(stadium.id)}>
                               Delete
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
                       {stadiums.length === 0 && (
                         <tr>
-                          <td colSpan="7" style={{ ...styles.td, textAlign: 'center' }}>
-                            No stadiums found. Click "Add Stadium" to create one.
+                          <td colSpan="7" className="text-center text-muted py-4">
+                            No stadiums found. Click &quot;Add Stadium&quot; to create one.
                           </td>
                         </tr>
                       )}
                     </tbody>
-                  </table>
+                  </Table>
                 </div>
 
-                {/* Pagination */}
-                <div style={styles.pagination}>
-                  <button
+                <div className="d-flex justify-content-center align-items-center gap-3 mt-4">
+                  <Button
+                    variant="primary"
                     onClick={() => handlePageChange(pagination.page - 1)}
                     disabled={pagination.page === 1}
-                    style={styles.pageBtn}
                   >
                     Previous
-                  </button>
-                  <span style={styles.pageInfo}>
+                  </Button>
+                  <span className="text-muted">
                     Page {pagination.page} of {pagination.totalPages}
                   </span>
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => handlePageChange(pagination.page + 1)}
                     disabled={pagination.page === pagination.totalPages}
-                    style={styles.pageBtn}
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
           </div>
         )}
-      </main>
+      </Container>
 
-      {/* Stadium Modal */}
-      {showStadiumModal && (
-        <div style={styles.modalOverlay} onClick={closeStadiumModal}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>
-              {editingStadium ? 'Edit Stadium' : 'Create New Stadium'}
-            </h2>
-            <form onSubmit={handleStadiumSubmit}>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={stadiumFormData.name}
-                    onChange={handleStadiumInputChange}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>City *</label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={stadiumFormData.city}
-                    onChange={handleStadiumInputChange}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Country *</label>
-                  <input
-                    type="text"
-                    name="country"
-                    value={stadiumFormData.country}
-                    onChange={handleStadiumInputChange}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Capacity *</label>
-                  <input
-                    type="number"
-                    name="capacity"
-                    value={stadiumFormData.capacity}
-                    onChange={handleStadiumInputChange}
-                    required
-                    min="1"
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Address</label>
-                <input
-                  type="text"
-                  name="address"
-                  value={stadiumFormData.address}
-                  onChange={handleStadiumInputChange}
-                  style={styles.input}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Image URL</label>
-                <input
-                  type="url"
-                  name="imageUrl"
-                  value={stadiumFormData.imageUrl}
-                  onChange={handleStadiumInputChange}
-                  style={styles.input}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Description</label>
-                <textarea
-                  name="description"
-                  value={stadiumFormData.description}
-                  onChange={handleStadiumInputChange}
-                  rows="3"
-                  style={{ ...styles.input, resize: 'vertical' }}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    name="isActive"
-                    checked={stadiumFormData.isActive === 1}
-                    onChange={handleStadiumInputChange}
-                    style={styles.checkbox}
-                  />
-                  Active Stadium
-                </label>
-              </div>
-              <div style={styles.modalActions}>
-                <button type="button" onClick={closeStadiumModal} style={styles.cancelBtn}>
-                  Cancel
-                </button>
-                <button type="submit" style={styles.submitBtn}>
-                  {editingStadium ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <Modal show={showStadiumModal} onHide={closeStadiumModal} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>{editingStadium ? 'Edit Stadium' : 'Create New Stadium'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleStadiumSubmit}>
+          <Modal.Body>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Name *</Form.Label>
+                  <Form.Control type="text" name="name" value={stadiumFormData.name} onChange={handleStadiumInputChange} required />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>City *</Form.Label>
+                  <Form.Control type="text" name="city" value={stadiumFormData.city} onChange={handleStadiumInputChange} required />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Country *</Form.Label>
+                  <Form.Control type="text" name="country" value={stadiumFormData.country} onChange={handleStadiumInputChange} required />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Capacity *</Form.Label>
+                  <Form.Control type="number" name="capacity" value={stadiumFormData.capacity} onChange={handleStadiumInputChange} required min="1" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Form.Group className="mb-3">
+              <Form.Label>Address</Form.Label>
+              <Form.Control type="text" name="address" value={stadiumFormData.address} onChange={handleStadiumInputChange} />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Image URL</Form.Label>
+              <Form.Control type="url" name="imageUrl" value={stadiumFormData.imageUrl} onChange={handleStadiumInputChange} />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control as="textarea" rows={3} name="description" value={stadiumFormData.description} onChange={handleStadiumInputChange} />
+            </Form.Group>
+            <Form.Check
+              type="checkbox"
+              name="isActive"
+              id="stadiumActive"
+              label="Active Stadium"
+              checked={stadiumFormData.isActive === 1}
+              onChange={handleStadiumInputChange}
+            />
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeStadiumModal}>Cancel</Button>
+            <Button type="submit" variant="primary">
+              {editingStadium ? 'Update' : 'Create'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
 
-      {/* Section Modal */}
-      {showSectionModal && (
-        <div style={styles.modalOverlay} onClick={closeSectionModal}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>
-              {editingSection ? 'Edit Section' : 'Create New Section'}
-            </h2>
-            <form onSubmit={handleSectionSubmit}>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={sectionFormData.name}
-                    onChange={handleSectionInputChange}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Price Multiplier</label>
-                  <input
-                    type="number"
-                    name="priceMultiplier"
-                    value={sectionFormData.priceMultiplier}
-                    onChange={handleSectionInputChange}
-                    step="0.1"
-                    min="0.1"
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Number of Rows *</label>
-                  <input
-                    type="number"
-                    name="rowCount"
-                    value={sectionFormData.rowCount}
-                    onChange={handleSectionInputChange}
-                    required
-                    min="1"
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Seats per Row *</label>
-                  <input
-                    type="number"
-                    name="seatsPerRow"
-                    value={sectionFormData.seatsPerRow}
-                    onChange={handleSectionInputChange}
-                    required
-                    min="1"
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Description</label>
-                <textarea
-                  name="description"
-                  value={sectionFormData.description}
-                  onChange={handleSectionInputChange}
-                  rows="3"
-                  style={{ ...styles.input, resize: 'vertical' }}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <p style={styles.totalSeats}>
-                  Total Seats: <strong>{(parseInt(sectionFormData.rowCount) || 0) * (parseInt(sectionFormData.seatsPerRow) || 0)}</strong>
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button type="button" onClick={closeSectionModal} style={styles.cancelBtn}>
-                  Cancel
-                </button>
-                <button type="submit" style={styles.submitBtn}>
-                  {editingSection ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <Modal show={showSectionModal} onHide={closeSectionModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{editingSection ? 'Edit Section' : 'Create New Section'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleSectionSubmit}>
+          <Modal.Body>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Name *</Form.Label>
+                  <Form.Control type="text" name="name" value={sectionFormData.name} onChange={handleSectionInputChange} required />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Price Multiplier</Form.Label>
+                  <Form.Control type="number" name="priceMultiplier" value={sectionFormData.priceMultiplier} onChange={handleSectionInputChange} step="0.1" min="0.1" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Number of Rows *</Form.Label>
+                  <Form.Control type="number" name="rowCount" value={sectionFormData.rowCount} onChange={handleSectionInputChange} required min="1" />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Seats per Row *</Form.Label>
+                  <Form.Control type="number" name="seatsPerRow" value={sectionFormData.seatsPerRow} onChange={handleSectionInputChange} required min="1" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Form.Group className="mb-3">
+              <Form.Label>Description</Form.Label>
+              <Form.Control as="textarea" rows={3} name="description" value={sectionFormData.description} onChange={handleSectionInputChange} />
+            </Form.Group>
+            <Alert variant="light" className="mb-0">
+              Total Seats: <strong>{(parseInt(sectionFormData.rowCount) || 0) * (parseInt(sectionFormData.seatsPerRow) || 0)}</strong>
+            </Alert>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeSectionModal}>Cancel</Button>
+            <Button type="submit" variant="primary">
+              {editingSection ? 'Update' : 'Create'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    padding: '20px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    margin: '0',
-    fontSize: '24px',
-  },
-  backLink: {
-    color: '#bdc3c7',
-    textDecoration: 'none',
-    fontSize: '14px',
-    marginTop: '4px',
-    display: 'inline-block',
-  },
-  userInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  userName: {
-    fontWeight: '600',
-  },
-  userRole: {
-    backgroundColor: '#3498db',
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  hamburgerBtn: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: '5px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '5px',
-    zIndex: 1001,
-  },
-  hamburgerLine: {
-    width: '25px',
-    height: '3px',
-    backgroundColor: 'white',
-    borderRadius: '2px',
-    transition: 'transform 0.3s, opacity 0.3s',
-  },
-  mobileOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 999,
-  },
-  mobileMenu: {
-    position: 'fixed',
-    top: 0,
-    right: 0,
-    width: '280px',
-    height: '100%',
-    backgroundColor: '#2c3e50',
-    zIndex: 1000,
-    padding: '20px',
-    boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)',
-    overflowY: 'auto',
-  },
-  mobileMenuHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '30px',
-    paddingBottom: '20px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  mobileUserName: {
-    color: 'white',
-    fontSize: '16px',
-    fontWeight: '600',
-  },
-  mobileLogoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-  },
-  mobileNav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  mobileNavLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '16px',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '30px 20px',
-  },
-  filters: {
-    display: 'flex',
-    gap: '16px',
-    marginBottom: '24px',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  searchForm: {
-    display: 'flex',
-    gap: '8px',
-    flex: 1,
-    minWidth: '300px',
-  },
-  searchInput: {
-    flex: 1,
-    padding: '10px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-  },
-  searchBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  roleSelect: {
-    padding: '10px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    minWidth: '150px',
-  },
-  createBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#2ecc71',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  table: {
-    width: '100%',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  th: {
-    padding: '16px',
-    textAlign: 'left',
-    backgroundColor: '#f8f9fa',
-    fontWeight: '600',
-    fontSize: '14px',
-    color: '#555',
-  },
-  td: {
-    padding: '16px',
-    fontSize: '14px',
-    borderBottom: '1px solid #eee',
-  },
-  statusBadge: {
-    display: 'inline-block',
-    padding: '2px 8px',
-    borderRadius: '4px',
-    fontSize: '12px',
-    color: 'white',
-  },
-  actionBtn: {
-    padding: '6px 12px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    marginRight: '8px',
-  },
-  pagination: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '16px',
-    marginTop: '24px',
-  },
-  pageBtn: {
-    padding: '8px 16px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  pageInfo: {
-    fontSize: '14px',
-    color: '#555',
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#555',
-  },
-  alertError: {
-    backgroundColor: '#fee2e2',
-    border: '1px solid #ef4444',
-    color: '#dc2626',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-  },
-  alertSuccess: {
-    backgroundColor: '#d1fae5',
-    border: '1px solid #10b981',
-    color: '#059669',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    width: '100%',
-    maxWidth: '600px',
-    maxHeight: '90vh',
-    overflow: 'auto',
-  },
-  modalTitle: {
-    margin: '0 0 20px 0',
-    fontSize: '20px',
-    color: '#2c3e50',
-  },
-  formRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-  },
-  formGroup: {
-    marginBottom: '16px',
-  },
-  label: {
-    display: 'block',
-    marginBottom: '6px',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#555',
-  },
-  input: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-  },
-  checkboxLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    cursor: 'pointer',
-  },
-  checkbox: {
-    width: '16px',
-    height: '16px',
-    cursor: 'pointer',
-  },
-  totalSeats: {
-    fontSize: '14px',
-    color: '#555',
-    padding: '12px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '6px',
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    marginTop: '24px',
-  },
-  cancelBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#95a5a6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  submitBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  sectionHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    marginBottom: '24px',
-    flexWrap: 'wrap',
-  },
-  backBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#95a5a6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  sectionTitle: {
-    margin: '0',
-    fontSize: '20px',
-    color: '#2c3e50',
-    flex: 1,
-  },
-  tableContainer: {
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    main: {
-      ...styles.main,
-      padding: '20px 15px',
-    },
-    filters: {
-      ...styles.filters,
-      flexDirection: 'column',
-      alignItems: 'stretch',
-    },
-    searchForm: {
-      ...styles.searchForm,
-      minWidth: 'auto',
-    },
-  },
-  tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    filters: {
-      ...styles.filters,
-    },
-  }
 };
 
 export default AdminStadiums;

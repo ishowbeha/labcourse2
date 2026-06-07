@@ -20,6 +20,7 @@ const createReportRoutes = require('./routes/reportRoutes');
 const createLogRoutes = require('./routes/logRoutes');
 const createReviewRoutes = require('./routes/reviewRoutes');
 const createNotificationRoutes = require('./routes/notificationRoutes');
+const createChatRoutes = require('./routes/chatRoutes');
 const createSettingsRoutes = require('./routes/settingsRoutes');
 const { setupWebSocket } = require('./websocket/websocket');
 
@@ -95,6 +96,9 @@ const startServer = async () => {
 
     // Notification routes
     app.use('/api/notifications', createNotificationRoutes(pool));
+
+    // Chat routes (contacts + conversation history)
+    app.use('/api/chat', createChatRoutes(pool));
 
     // Settings routes (admin only)
     app.use('/api/admin/settings', createSettingsRoutes(pool));

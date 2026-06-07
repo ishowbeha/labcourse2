@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import {
+  Container, Row, Col, Card, Form, Button, Alert, Table, Badge, Modal, Spinner,
+} from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
-import AdminNavbar from '../components/AdminNavbar';
+import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 
 const AdminMatches = () => {
-  const screenSize = useResponsiveStyles();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  // Match list state
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
@@ -21,7 +21,6 @@ const AdminMatches = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // Modal state
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState(null);
   const [matchFormData, setMatchFormData] = useState({
@@ -41,12 +40,8 @@ const AdminMatches = () => {
     awayScore: 0
   });
 
-  // Detail view state
   const [selectedMatch, setSelectedMatch] = useState(null);
-
-  // Stadiums for dropdown
   const [stadiums, setStadiums] = useState([]);
-
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
@@ -59,7 +54,6 @@ const AdminMatches = () => {
   }, [pagination.page, statusFilter, search, dateFrom, dateTo]);
 
   useEffect(() => {
-    // Load stadiums when modal opens
     if (showMatchModal && stadiums.length === 0) {
       fetchStadiums();
     }
@@ -129,7 +123,6 @@ const AdminMatches = () => {
     setPagination({ ...pagination, page: 1 });
   };
 
-  // Modal operations
   const openCreateMatchModal = () => {
     setEditingMatch(null);
     setMatchFormData({
@@ -258,7 +251,6 @@ const AdminMatches = () => {
     setSelectedMatch(null);
   };
 
-  // Helpers
   const getStatusColor = (status) => {
     const colors = {
       scheduled: '#3498db',
@@ -306,970 +298,390 @@ const AdminMatches = () => {
     return null;
   }
 
+  const DetailRow = ({ label, children }) => (
+    <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
+      <span className="text-muted small fw-medium">{label}</span>
+      <span className="small fw-medium">{children}</span>
+    </div>
+  );
+
   return (
-    <div style={styles.container}>
-      <AdminNavbar title="⚽ Match Management" subtitle="Schedule and manage football matches" />
+    <div className="min-vh-100 bg-light">
+      <LazyAdminNavbar title="⚽ Match Management" subtitle="Schedule and manage football matches" />
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
-        {error && <div style={styles.alertError}>{error}</div>}
-        {success && <div style={styles.alertSuccess}>{success}</div>}
+      <Container className="py-4">
+        {error && <Alert variant="danger">{error}</Alert>}
+        {success && <Alert variant="success">{success}</Alert>}
 
-        {/* Match Detail View */}
         {selectedMatch ? (
           <div>
-            <div style={styles.detailHeader}>
-              <button onClick={closeMatchDetail} style={styles.backBtn}>
+            <div className="d-flex flex-wrap align-items-center gap-3 mb-4">
+              <Button variant="secondary" onClick={closeMatchDetail}>
                 ← Back to Matches
-              </button>
-              <h2 style={styles.detailTitle}>
+              </Button>
+              <h2 className="h4 mb-0 flex-grow-1">
                 {selectedMatch.homeTeam} vs {selectedMatch.awayTeam}
               </h2>
-              <button
+              <Button
+                variant="primary"
                 onClick={() => { openEditMatchModal(selectedMatch); closeMatchDetail(); }}
-                style={styles.editBtn}
               >
                 Edit Match
-              </button>
+              </Button>
             </div>
 
-            <div style={styles.detailGrid}>
-              <div style={styles.detailCard}>
-                <h3 style={styles.detailCardTitle}>Match Information</h3>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Home Team</span>
-                  <span style={styles.detailValue}>{selectedMatch.homeTeam}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Away Team</span>
-                  <span style={styles.detailValue}>{selectedMatch.awayTeam}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Date</span>
-                  <span style={styles.detailValue}>{formatDate(selectedMatch.matchDate)}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Time</span>
-                  <span style={styles.detailValue}>{formatTime(selectedMatch.matchTime)}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Competition</span>
-                  <span style={styles.detailValue}>{selectedMatch.competition || '-'}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Round</span>
-                  <span style={styles.detailValue}>{selectedMatch.round || '-'}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Status</span>
-                  <span style={{
-                    ...styles.statusBadge,
-                    backgroundColor: getStatusColor(selectedMatch.status)
-                  }}>
-                    {getStatusLabel(selectedMatch.status)}
-                  </span>
-                </div>
-                {(selectedMatch.status === 'completed' || selectedMatch.status === 'live') && (
-                  <div style={styles.detailRow}>
-                    <span style={styles.detailLabel}>Score</span>
-                    <span style={{ ...styles.detailValue, fontWeight: '700', fontSize: '18px' }}>
-                      {selectedMatch.homeScore} - {selectedMatch.awayScore}
-                    </span>
-                  </div>
-                )}
-              </div>
+            <Row className="g-4">
+              <Col md={6}>
+                <Card className="shadow-sm h-100">
+                  <Card.Header className="fw-semibold">Match Information</Card.Header>
+                  <Card.Body>
+                    <DetailRow label="Home Team">{selectedMatch.homeTeam}</DetailRow>
+                    <DetailRow label="Away Team">{selectedMatch.awayTeam}</DetailRow>
+                    <DetailRow label="Date">{formatDate(selectedMatch.matchDate)}</DetailRow>
+                    <DetailRow label="Time">{formatTime(selectedMatch.matchTime)}</DetailRow>
+                    <DetailRow label="Competition">{selectedMatch.competition || '-'}</DetailRow>
+                    <DetailRow label="Round">{selectedMatch.round || '-'}</DetailRow>
+                    <DetailRow label="Status">
+                      <Badge style={{ backgroundColor: getStatusColor(selectedMatch.status) }}>
+                        {getStatusLabel(selectedMatch.status)}
+                      </Badge>
+                    </DetailRow>
+                    {(selectedMatch.status === 'completed' || selectedMatch.status === 'live') && (
+                      <DetailRow label="Score">
+                        <span className="fw-bold fs-5">{selectedMatch.homeScore} - {selectedMatch.awayScore}</span>
+                      </DetailRow>
+                    )}
+                  </Card.Body>
+                </Card>
+              </Col>
 
-              <div style={styles.detailCard}>
-                <h3 style={styles.detailCardTitle}>Stadium</h3>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Name</span>
-                  <span style={styles.detailValue}>{selectedMatch.stadiumName || '-'}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>City</span>
-                  <span style={styles.detailValue}>{selectedMatch.stadiumCity || '-'}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Capacity</span>
-                  <span style={styles.detailValue}>
-                    {selectedMatch.stadiumCapacity ? selectedMatch.stadiumCapacity.toLocaleString() : '-'}
-                  </span>
-                </div>
-              </div>
+              <Col md={6}>
+                <Card className="shadow-sm h-100">
+                  <Card.Header className="fw-semibold">Stadium</Card.Header>
+                  <Card.Body>
+                    <DetailRow label="Name">{selectedMatch.stadiumName || '-'}</DetailRow>
+                    <DetailRow label="City">{selectedMatch.stadiumCity || '-'}</DetailRow>
+                    <DetailRow label="Capacity">
+                      {selectedMatch.stadiumCapacity ? selectedMatch.stadiumCapacity.toLocaleString() : '-'}
+                    </DetailRow>
+                  </Card.Body>
+                </Card>
+              </Col>
 
-              <div style={styles.detailCard}>
-                <h3 style={styles.detailCardTitle}>Ticket Sales</h3>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Base Price</span>
-                  <span style={styles.detailValue}>{formatCurrency(selectedMatch.basePrice)}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Max Tickets/User</span>
-                  <span style={styles.detailValue}>{selectedMatch.maxTicketsPerUser || 4}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Sale Start</span>
-                  <span style={styles.detailValue}>{formatDateTime(selectedMatch.saleStartDate) || '-'}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Sale End</span>
-                  <span style={styles.detailValue}>{formatDateTime(selectedMatch.saleEndDate) || '-'}</span>
-                </div>
-              </div>
+              <Col md={6}>
+                <Card className="shadow-sm h-100">
+                  <Card.Header className="fw-semibold">Ticket Sales</Card.Header>
+                  <Card.Body>
+                    <DetailRow label="Base Price">{formatCurrency(selectedMatch.basePrice)}</DetailRow>
+                    <DetailRow label="Max Tickets/User">{selectedMatch.maxTicketsPerUser || 4}</DetailRow>
+                    <DetailRow label="Sale Start">{formatDateTime(selectedMatch.saleStartDate) || '-'}</DetailRow>
+                    <DetailRow label="Sale End">{formatDateTime(selectedMatch.saleEndDate) || '-'}</DetailRow>
+                  </Card.Body>
+                </Card>
+              </Col>
 
-              <div style={styles.detailCard}>
-                <h3 style={styles.detailCardTitle}>Ticket Statistics</h3>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Total Tickets</span>
-                  <span style={styles.detailValue}>{selectedMatch.totalTickets?.toLocaleString() || 0}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Available</span>
-                  <span style={{ ...styles.detailValue, color: '#2ecc71' }}>{selectedMatch.availableTickets?.toLocaleString() || 0}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Sold</span>
-                  <span style={{ ...styles.detailValue, color: '#3498db' }}>{selectedMatch.soldTickets?.toLocaleString() || 0}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Reserved</span>
-                  <span style={{ ...styles.detailValue, color: '#f39c12' }}>{selectedMatch.reservedTickets?.toLocaleString() || 0}</span>
-                </div>
-                <div style={styles.detailRow}>
-                  <span style={styles.detailLabel}>Revenue</span>
-                  <span style={{ ...styles.detailValue, fontWeight: '700', color: '#27ae60' }}>
-                    {formatCurrency(selectedMatch.revenue)}
-                  </span>
-                </div>
-              </div>
-            </div>
+              <Col md={6}>
+                <Card className="shadow-sm h-100">
+                  <Card.Header className="fw-semibold">Ticket Statistics</Card.Header>
+                  <Card.Body>
+                    <DetailRow label="Total Tickets">{selectedMatch.totalTickets?.toLocaleString() || 0}</DetailRow>
+                    <DetailRow label="Available">
+                      <span className="text-success">{selectedMatch.availableTickets?.toLocaleString() || 0}</span>
+                    </DetailRow>
+                    <DetailRow label="Sold">
+                      <span className="text-primary">{selectedMatch.soldTickets?.toLocaleString() || 0}</span>
+                    </DetailRow>
+                    <DetailRow label="Reserved">
+                      <span className="text-warning">{selectedMatch.reservedTickets?.toLocaleString() || 0}</span>
+                    </DetailRow>
+                    <DetailRow label="Revenue">
+                      <span className="fw-bold text-success">{formatCurrency(selectedMatch.revenue)}</span>
+                    </DetailRow>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
           </div>
         ) : (
-          /* Match List View */
           <div>
-            {/* Filters */}
-            <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : screenSize === 'tablet' ? responsiveStyles.tablet.filters : styles.filters}>
-              <form onSubmit={handleSearch} style={styles.searchForm}>
-                <input
-                  type="text"
-                  placeholder="Search by team, competition, stadium or date..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  style={styles.searchInput}
+            <Row className="g-3 mb-4 align-items-center">
+              <Col xs={12} lg>
+                <Form onSubmit={handleSearch} className="d-flex gap-2">
+                  <Form.Control
+                    type="text"
+                    placeholder="Search by team, competition, stadium or date..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                  />
+                  <Button type="submit" variant="primary">Search</Button>
+                </Form>
+              </Col>
+              <Col xs={6} md={4} lg="auto">
+                <Form.Select value={statusFilter} onChange={handleStatusFilter}>
+                  <option value="">All Statuses</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="live">Live</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="postponed">Postponed</option>
+                </Form.Select>
+              </Col>
+              <Col xs={6} md={4} lg="auto">
+                <Form.Control
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => { setDateFrom(e.target.value); setPagination({ ...pagination, page: 1 }); }}
                 />
-                <button type="submit" style={styles.searchBtn}>Search</button>
-              </form>
-              <select
-                value={statusFilter}
-                onChange={handleStatusFilter}
-                style={styles.filterSelect}
-              >
-                <option value="">All Statuses</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="live">Live</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="postponed">Postponed</option>
-              </select>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPagination({ ...pagination, page: 1 }); }}
-                style={styles.dateInput}
-                placeholder="From date"
-              />
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPagination({ ...pagination, page: 1 }); }}
-                style={styles.dateInput}
-                placeholder="To date"
-              />
-              <button onClick={openCreateMatchModal} style={styles.createBtn}>
-                + Add Match
-              </button>
-            </div>
+              </Col>
+              <Col xs={6} md={4} lg="auto">
+                <Form.Control
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => { setDateTo(e.target.value); setPagination({ ...pagination, page: 1 }); }}
+                />
+              </Col>
+              <Col xs={6} md="auto">
+                <Button variant="success" onClick={openCreateMatchModal} className="w-100">
+                  + Add Match
+                </Button>
+              </Col>
+            </Row>
 
-            {/* Matches Table */}
             {loading ? (
-              <div style={styles.loading}>Loading matches...</div>
+              <div className="text-center py-5">
+                <Spinner animation="border" role="status" />
+                <p className="text-muted mt-2 mb-0">Loading matches...</p>
+              </div>
             ) : (
               <>
-                <div style={styles.tableContainer}>
-                  <table style={styles.table}>
-                    <thead>
+                <div className="table-responsive bg-white rounded shadow-sm">
+                  <Table hover className="mb-0 align-middle">
+                    <thead className="table-light">
                       <tr>
-                        <th style={styles.th}>ID</th>
-                        <th style={styles.th}>Match</th>
-                        <th style={styles.th}>Stadium</th>
-                        <th style={styles.th}>Date / Time</th>
-                        <th style={styles.th}>Competition</th>
-                        <th style={styles.th}>Status</th>
-                        <th style={styles.th}>Tickets</th>
-                        <th style={styles.th}>Revenue</th>
-                        <th style={styles.th}>Actions</th>
+                        <th>ID</th>
+                        <th>Match</th>
+                        <th>Stadium</th>
+                        <th>Date / Time</th>
+                        <th>Competition</th>
+                        <th>Status</th>
+                        <th>Tickets</th>
+                        <th>Revenue</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {matches.map(match => (
                         <tr key={match.id}>
-                          <td style={styles.td}>{match.id}</td>
-                          <td style={styles.td}>
+                          <td>{match.id}</td>
+                          <td>
                             <strong>{match.homeTeam}</strong> vs <strong>{match.awayTeam}</strong>
                           </td>
-                          <td style={styles.td}>{match.stadiumName || '-'}</td>
-                          <td style={styles.td}>
+                          <td>{match.stadiumName || '-'}</td>
+                          <td>
                             {formatDate(match.matchDate)}<br />
-                            <span style={{ fontSize: '12px', color: '#95a5a6' }}>{formatTime(match.matchTime)}</span>
+                            <small className="text-muted">{formatTime(match.matchTime)}</small>
                           </td>
-                          <td style={styles.td}>
+                          <td>
                             {match.competition || '-'}
-                            {match.round && <div style={{ fontSize: '12px', color: '#95a5a6' }}>{match.round}</div>}
+                            {match.round && <div className="small text-muted">{match.round}</div>}
                           </td>
-                          <td style={styles.td}>
-                            <span style={{
-                              ...styles.statusBadge,
-                              backgroundColor: getStatusColor(match.status)
-                            }}>
+                          <td>
+                            <Badge style={{ backgroundColor: getStatusColor(match.status) }}>
                               {getStatusLabel(match.status)}
-                            </span>
+                            </Badge>
                           </td>
-                          <td style={styles.td}>
-                            <div style={{ fontSize: '13px' }}>
-                              <span style={{ color: '#2ecc71' }}>{match.availableTickets || 0}</span>
-                              <span style={{ color: '#95a5a6' }}> / </span>
-                              <span style={{ color: '#3498db' }}>{match.soldTickets || 0}</span>
+                          <td>
+                            <small>
+                              <span className="text-success">{match.availableTickets || 0}</span>
+                              <span className="text-muted"> / </span>
+                              <span className="text-primary">{match.soldTickets || 0}</span>
                               {match.reservedTickets > 0 && (
-                                <span style={{ color: '#f39c12' }}> ({match.reservedTickets} res.)</span>
+                                <span className="text-warning"> ({match.reservedTickets} res.)</span>
                               )}
-                            </div>
+                            </small>
                           </td>
-                          <td style={styles.td}>{formatCurrency(match.revenue)}</td>
-                          <td style={styles.td}>
-                            <button
-                              onClick={() => openMatchDetail(match)}
-                              style={styles.smallBtn}
-                              title="View details"
-                            >
+                          <td>{formatCurrency(match.revenue)}</td>
+                          <td>
+                            <Button size="sm" variant="primary" className="me-1 mb-1" onClick={() => openMatchDetail(match)} title="View details">
                               View
-                            </button>
-                            <button
-                              onClick={() => openEditMatchModal(match)}
-                              style={styles.smallBtn}
-                              title="Edit match"
-                            >
+                            </Button>
+                            <Button size="sm" variant="primary" className="me-1 mb-1" onClick={() => openEditMatchModal(match)} title="Edit match">
                               Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteMatch(match.id)}
-                              style={{ ...styles.smallBtn, backgroundColor: '#e74c3c' }}
-                              title="Delete match"
-                            >
+                            </Button>
+                            <Button size="sm" variant="danger" className="mb-1" onClick={() => handleDeleteMatch(match.id)} title="Delete match">
                               Delete
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
                       {matches.length === 0 && (
                         <tr>
-                          <td colSpan="9" style={{ ...styles.td, textAlign: 'center', padding: '40px' }}>
-                            No matches found. Click "Add Match" to create one.
+                          <td colSpan="9" className="text-center text-muted py-5">
+                            No matches found. Click &quot;Add Match&quot; to create one.
                           </td>
                         </tr>
                       )}
                     </tbody>
-                  </table>
+                  </Table>
                 </div>
 
-                {/* Pagination */}
-                <div style={styles.pagination}>
-                  <button
+                <div className="d-flex justify-content-center align-items-center gap-3 mt-4 flex-wrap">
+                  <Button
+                    variant="primary"
                     onClick={() => handlePageChange(pagination.page - 1)}
                     disabled={pagination.page === 1}
-                    style={styles.pageBtn}
                   >
                     Previous
-                  </button>
-                  <span style={styles.pageInfo}>
+                  </Button>
+                  <span className="text-muted">
                     Page {pagination.page} of {pagination.totalPages} ({pagination.total} total matches)
                   </span>
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={() => handlePageChange(pagination.page + 1)}
                     disabled={pagination.page === pagination.totalPages}
-                    style={styles.pageBtn}
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
           </div>
         )}
-      </main>
+      </Container>
 
-      {/* Match Modal */}
-      {showMatchModal && (
-        <div style={styles.modalOverlay} onClick={closeMatchModal}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 style={styles.modalTitle}>
-              {editingMatch ? 'Edit Match' : 'Create New Match'}
-            </h2>
-            <form onSubmit={handleMatchSubmit}>
-              {/* Home & Away Teams */}
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Home Team *</label>
-                  <input
-                    type="text"
-                    name="homeTeam"
-                    value={matchFormData.homeTeam}
-                    onChange={handleInputChange}
-                    required
-                    style={styles.input}
-                    placeholder="e.g. FC Barcelona"
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Away Team *</label>
-                  <input
-                    type="text"
-                    name="awayTeam"
-                    value={matchFormData.awayTeam}
-                    onChange={handleInputChange}
-                    required
-                    style={styles.input}
-                    placeholder="e.g. Real Madrid"
-                  />
-                </div>
-              </div>
-
-              {/* Stadium & Competition */}
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Stadium *</label>
-                  <select
-                    name="stadiumId"
-                    value={matchFormData.stadiumId}
-                    onChange={handleInputChange}
-                    required
-                    style={styles.input}
-                  >
+      <Modal show={showMatchModal} onHide={closeMatchModal} centered size="lg" scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>{editingMatch ? 'Edit Match' : 'Create New Match'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleMatchSubmit}>
+          <Modal.Body>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Home Team *</Form.Label>
+                  <Form.Control type="text" name="homeTeam" value={matchFormData.homeTeam} onChange={handleInputChange} required placeholder="e.g. FC Barcelona" />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Away Team *</Form.Label>
+                  <Form.Control type="text" name="awayTeam" value={matchFormData.awayTeam} onChange={handleInputChange} required placeholder="e.g. Real Madrid" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Stadium *</Form.Label>
+                  <Form.Select name="stadiumId" value={matchFormData.stadiumId} onChange={handleInputChange} required>
                     <option value="">Select Stadium</option>
                     {stadiums.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({s.city})
                       </option>
                     ))}
-                  </select>
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Competition</label>
-                  <input
-                    type="text"
-                    name="competition"
-                    value={matchFormData.competition}
-                    onChange={handleInputChange}
-                    style={styles.input}
-                    placeholder="e.g. La Liga"
-                  />
-                </div>
-              </div>
-
-              {/* Date, Time, Round */}
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Match Date *</label>
-                  <input
-                    type="date"
-                    name="matchDate"
-                    value={matchFormData.matchDate}
-                    onChange={handleInputChange}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Match Time *</label>
-                  <input
-                    type="time"
-                    name="matchTime"
-                    value={matchFormData.matchTime}
-                    onChange={handleInputChange}
-                    required
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Round</label>
-                  <input
-                    type="text"
-                    name="round"
-                    value={matchFormData.round}
-                    onChange={handleInputChange}
-                    style={styles.input}
-                    placeholder="e.g. Round 1"
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Status</label>
-                  <select
-                    name="status"
-                    value={matchFormData.status}
-                    onChange={handleInputChange}
-                    style={styles.input}
-                  >
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Competition</Form.Label>
+                  <Form.Control type="text" name="competition" value={matchFormData.competition} onChange={handleInputChange} placeholder="e.g. La Liga" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Match Date *</Form.Label>
+                  <Form.Control type="date" name="matchDate" value={matchFormData.matchDate} onChange={handleInputChange} required />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Match Time *</Form.Label>
+                  <Form.Control type="time" name="matchTime" value={matchFormData.matchTime} onChange={handleInputChange} required />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Round</Form.Label>
+                  <Form.Control type="text" name="round" value={matchFormData.round} onChange={handleInputChange} placeholder="e.g. Round 1" />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Status</Form.Label>
+                  <Form.Select name="status" value={matchFormData.status} onChange={handleInputChange}>
                     <option value="scheduled">Scheduled</option>
                     <option value="live">Live</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                     <option value="postponed">Postponed</option>
-                  </select>
-                </div>
-              </div>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+            {editingMatch && (
+              <Row>
+                <Col sm={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Home Score</Form.Label>
+                    <Form.Control type="number" name="homeScore" value={matchFormData.homeScore} onChange={handleInputChange} min="0" />
+                  </Form.Group>
+                </Col>
+                <Col sm={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Away Score</Form.Label>
+                    <Form.Control type="number" name="awayScore" value={matchFormData.awayScore} onChange={handleInputChange} min="0" />
+                  </Form.Group>
+                </Col>
+              </Row>
+            )}
 
-              {/* Score (when editing) */}
-              {editingMatch && (
-                <div style={styles.formRow}>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Home Score</label>
-                    <input
-                      type="number"
-                      name="homeScore"
-                      value={matchFormData.homeScore}
-                      onChange={handleInputChange}
-                      min="0"
-                      style={styles.input}
-                    />
-                  </div>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Away Score</label>
-                    <input
-                      type="number"
-                      name="awayScore"
-                      value={matchFormData.awayScore}
-                      onChange={handleInputChange}
-                      min="0"
-                      style={styles.input}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Ticket Settings */}
-              <h3 style={styles.sectionLabel}>Ticket Settings</h3>
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Base Ticket Price (€) *</label>
-                  <input
-                    type="number"
-                    name="basePrice"
-                    value={matchFormData.basePrice}
-                    onChange={handleInputChange}
-                    required
-                    min="0.01"
-                    step="0.01"
-                    style={styles.input}
-                    placeholder="e.g. 50.00"
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Max Tickets Per User</label>
-                  <input
-                    type="number"
-                    name="maxTicketsPerUser"
-                    value={matchFormData.maxTicketsPerUser}
-                    onChange={handleInputChange}
-                    min="1"
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.formRow}>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Ticket Sale Start</label>
-                  <input
-                    type="datetime-local"
-                    name="saleStartDate"
-                    value={matchFormData.saleStartDate}
-                    onChange={handleInputChange}
-                    style={styles.input}
-                  />
-                </div>
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Ticket Sale End</label>
-                  <input
-                    type="datetime-local"
-                    name="saleEndDate"
-                    value={matchFormData.saleEndDate}
-                    onChange={handleInputChange}
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-
-              <div style={styles.modalActions}>
-                <button type="button" onClick={closeMatchModal} style={styles.cancelBtn}>
-                  Cancel
-                </button>
-                <button type="submit" style={styles.submitBtn}>
-                  {editingMatch ? 'Update Match' : 'Create Match'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <h5 className="border-bottom pb-2 mt-2 mb-3">Ticket Settings</h5>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Base Ticket Price (€) *</Form.Label>
+                  <Form.Control type="number" name="basePrice" value={matchFormData.basePrice} onChange={handleInputChange} required min="0.01" step="0.01" placeholder="e.g. 50.00" />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Max Tickets Per User</Form.Label>
+                  <Form.Control type="number" name="maxTicketsPerUser" value={matchFormData.maxTicketsPerUser} onChange={handleInputChange} min="1" />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Ticket Sale Start</Form.Label>
+                  <Form.Control type="datetime-local" name="saleStartDate" value={matchFormData.saleStartDate} onChange={handleInputChange} />
+                </Form.Group>
+              </Col>
+              <Col sm={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Ticket Sale End</Form.Label>
+                  <Form.Control type="datetime-local" name="saleEndDate" value={matchFormData.saleEndDate} onChange={handleInputChange} />
+                </Form.Group>
+              </Col>
+            </Row>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={closeMatchModal}>Cancel</Button>
+            <Button type="submit" variant="primary">
+              {editingMatch ? 'Update Match' : 'Create Match'}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    padding: '20px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  headerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    margin: '0',
-    fontSize: '24px',
-  },
-  backLink: {
-    color: '#bdc3c7',
-    textDecoration: 'none',
-    fontSize: '14px',
-    marginTop: '4px',
-    display: 'inline-block',
-  },
-  userInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-  },
-  userName: {
-    fontWeight: '600',
-  },
-  userRole: {
-    backgroundColor: '#3498db',
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '8px 16px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  hamburgerBtn: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    gap: '5px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '5px',
-    zIndex: 1001,
-  },
-  hamburgerLine: {
-    width: '25px',
-    height: '3px',
-    backgroundColor: 'white',
-    borderRadius: '2px',
-    transition: 'transform 0.3s, opacity 0.3s',
-  },
-  mobileOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 999,
-  },
-  mobileMenu: {
-    position: 'fixed',
-    top: 0,
-    right: 0,
-    width: '280px',
-    height: '100%',
-    backgroundColor: '#2c3e50',
-    zIndex: 1000,
-    padding: '20px',
-    boxShadow: '-2px 0 10px rgba(0, 0, 0, 0.2)',
-    overflowY: 'auto',
-  },
-  mobileMenuHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '30px',
-    paddingBottom: '20px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  },
-  mobileUserName: {
-    color: 'white',
-    fontSize: '16px',
-    fontWeight: '600',
-  },
-  mobileLogoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-  },
-  mobileNav: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  mobileNavLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '16px',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '30px 20px',
-  },
-  filters: {
-    display: 'flex',
-    gap: '12px',
-    marginBottom: '24px',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  searchForm: {
-    display: 'flex',
-    gap: '8px',
-    flex: 1,
-    minWidth: '250px',
-  },
-  searchInput: {
-    flex: 1,
-    padding: '10px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-  },
-  searchBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  filterSelect: {
-    padding: '10px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    minWidth: '150px',
-  },
-  dateInput: {
-    padding: '10px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    minWidth: '140px',
-  },
-  createBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#2ecc71',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  tableContainer: {
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-  },
-  table: {
-    width: '100%',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  th: {
-    padding: '14px 12px',
-    textAlign: 'left',
-    backgroundColor: '#f8f9fa',
-    fontWeight: '600',
-    fontSize: '13px',
-    color: '#555',
-    whiteSpace: 'nowrap',
-  },
-  td: {
-    padding: '14px 12px',
-    fontSize: '14px',
-    borderBottom: '1px solid #eee',
-  },
-  statusBadge: {
-    display: 'inline-block',
-    padding: '3px 10px',
-    borderRadius: '4px',
-    fontSize: '12px',
-    color: 'white',
-    fontWeight: '600',
-  },
-  smallBtn: {
-    padding: '5px 10px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    marginRight: '4px',
-    marginBottom: '4px',
-  },
-  pagination: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '16px',
-    marginTop: '24px',
-  },
-  pageBtn: {
-    padding: '8px 16px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  pageInfo: {
-    fontSize: '14px',
-    color: '#555',
-  },
-  loading: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#555',
-  },
-  alertError: {
-    backgroundColor: '#fee2e2',
-    border: '1px solid #ef4444',
-    color: '#dc2626',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-  },
-  alertSuccess: {
-    backgroundColor: '#d1fae5',
-    border: '1px solid #10b981',
-    color: '#059669',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-  },
-  // Detail view styles
-  detailHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    marginBottom: '24px',
-    flexWrap: 'wrap',
-  },
-  backBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#95a5a6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  editBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  detailTitle: {
-    margin: '0',
-    fontSize: '20px',
-    color: '#2c3e50',
-    flex: 1,
-  },
-  detailGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '20px',
-  },
-  detailCard: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  detailCardTitle: {
-    margin: '0 0 16px 0',
-    fontSize: '16px',
-    color: '#2c3e50',
-    borderBottom: '2px solid #f0f0f0',
-    paddingBottom: '12px',
-  },
-  detailRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '8px 0',
-    borderBottom: '1px solid #f5f5f5',
-  },
-  detailLabel: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-    fontWeight: '500',
-  },
-  detailValue: {
-    fontSize: '14px',
-    color: '#2c3e50',
-    fontWeight: '500',
-  },
-  // Modal styles
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    width: '100%',
-    maxWidth: '700px',
-    maxHeight: '90vh',
-    overflow: 'auto',
-  },
-  modalTitle: {
-    margin: '0 0 20px 0',
-    fontSize: '20px',
-    color: '#2c3e50',
-  },
-  sectionLabel: {
-    margin: '20px 0 12px 0',
-    fontSize: '16px',
-    color: '#2c3e50',
-    borderBottom: '1px solid #eee',
-    paddingBottom: '8px',
-  },
-  formRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px',
-  },
-  formGroup: {
-    marginBottom: '16px',
-  },
-  label: {
-    display: 'block',
-    marginBottom: '6px',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#555',
-  },
-  input: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    marginTop: '24px',
-  },
-  cancelBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#95a5a6',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  },
-  submitBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '600',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    main: {
-      ...styles.main,
-      padding: '20px 15px',
-    },
-    filters: {
-      ...styles.filters,
-      flexDirection: 'column',
-      alignItems: 'stretch',
-    },
-    searchForm: {
-      ...styles.searchForm,
-      minWidth: 'auto',
-    },
-  },
-  tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    filters: {
-      ...styles.filters,
-    },
-  }
 };
 
 export default AdminMatches;

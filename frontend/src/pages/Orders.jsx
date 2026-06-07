@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
-import Navbar from '../components/Navbar';
+import { Container, Row, Col, Card, Button, Badge, Modal } from 'react-bootstrap';
+import LazyNavbar from '../components/layout/LazyNavbar';
 import OrderService from '../services/OrderService';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
 
 const Orders = () => {
-  const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const screenSize = useResponsiveStyles();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -85,18 +82,13 @@ const Orders = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const getStatusColor = (status) => {
+  const getStatusVariant = (status) => {
     switch(status) {
-      case 'confirmed': return '#27ae60';
-      case 'pending': return '#f39c12';
-      case 'completed': return '#3498db';
-      case 'cancelled': return '#e74c3c';
-      default: return '#7f8c8d';
+      case 'confirmed': return 'success';
+      case 'pending': return 'warning';
+      case 'completed': return 'info';
+      case 'cancelled': return 'danger';
+      default: return 'secondary';
     }
   };
 
@@ -270,472 +262,166 @@ Payment Method: ${order.paymentMethod}
     }
   };
 
+  const renderOrderSummary = (order) => (
+    <div className="bg-light rounded p-3">
+      <div className="d-flex justify-content-between small text-muted mb-2">
+        <span>Subtotal</span>
+        <span>€{(order.subtotal || 0).toFixed(2)}</span>
+      </div>
+      <div className="d-flex justify-content-between small text-muted mb-2">
+        <span>Fees</span>
+        <span>€{(order.fees || 0).toFixed(2)}</span>
+      </div>
+      {order.discount > 0 && (
+        <div className="d-flex justify-content-between small text-success mb-2">
+          <span>Discount {order.couponCode ? `(${order.couponCode})` : ''}</span>
+          <span className="fw-semibold">-€{Number(order.discount).toFixed(2)}</span>
+        </div>
+      )}
+      <div className="d-flex justify-content-between fw-bold border-top pt-2 mt-2">
+        <span>Total</span>
+        <span>€{(order.total || 0).toFixed(2)}</span>
+      </div>
+      <p className="small text-muted text-center mt-3 mb-0">Paid via {order.paymentMethod}</p>
+    </div>
+  );
 
   return (
-    <div style={styles.container}>
-      <Navbar />
+    <div className="min-vh-100 bg-light">
+      <LazyNavbar />
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
-        <div style={styles.header}>
-          <h1>📋 My Orders</h1>
-          <p>View your order history and track your purchases</p>
+      <Container className="py-4 py-md-5">
+        <div className="text-center mb-4">
+          <h1 className="h2 text-dark">📋 My Orders</h1>
+          <p className="text-muted mb-0">View your order history and track your purchases</p>
         </div>
 
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.stats : screenSize === 'tablet' ? responsiveStyles.tablet.stats : styles.stats}>
-          <div style={styles.statCard}>
-            <span style={styles.statNumber}>{orders.length}</span>
-            <span style={styles.statLabel}>Total Orders</span>
-          </div>
-          <div style={styles.statCard}>
-            <span style={styles.statNumber}>{orders.filter(o => o.status === 'confirmed' || o.status === 'completed').length}</span>
-            <span style={styles.statLabel}>Completed</span>
-          </div>
-          <div style={styles.statCard}>
-            <span style={styles.statNumber}>€{getTotalSpent()}</span>
-            <span style={styles.statLabel}>Total Spent</span>
-          </div>
-        </div>
+        <Row className="g-3 mb-4">
+          <Col xs={12} md={4}>
+            <Card className="text-center shadow-sm border-0">
+              <Card.Body>
+                <div className="display-6 fw-bold text-dark">{orders.length}</div>
+                <div className="small text-muted">Total Orders</div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} md={4}>
+            <Card className="text-center shadow-sm border-0">
+              <Card.Body>
+                <div className="display-6 fw-bold text-dark">
+                  {orders.filter(o => o.status === 'confirmed' || o.status === 'completed').length}
+                </div>
+                <div className="small text-muted">Completed</div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} md={4}>
+            <Card className="text-center shadow-sm border-0">
+              <Card.Body>
+                <div className="display-6 fw-bold text-dark">€{getTotalSpent()}</div>
+                <div className="small text-muted">Total Spent</div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
 
         {orders.length === 0 ? (
-          <div style={styles.emptyState}>
-            <span style={{ fontSize: '48px' }}>📋</span>
-            <h2>No Orders Yet</h2>
-            <p>You haven't purchased any tickets yet.</p>
-            <button style={styles.browseBtn} onClick={() => navigate('/matches')}>
+          <Card className="text-center shadow-sm border-0 p-4 p-md-5">
+            <div className="display-3 mb-3">📋</div>
+            <h2 className="h4">No Orders Yet</h2>
+            <p className="text-muted mb-4">You haven&apos;t purchased any tickets yet.</p>
+            <Button variant="primary" size="lg" onClick={() => navigate('/matches')}>
               Browse Matches
-            </button>
-          </div>
+            </Button>
+          </Card>
         ) : (
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.orderList : screenSize === 'tablet' ? responsiveStyles.tablet.orderList : styles.orderList}>
+          <div className="d-flex flex-column gap-3">
             {orders.map(order => (
-              <div key={order.id} style={styles.orderCard}>
-                <div style={styles.orderHeader}>
-                  <div>
-                    <span style={styles.orderNumber}>{order.orderNumber}</span>
-                    <span style={styles.orderDate}>Placed on {order.date}</span>
-                  </div>
-                  <span style={{...styles.status, backgroundColor: getStatusColor(order.status)}}>
-                    {order.status.toUpperCase()}
-                  </span>
-                </div>
-
-                <div style={styles.orderContent}>
-                  <div style={styles.orderInfo}>
-                    <h3 style={styles.matchTitle}>{order.match}</h3>
-                    <p style={styles.matchDate}>📅 Match Date: {order.matchDate} {order.matchTime ? `at ${order.matchTime}` : ''}</p>
-                    <p style={styles.matchStadium}>🏟️ {order.stadium || 'TBD'}</p>
-                    <p style={styles.matchCompetition}>🏆 {order.competition || 'Match'}</p>
-                    <p style={styles.ticketInfo}>🎫 {order.tickets} ticket(s)</p>
-                    <div style={styles.seats}>
-                      {order.seats?.map((seat, idx) => (
-                        <span key={idx} style={styles.seatTag}>{seat}</span>
-                      ))}
+              <Card key={order.id} className="shadow-sm border-0">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <div>
+                      <div className="fw-bold text-dark">{order.orderNumber}</div>
+                      <div className="small text-muted">Placed on {order.date}</div>
                     </div>
+                    <Badge bg={getStatusVariant(order.status)}>{order.status.toUpperCase()}</Badge>
                   </div>
 
-                  <div style={styles.orderSummary}>
-                    <div style={styles.summaryRow}>
-                      <span>Subtotal</span>
-                      <span>€{(order.subtotal || 0).toFixed(2)}</span>
-                    </div>
-                    <div style={styles.summaryRow}>
-                      <span>Fees</span>
-                      <span>€{(order.fees || 0).toFixed(2)}</span>
-                    </div>
-                    {order.discount > 0 && (
-                      <div style={styles.summaryRow}>
-                        <span style={{ color: '#047857' }}>Discount {order.couponCode ? `(${order.couponCode})` : ''}</span>
-                        <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(order.discount).toFixed(2)}</span>
+                  <Row className="g-3 mb-3">
+                    <Col md={8}>
+                      <h3 className="h5 text-dark mb-2">{order.match}</h3>
+                      <p className="small text-muted mb-1">📅 Match Date: {order.matchDate} {order.matchTime ? `at ${order.matchTime}` : ''}</p>
+                      <p className="small text-muted mb-1">🏟️ {order.stadium || 'TBD'}</p>
+                      <p className="small text-muted mb-1">🏆 {order.competition || 'Match'}</p>
+                      <p className="small mb-2">🎫 {order.tickets} ticket(s)</p>
+                      <div className="d-flex flex-wrap gap-2">
+                        {order.seats?.map((seat, idx) => (
+                          <Badge key={idx} bg="light" text="dark" className="fw-normal">{seat}</Badge>
+                        ))}
                       </div>
-                    )}
-                    <div style={{...styles.summaryRow, ...styles.totalRow}}>
-                      <span>Total</span>
-                      <span>€{(order.total || 0).toFixed(2)}</span>
-                    </div>
-                    <p style={styles.paymentMethod}>Paid via {order.paymentMethod}</p>
-                  </div>
-                </div>
+                    </Col>
+                    <Col md={4}>
+                      {renderOrderSummary(order)}
+                    </Col>
+                  </Row>
 
-                <div style={styles.orderActions}>
-                  <button style={styles.primaryBtn} onClick={() => handleViewDetails(order)}>View Details</button>
-                  {order.status !== 'pending' && (
-                    <button style={styles.secondaryBtn} onClick={() => handleDownloadInvoice(order)}>Download Invoice</button>
-                  )}
-                  {order.status === 'pending' && (
-                    <button style={styles.payBtn}>Complete Payment</button>
-                  )}
-                </div>
-              </div>
+                  <div className="d-flex flex-column flex-sm-row gap-2 border-top pt-3">
+                    <Button variant="primary" onClick={() => handleViewDetails(order)}>View Details</Button>
+                    {order.status !== 'pending' && (
+                      <Button variant="outline-primary" onClick={() => handleDownloadInvoice(order)}>Download Invoice</Button>
+                    )}
+                    {order.status === 'pending' && (
+                      <Button variant="success">Complete Payment</Button>
+                    )}
+                  </div>
+                </Card.Body>
+              </Card>
             ))}
           </div>
         )}
 
-        {showDetailsModal && selectedOrder && (
-          <div style={styles.modalOverlay} onClick={closeDetailsModal}>
-            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Order Details</h2>
-                <button style={styles.modalCloseBtn} onClick={closeDetailsModal}>&times;</button>
-              </div>
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #eee' }}>
+        <Modal show={showDetailsModal} onHide={closeDetailsModal} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Order Details</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {selectedOrder && (
+              <>
+                <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
                   <div>
-                    <span style={styles.orderNumber}>{selectedOrder.orderNumber}</span>
-                    <span style={styles.orderDate}>Placed on {selectedOrder.date}</span>
+                    <div className="fw-bold text-dark">{selectedOrder.orderNumber}</div>
+                    <div className="small text-muted">Placed on {selectedOrder.date}</div>
                   </div>
-                  <span style={{...styles.status, backgroundColor: getStatusColor(selectedOrder.status)}}>
-                    {selectedOrder.status.toUpperCase()}
-                  </span>
+                  <Badge bg={getStatusVariant(selectedOrder.status)}>{selectedOrder.status.toUpperCase()}</Badge>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                  <h3 style={{ ...styles.matchTitle, margin: 0 }}>{selectedOrder.match}</h3>
-                  <p style={{ ...styles.matchDate, margin: 0 }}>📅 Match Date: {selectedOrder.matchDate} {selectedOrder.matchTime ? `at ${selectedOrder.matchTime}` : ''}</p>
-                  <p style={{ ...styles.matchStadium, margin: 0 }}>🏟️ {selectedOrder.stadium || 'TBD'}</p>
-                  <p style={{ ...styles.matchCompetition, margin: 0 }}>🏆 {selectedOrder.competition || 'Match'}</p>
-                  <p style={{ ...styles.ticketInfo, margin: 0 }}>🎫 {selectedOrder.tickets} ticket(s)</p>
-                  <div style={styles.seats}>
+                <div className="mb-3">
+                  <h3 className="h5 text-dark mb-2">{selectedOrder.match}</h3>
+                  <p className="small text-muted mb-1">📅 Match Date: {selectedOrder.matchDate} {selectedOrder.matchTime ? `at ${selectedOrder.matchTime}` : ''}</p>
+                  <p className="small text-muted mb-1">🏟️ {selectedOrder.stadium || 'TBD'}</p>
+                  <p className="small text-muted mb-1">🏆 {selectedOrder.competition || 'Match'}</p>
+                  <p className="small mb-2">🎫 {selectedOrder.tickets} ticket(s)</p>
+                  <div className="d-flex flex-wrap gap-2">
                     {selectedOrder.seats?.map((seat, idx) => (
-                      <span key={idx} style={styles.seatTag}>{seat}</span>
+                      <Badge key={idx} bg="light" text="dark" className="fw-normal">{seat}</Badge>
                     ))}
                   </div>
                 </div>
 
-                <div style={styles.orderSummary}>
-                  <div style={styles.summaryRow}>
-                    <span>Subtotal</span>
-                    <span>€{(selectedOrder.subtotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div style={styles.summaryRow}>
-                    <span>Fees</span>
-                    <span>€{(selectedOrder.fees || 0).toFixed(2)}</span>
-                  </div>
-                  {selectedOrder.discount > 0 && (
-                    <div style={styles.summaryRow}>
-                      <span style={{ color: '#047857' }}>Discount {selectedOrder.couponCode ? `(${selectedOrder.couponCode})` : ''}</span>
-                      <span style={{ color: '#047857', fontWeight: 600 }}>-€{Number(selectedOrder.discount).toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div style={{...styles.summaryRow, ...styles.totalRow}}>
-                    <span>Total</span>
-                    <span>€{(selectedOrder.total || 0).toFixed(2)}</span>
-                  </div>
-                  <p style={styles.paymentMethod}>Paid via {selectedOrder.paymentMethod}</p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #eee' }}>
-                {selectedOrder.status !== 'pending' && (
-                  <button style={styles.secondaryBtn} onClick={() => handleDownloadInvoice(selectedOrder)}>Download Invoice</button>
-                )}
-                <button style={styles.primaryBtn} onClick={closeDetailsModal}>Close</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+                {renderOrderSummary(selectedOrder)}
+              </>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            {selectedOrder?.status !== 'pending' && (
+              <Button variant="outline-primary" onClick={() => handleDownloadInvoice(selectedOrder)}>Download Invoice</Button>
+            )}
+            <Button variant="primary" onClick={closeDetailsModal}>Close</Button>
+          </Modal.Footer>
+        </Modal>
+      </Container>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '80px 20px',
-    color: '#555',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  browseBtn: {
-    padding: '12px 24px',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    marginTop: '16px',
-  },
-  stats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '20px',
-    marginBottom: '30px',
-  },
-  statCard: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '12px',
-    textAlign: 'center',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  statNumber: {
-    display: 'block',
-    fontSize: '28px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  statLabel: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-  },
-  orderList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  orderCard: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-  },
-  orderHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '16px',
-    paddingBottom: '16px',
-    borderBottom: '1px solid #eee',
-  },
-  orderNumber: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    display: 'block',
-  },
-  orderDate: {
-    fontSize: '13px',
-    color: '#7f8c8d',
-  },
-  status: {
-    fontSize: '11px',
-    color: 'white',
-    padding: '4px 12px',
-    borderRadius: '4px',
-    fontWeight: '600',
-  },
-  orderContent: {
-    display: 'flex',
-    gap: '24px',
-    marginBottom: '16px',
-  },
-  orderInfo: {
-    flex: 1,
-  },
-  matchTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '18px',
-    color: '#2c3e50',
-  },
-  matchDate: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-    margin: '4px 0',
-  },
-  matchStadium: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-    margin: '4px 0',
-  },
-  matchCompetition: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-    margin: '4px 0',
-  },
-  ticketInfo: {
-    fontSize: '14px',
-    margin: '4px 0',
-  },
-  seats: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    marginTop: '8px',
-  },
-  seatTag: {
-    backgroundColor: '#f8f9fa',
-    padding: '4px 12px',
-    borderRadius: '4px',
-    fontSize: '13px',
-    color: '#2c3e50',
-  },
-  orderSummary: {
-    minWidth: '180px',
-    padding: '16px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-  },
-  summaryRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    fontSize: '14px',
-    color: '#7f8c8d',
-    marginBottom: '8px',
-  },
-  totalRow: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    paddingTop: '8px',
-    marginTop: '8px',
-    borderTop: '1px solid #ddd',
-  },
-  paymentMethod: {
-    fontSize: '12px',
-    color: '#7f8c8d',
-    marginTop: '12px',
-    textAlign: 'center',
-  },
-  orderActions: {
-    display: 'flex',
-    gap: '12px',
-    paddingTop: '16px',
-    borderTop: '1px solid #eee',
-  },
-  primaryBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  secondaryBtn: {
-    padding: '10px 20px',
-    backgroundColor: 'transparent',
-    color: '#2c3e50',
-    border: '1px solid #2c3e50',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  payBtn: {
-    padding: '10px 20px',
-    backgroundColor: '#27ae60',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    backdropFilter: 'blur(3px)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000,
-  },
-  modal: {
-    backgroundColor: 'white',
-    padding: '30px',
-    borderRadius: '16px',
-    width: '500px',
-    maxWidth: '90%',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-    position: 'relative',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: '20px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  modalCloseBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '28px',
-    fontWeight: '300',
-    color: '#95a5a6',
-    cursor: 'pointer',
-    padding: '0 8px',
-    lineHeight: 1,
-    transition: 'color 0.2s',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    main: {
-      ...styles.main,
-      padding: '20px 15px',
-    },
-    stats: {
-      ...styles.stats,
-      gridTemplateColumns: '1fr',
-    },
-    orderList: {
-      ...styles.orderList,
-      flexDirection: 'column',
-    },
-    orderContent: {
-      ...styles.orderContent,
-      flexDirection: 'column',
-      gap: '16px',
-    },
-    orderSummary: {
-      ...styles.orderSummary,
-      minWidth: 'auto',
-      width: '100%',
-    },
-    orderActions: {
-      ...styles.orderActions,
-      flexDirection: 'column',
-      gap: '8px',
-    },
-  },
-  tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    stats: {
-      ...styles.stats,
-      gridTemplateColumns: 'repeat(3, 1fr)',
-    },
-    orderList: {
-      ...styles.orderList,
-      flexDirection: 'column',
-    },
-    orderContent: {
-      ...styles.orderContent,
-      flexDirection: 'row',
-      gap: '24px',
-    },
-  }
 };
 
 export default Orders;

@@ -386,7 +386,10 @@ class AdminController {
         await this.db.query('DELETE FROM favorites WHERE id = ?', [existing[0].id]);
         return res.json({ success: true, favorited: false, message: 'Removed from favorites' });
       }
-      await this.db.query('INSERT INTO favorites (user_id, match_id, stadium_id) VALUES (?, ?, ?)', [userId, parseInt(match_id), stadium_id || null]);
+      await this.db.query(
+        'INSERT INTO favorites (user_id, match_id, stadium_id, created_by, updated_by) VALUES (?, ?, ?, ?, ?)',
+        [userId, parseInt(match_id), stadium_id || null, userId, userId]
+      );
       res.json({ success: true, favorited: true, message: 'Added to favorites' });
     } catch (error) { next(error); }
   }
@@ -411,9 +414,9 @@ class AdminController {
       let maxDiscountPercent = 100; // fallback: no cap
       try {
         const [[row]] = await this.db.query(
-          "SELECT setting_value FROM system_settings WHERE setting_key = 'max_discount_percent'"
+          "SELECT value FROM settings WHERE `key` = 'max_discount_percent'"
         );
-        if (row) maxDiscountPercent = parseFloat(row.setting_value) || 100;
+        if (row) maxDiscountPercent = parseFloat(row.value) || 100;
       } catch { /* ignore */ }
 
       // ── Check allow_stacking_coupons (future: pass existing coupons count in body) ──

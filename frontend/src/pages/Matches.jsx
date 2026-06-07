@@ -1,32 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import {
+  Container, Row, Col, Card, Button, Form, Spinner, Alert, Dropdown, ButtonGroup,
+} from 'react-bootstrap';
 import MatchService from '../services/MatchService';
 import FootballService from '../services/FootballService';
-import Navbar from '../components/Navbar';
-import { getFlagEmoji, getFlagUrl } from '../utils/flags';
+import LazyNavbar from '../components/layout/LazyNavbar';
+import { getFlagEmoji } from '../utils/flags';
 import api from '../services/api';
 
-const useResponsiveStyles = () => {
-  const [screenSize, setScreenSize] = useState('desktop');
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      if (width <= 768) setScreenSize('mobile');
-      else if (width <= 1024) setScreenSize('tablet');
-      else setScreenSize('desktop');
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  return screenSize;
-};
+const wcGroups = ['All Groups', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G', 'Group H', 'Group I', 'Group J', 'Group K', 'Group L'];
 
 const Matches = () => {
-  const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const screenSize = useResponsiveStyles();
   const [favorites, setFavorites] = useState([]);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,9 +23,6 @@ const Matches = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [apiAvailable, setApiAvailable] = useState(false);
-  const [wcDropdownOpen, setWcDropdownOpen] = useState(false);
-  const [dataFetched, setDataFetched] = useState(false);
-  const wcGroups = ['All Groups', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G', 'Group H', 'Group I', 'Group J', 'Group K', 'Group L'];
 
   useEffect(() => {
     const init = async () => {
@@ -49,36 +32,53 @@ const Matches = () => {
           FootballService.getAvailableLeagues().catch(() => []),
           MatchService.getAllMatches().catch(() => []),
           FootballService.getLiveFootballMatches().catch(() => []),
-          FootballService.getUpcomingFootballMatches(50).catch(() => [])
+          FootballService.getUpcomingFootballMatches(50).catch(() => []),
         ]);
         setApiAvailable(avail && avail.length > 0);
         setMatches(localData || []);
         setLiveMatches(liveData || []);
         setApiMatches(upcomingData || []);
-        try { const r = await api.get('/admin/favorites'); setFavorites(r.data?.map(f => f.match_id) || []); } catch (e) {}
-      } catch (e) { console.error('Init error:', e); }
-      finally { setLoading(false); setDataFetched(true); }
+        try {
+          const r = await api.get('/admin/favorites');
+          setFavorites(r.data?.map((f) => f.match_id) || []);
+        } catch (e) {}
+      } catch (e) {
+        console.error('Init error:', e);
+      } finally {
+        setLoading(false);
+      }
     };
     init();
   }, []);
 
   const toggleFavorite = async (matchId) => {
-    try { const r = await api.post('/admin/favorites/toggle', { match_id: matchId }); if (r.success) { const res = await api.get('/admin/favorites'); setFavorites(res.data?.map(f => f.match_id) || []); } } catch (e) { console.error(e); }
+    try {
+      const r = await api.post('/admin/favorites/toggle', { match_id: matchId });
+      if (r.success) {
+        const res = await api.get('/admin/favorites');
+        setFavorites(res.data?.map((f) => f.match_id) || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleSync = async () => {
     try {
-      setSyncing(true); setSyncMessage('');
+      setSyncing(true);
+      setSyncMessage('');
       const result = await fetch('/api/football/sync', { method: 'POST' });
       const data = await result.json();
       setSyncMessage(data.message || 'Sync complete');
       const localData = await MatchService.getAllMatches().catch(() => []);
       setMatches(localData || []);
-    } catch (error) { setSyncMessage('Sync failed: ' + error.message); }
-    finally { setSyncing(false); setTimeout(() => setSyncMessage(''), 5000); }
+    } catch (error) {
+      setSyncMessage(`Sync failed: ${error.message}`);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMessage(''), 5000);
+    }
   };
-
-  const handleLogout = () => { logout(); navigate('/login'); };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'TBD';
@@ -98,7 +98,9 @@ const Matches = () => {
     return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const handleFilterChange = (key, value) => { setFilters(prev => ({ ...prev, [key]: value || undefined })); };
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value || undefined }));
+  };
 
   const getDisplayMatches = () => {
     if (activeTab === 'local') return matches;
@@ -108,9 +110,12 @@ const Matches = () => {
     const allMapped = [];
     const localKeys = new Set();
 
-    matches.forEach(m => { allMapped.push({ ...m, _sortDate: m.matchDate || '', _groupId: '' }); localKeys.add(`${m.homeTeam || ''}-${m.awayTeam || ''}`); });
+    matches.forEach((m) => {
+      allMapped.push({ ...m, _sortDate: m.matchDate || '', _groupId: '' });
+      localKeys.add(`${m.homeTeam || ''}-${m.awayTeam || ''}`);
+    });
 
-    apiMatches.forEach(apiMatch => {
+    apiMatches.forEach((apiMatch) => {
       const key = `${apiMatch.homeTeam?.name}-${apiMatch.awayTeam?.name}`;
       if (!localKeys.has(key)) {
         const compName = apiMatch.league?.name || '';
@@ -118,63 +123,137 @@ const Matches = () => {
         const matchDate = apiMatch.date ? apiMatch.date.split('T')[0] : null;
         const group = apiMatch.group || '';
         allMapped.push({
-          id: `api-${apiMatch.id}`, homeTeam: apiMatch.homeTeam?.name || 'Home', awayTeam: apiMatch.awayTeam?.name || 'Away',
-          matchDate, matchTime: apiMatch.date ? new Date(apiMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
-          competition: isWorldCup ? 'FIFA World Cup 2026' : (compName || 'International'), basePrice: isWorldCup ? 89 : 25,
-          stadiumName: apiMatch.venue || 'TBD', status: apiMatch.status || 'Scheduled', source: 'api-football',
-          homeScore: apiMatch.goals?.home, awayScore: apiMatch.goals?.away, _sortDate: matchDate || '', _groupId: group
+          id: `api-${apiMatch.id}`,
+          homeTeam: apiMatch.homeTeam?.name || 'Home',
+          awayTeam: apiMatch.awayTeam?.name || 'Away',
+          matchDate,
+          matchTime: apiMatch.date ? new Date(apiMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
+          competition: isWorldCup ? 'FIFA World Cup 2026' : (compName || 'International'),
+          basePrice: isWorldCup ? 89 : 25,
+          stadiumName: apiMatch.venue || 'TBD',
+          status: apiMatch.status || 'Scheduled',
+          source: 'api-football',
+          homeScore: apiMatch.goals?.home,
+          awayScore: apiMatch.goals?.away,
+          _sortDate: matchDate || '',
+          _groupId: group,
         });
       }
     });
 
-    liveMatches.forEach(liveMatch => {
+    liveMatches.forEach((liveMatch) => {
       const key = `${liveMatch.homeTeam?.name}-${liveMatch.awayTeam?.name}`;
-      const existingIdx = allMapped.findIndex(m => `${m.homeTeam}-${m.awayTeam}` === key);
+      const existingIdx = allMapped.findIndex((m) => `${m.homeTeam}-${m.awayTeam}` === key);
       const matchDate = liveMatch.date ? liveMatch.date.split('T')[0] : null;
-      if (existingIdx >= 0) { allMapped[existingIdx] = { ...allMapped[existingIdx], status: 'LIVE', homeScore: liveMatch.goals?.home, awayScore: liveMatch.goals?.away, source: 'live' }; }
-      else {
+      if (existingIdx >= 0) {
+        allMapped[existingIdx] = {
+          ...allMapped[existingIdx],
+          status: 'LIVE',
+          homeScore: liveMatch.goals?.home,
+          awayScore: liveMatch.goals?.away,
+          source: 'live',
+        };
+      } else {
         allMapped.push({
-          id: `live-${liveMatch.id}`, homeTeam: liveMatch.homeTeam?.name || 'Home', awayTeam: liveMatch.awayTeam?.name || 'Away',
-          matchDate, matchTime: liveMatch.date ? new Date(liveMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
-          competition: liveMatch.league?.name || 'Live Match', basePrice: null, stadiumName: liveMatch.venue || 'TBD',
-          status: 'LIVE', source: 'live', homeScore: liveMatch.goals?.home, awayScore: liveMatch.goals?.away, _sortDate: matchDate || '', _groupId: ''
+          id: `live-${liveMatch.id}`,
+          homeTeam: liveMatch.homeTeam?.name || 'Home',
+          awayTeam: liveMatch.awayTeam?.name || 'Away',
+          matchDate,
+          matchTime: liveMatch.date ? new Date(liveMatch.date).toTimeString().split(' ')[0].slice(0, 5) : null,
+          competition: liveMatch.league?.name || 'Live Match',
+          basePrice: null,
+          stadiumName: liveMatch.venue || 'TBD',
+          status: 'LIVE',
+          source: 'live',
+          homeScore: liveMatch.goals?.home,
+          awayScore: liveMatch.goals?.away,
+          _sortDate: matchDate || '',
+          _groupId: '',
         });
       }
     });
 
-    allMapped.sort((a, b) => { if (!a._sortDate) return 1; if (!b._sortDate) return -1; return a._sortDate.localeCompare(b._sortDate); });
+    allMapped.sort((a, b) => {
+      if (!a._sortDate) return 1;
+      if (!b._sortDate) return -1;
+      return a._sortDate.localeCompare(b._sortDate);
+    });
 
     let filtered = allMapped;
     const competitionFilter = filters.competition;
-    if (competitionFilter) { filtered = filtered.filter(m => { const c = (m.competition || '').toLowerCase(); const f = competitionFilter.toLowerCase(); return c.includes(f) || c.includes(f.replace(/2026/g, '').trim()); }); }
+    if (competitionFilter) {
+      filtered = filtered.filter((m) => {
+        const c = (m.competition || '').toLowerCase();
+        const f = competitionFilter.toLowerCase();
+        return c.includes(f) || c.includes(f.replace(/2026/g, '').trim());
+      });
+    }
     if (filters.wcGroup && filters.wcGroup !== 'all') {
       const groupMatch = filters.wcGroup.match(/Group ([A-L])/i);
-      if (groupMatch) { const g = groupMatch[1].toUpperCase(); filtered = filtered.filter(m => { const gr = (m._groupId || '').toUpperCase(); return gr.includes(`GROUP ${g}`) || gr.includes(`GROUP_${g}`); }); }
+      if (groupMatch) {
+        const g = groupMatch[1].toUpperCase();
+        filtered = filtered.filter((m) => {
+          const gr = (m._groupId || '').toUpperCase();
+          return gr.includes(`GROUP ${g}`) || gr.includes(`GROUP_${g}`);
+        });
+      }
     }
-    if (filters.team) { const t = filters.team.toLowerCase(); filtered = filtered.filter(m => { const h = (m.homeTeam || '').toLowerCase(); const a = (m.awayTeam || '').toLowerCase(); return h.includes(t) || a.includes(t); }); }
+    if (filters.team) {
+      const t = filters.team.toLowerCase();
+      filtered = filtered.filter((m) => {
+        const h = (m.homeTeam || '').toLowerCase();
+        const a = (m.awayTeam || '').toLowerCase();
+        return h.includes(t) || a.includes(t);
+      });
+    }
     return filtered;
   };
 
   const isLive = (match) => match.status === 'LIVE' || match.status === 'live' || match.source === 'live';
 
+  const getCardBorderClass = (match) => {
+    if (isLive(match)) return 'border-danger';
+    if (match.source === 'api-football') return 'border-primary';
+    return '';
+  };
+
   return (
-    <div style={styles.container}>
-      <Navbar />
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
-        <div style={styles.header}>
-          <h1>⚽ Upcoming Matches</h1>
-          <p>Select a match to view available tickets and seat options</p>
-          {syncMessage && <div style={styles.syncMessage}>{syncMessage}</div>}
+    <div className="min-vh-100 bg-light">
+      <LazyNavbar />
+      <Container className="py-4 py-md-5">
+        <div className="text-center mb-4">
+          <h1 className="h2">⚽ Upcoming Matches</h1>
+          <p className="text-muted">Select a match to view available tickets and seat options</p>
+          {syncMessage && <Alert variant="success" className="d-inline-block mt-2 mb-0">{syncMessage}</Alert>}
         </div>
 
-        <div style={styles.tabs}>
-          <button style={{...styles.tab, ...(activeTab === 'all' ? styles.activeTab : {})}} onClick={() => setActiveTab('all')}>All Matches</button>
-          <button style={{...styles.tab, ...(activeTab === 'local' ? styles.activeTab : {})}} onClick={() => setActiveTab('local')}>Stadium Matches</button>
+        <div className="d-flex justify-content-center flex-wrap gap-2 mb-4">
+          <Button
+            variant={activeTab === 'all' ? 'dark' : 'outline-secondary'}
+            className="rounded-pill"
+            onClick={() => setActiveTab('all')}
+          >
+            All Matches
+          </Button>
+          <Button
+            variant={activeTab === 'local' ? 'dark' : 'outline-secondary'}
+            className="rounded-pill"
+            onClick={() => setActiveTab('local')}
+          >
+            Stadium Matches
+          </Button>
         </div>
 
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.filters : styles.filters}>
-          <div style={styles.filterGroup}>
-            <select style={styles.select} value={filters.competition || ''} onChange={(e) => { handleFilterChange('competition', e.target.value); handleFilterChange('wcGroup', undefined); }}>
+        <div className="d-flex flex-wrap justify-content-center gap-3 mb-4 align-items-start">
+          <div className="d-flex flex-wrap gap-2">
+            <Form.Select
+              value={filters.competition || ''}
+              onChange={(e) => {
+                handleFilterChange('competition', e.target.value);
+                handleFilterChange('wcGroup', undefined);
+              }}
+              style={{ minWidth: '220px' }}
+            >
               <option value="">All Competitions</option>
               <option value="FIFA World Cup 2026">⚽ FIFA World Cup 2026</option>
               <option value="European Championship">🏆 European Championship</option>
@@ -183,124 +262,122 @@ const Matches = () => {
               <option value="UEFA Nations League">🏆 UEFA Nations League</option>
               <option value="Kategoria Superiore">🇦🇱 Kategoria Superiore</option>
               <option value="Football Superleague of Kosova">🇽🇰 Football Superleague of Kosova</option>
-            </select>
+            </Form.Select>
+
             {filters.competition && filters.competition.toLowerCase().includes('world cup') && (
-              <div style={styles.groupDropdownWrapper} onClick={(e) => { e.stopPropagation(); setWcDropdownOpen(!wcDropdownOpen); }}>
-                <div style={{...styles.groupDropdownTrigger, backgroundColor: filters.wcGroup && filters.wcGroup !== 'all' ? '#2c3e50' : '#fff', color: filters.wcGroup && filters.wcGroup !== 'all' ? '#fff' : '#555'}}>
+              <Dropdown>
+                <Dropdown.Toggle
+                  variant={filters.wcGroup && filters.wcGroup !== 'all' ? 'dark' : 'outline-secondary'}
+                  style={{ minWidth: '180px' }}
+                >
                   {filters.wcGroup && filters.wcGroup !== 'all' ? filters.wcGroup : '🌍 Select Group'}
-                  <span style={{marginLeft: '8px'}}>▼</span>
-                </div>
-                {wcDropdownOpen && (
-                  <div style={styles.groupDropdownMenu}>
-                    {wcGroups.map(group => (
-                      <div key={group} style={{...styles.groupDropdownItem, fontWeight: group === filters.wcGroup ? 'bold' : 'normal', backgroundColor: group === filters.wcGroup ? '#f0f0f0' : 'transparent'}}
-                        onClick={() => { handleFilterChange('wcGroup', group === 'All Groups' ? undefined : group); setWcDropdownOpen(false); }}>
-                        {group === 'All Groups' ? '🌍 All Groups' : `📋 ${group}`}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  {wcGroups.map((group) => (
+                    <Dropdown.Item
+                      key={group}
+                      active={group === filters.wcGroup}
+                      onClick={() => handleFilterChange('wcGroup', group === 'All Groups' ? undefined : group)}
+                    >
+                      {group === 'All Groups' ? '🌍 All Groups' : `📋 ${group}`}
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.Menu>
+              </Dropdown>
             )}
           </div>
-          <input type="text" style={styles.input} placeholder="Search team..." value={filters.team || ''} onChange={(e) => handleFilterChange('team', e.target.value)} />
-          <button style={styles.searchBtn} onClick={() => {}}>Search</button>
-          {apiAvailable && <button style={styles.syncBtn} onClick={handleSync} disabled={syncing}>{syncing ? '⏳ Syncing...' : '🔄 Sync Fixtures'}</button>}
+
+          <Form.Control
+            type="text"
+            placeholder="Search team..."
+            value={filters.team || ''}
+            onChange={(e) => handleFilterChange('team', e.target.value)}
+            style={{ minWidth: '180px', maxWidth: '220px' }}
+          />
+          <Button variant="primary">Search</Button>
+          {apiAvailable && (
+            <Button variant="success" onClick={handleSync} disabled={syncing}>
+              {syncing ? '⏳ Syncing...' : '🔄 Sync Fixtures'}
+            </Button>
+          )}
         </div>
 
         {loading ? (
-          <div style={styles.loading}><p>Loading matches...</p></div>
+          <div className="text-center py-5 text-muted">
+            <Spinner animation="border" className="me-2" />
+            Loading matches...
+          </div>
         ) : getDisplayMatches().length === 0 ? (
-          <div style={styles.empty}>
-            <p>No matches found</p>
-            {apiAvailable && <p style={styles.emptyHint}>Try clicking "Sync Fixtures" to import live fixtures</p>}
+          <div className="text-center py-5 text-muted">
+            <p className="mb-1">No matches found</p>
+            {apiAvailable && <p className="small text-primary">Try clicking &quot;Sync Fixtures&quot; to import live fixtures</p>}
           </div>
         ) : (
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.grid : screenSize === 'tablet' ? responsiveStyles.tablet.grid : styles.grid}>
-            {getDisplayMatches().map(match => (
-              <div key={match.id || `${match.homeTeam}-${match.awayTeam}`} style={{...styles.card, borderColor: isLive(match) ? '#e74c3c' : match.source === 'api-football' ? '#3498db' : '#e9ecef'}}>
-                <div style={styles.matchHeader}>
-                  <span style={styles.competition}>{match.competition || 'Match'}</span>
-                  <div style={styles.headerRight}>
-                    {isLive(match) && <span style={styles.liveBadge}>🔴 LIVE</span>}
-                    {match.source === 'api-football' && !isLive(match) && <span style={styles.apiBadge}>🌍</span>}
-                    <span style={styles.timeAgo}>{match.matchDate ? getRelativeTime(match.matchDate, match.matchTime) : 'TBD'}</span>
-                  </div>
-                </div>
-                <div style={styles.teams}>
-                  <span style={styles.team}>{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
-                  <span style={styles.vs}>{isLive(match) && match.homeScore !== null ? `${match.homeScore} - ${match.awayScore}` : 'VS'}</span>
-                  <span style={styles.team}>{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
-                </div>
-                <div style={styles.info}>
-                  <p style={styles.infoItem}>📅 {match.matchDate ? formatDate(match.matchDate) : 'Date TBD'}{match.matchTime ? ` at ${match.matchTime}` : ''}</p>
-                  <p style={styles.infoItem}>🏟️ {match.stadiumName || match.venue || 'TBD'}</p>
-                </div>
-                <div style={styles.footer}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span onClick={() => { if (typeof match.id === 'string' && match.id.startsWith('api-')) return; toggleFavorite(match.id); }} style={{ cursor: typeof match.id === 'string' && match.id.startsWith('api-') ? 'not-allowed' : 'pointer', fontSize: '22px', lineHeight: '1', color: favorites.includes(match.id) ? '#f39c12' : '#bbb', transition: 'color 0.2s, transform 0.2s', display: 'inline-block' }}
-                      onMouseOver={e => e.currentTarget.style.transform = 'scale(1.2)'}
-                      onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
-                      title={favorites.includes(match.id) ? 'Remove from favorites' : 'Add to favorites'}>
-                      {favorites.includes(match.id) ? '★' : '☆'}
-                    </span>
-                    <span style={styles.price}>{match.basePrice ? `From €${match.basePrice}` : isLive(match) ? '🔴 Watch Live' : 'Check venue'}</span>
-                  </div>
-                  {!isLive(match) && match.basePrice ? (
-                    <button style={styles.buyBtn} onClick={() => navigate(`/tickets?matchId=${match.id}`, { state: { match } })}>Buy Tickets</button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Row className="g-4">
+            {getDisplayMatches().map((match) => {
+              const isApi = typeof match.id === 'string' && match.id.startsWith('api-');
+              return (
+                <Col key={match.id || `${match.homeTeam}-${match.awayTeam}`} xs={12} md={6} lg={4}>
+                  <Card className={`h-100 shadow-sm border-2 ${getCardBorderClass(match)}`}>
+                    <Card.Body>
+                      <div className="d-flex justify-content-between mb-3">
+                        <span className="small text-muted text-uppercase">{match.competition || 'Match'}</span>
+                        <div className="d-flex gap-2 align-items-center">
+                          {isLive(match) && <span className="small text-danger fw-bold">🔴 LIVE</span>}
+                          {match.source === 'api-football' && !isLive(match) && <span>🌍</span>}
+                          <span className="small text-success fw-semibold">
+                            {match.matchDate ? getRelativeTime(match.matchDate, match.matchTime) : 'TBD'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
+                        <span className="fw-bold">{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
+                        <span className="text-danger fw-bold">
+                          {isLive(match) && match.homeScore !== null ? `${match.homeScore} - ${match.awayScore}` : 'VS'}
+                        </span>
+                        <span className="fw-bold">{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
+                      </div>
+
+                      <div className="small text-muted mb-3">
+                        <p className="mb-1">📅 {match.matchDate ? formatDate(match.matchDate) : 'Date TBD'}{match.matchTime ? ` at ${match.matchTime}` : ''}</p>
+                        <p className="mb-0">🏟️ {match.stadiumName || match.venue || 'TBD'}</p>
+                      </div>
+
+                      <div className="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <div className="d-flex align-items-center gap-2">
+                          <span
+                            onClick={() => { if (!isApi) toggleFavorite(match.id); }}
+                            className={`favorite-star ${isApi ? 'disabled' : ''}`}
+                            style={{ color: favorites.includes(match.id) ? '#f39c12' : '#bbb' }}
+                            title={favorites.includes(match.id) ? 'Remove from favorites' : 'Add to favorites'}
+                          >
+                            {favorites.includes(match.id) ? '★' : '☆'}
+                          </span>
+                          <span className="fw-bold">
+                            {match.basePrice ? `From €${match.basePrice}` : isLive(match) ? '🔴 Watch Live' : 'Check venue'}
+                          </span>
+                        </div>
+                        {!isLive(match) && match.basePrice && (
+                          <Button
+                            variant="dark"
+                            size="sm"
+                            onClick={() => navigate(`/tickets?matchId=${match.id}`, { state: { match } })}
+                          >
+                            Buy Tickets
+                          </Button>
+                        )}
+                      </div>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              );
+            })}
+          </Row>
         )}
-      </main>
+      </Container>
     </div>
   );
-};
-
-const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#f5f5f5' },
-  main: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' },
-  header: { textAlign: 'center', marginBottom: '20px' },
-  syncMessage: { marginTop: '10px', padding: '8px 16px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '6px', fontSize: '14px', display: 'inline-block' },
-  tabs: { display: 'flex', gap: '8px', marginBottom: '20px', justifyContent: 'center', flexWrap: 'wrap' },
-  tab: { padding: '8px 20px', border: '2px solid #ddd', borderRadius: '20px', backgroundColor: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: '600', color: '#555' },
-  activeTab: { backgroundColor: '#2c3e50', color: 'white', borderColor: '#2c3e50' },
-  filters: { display: 'flex', gap: '16px', marginBottom: '30px', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'flex-start' },
-  filterGroup: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start' },
-  select: { padding: '10px 16px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', minWidth: '220px' },
-  input: { padding: '10px 16px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', minWidth: '180px' },
-  searchBtn: { padding: '10px 24px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' },
-  syncBtn: { padding: '10px 24px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' },
-  groupDropdownWrapper: { position: 'relative', display: 'inline-block', cursor: 'pointer' },
-  groupDropdownTrigger: { padding: '10px 16px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', minWidth: '180px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  groupDropdownMenu: { position: 'absolute', top: '100%', left: 0, backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 1000, minWidth: '200px', maxHeight: '300px', overflowY: 'auto', marginTop: '4px' },
-  groupDropdownItem: { padding: '10px 16px', cursor: 'pointer', fontSize: '14px', borderBottom: '1px solid #f0f0f0' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' },
-  card: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)', border: '2px solid #e9ecef' },
-  matchHeader: { display: 'flex', justifyContent: 'space-between', marginBottom: '16px' },
-  headerRight: { display: 'flex', gap: '8px', alignItems: 'center' },
-  competition: { fontSize: '12px', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  liveBadge: { fontSize: '11px', color: '#e74c3c', fontWeight: 'bold' },
-  apiBadge: { fontSize: '14px' },
-  timeAgo: { fontSize: '12px', color: '#27ae60', fontWeight: '600' },
-  teams: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginBottom: '16px' },
-  team: { fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' },
-  vs: { fontSize: '16px', color: '#e74c3c', fontWeight: '800', minWidth: '50px', textAlign: 'center' },
-  info: { marginBottom: '16px' },
-  infoItem: { fontSize: '14px', color: '#7f8c8d', margin: '4px 0' },
-  footer: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid #eee' },
-  price: { fontSize: '16px', fontWeight: 'bold', color: '#2c3e50' },
-  buyBtn: { padding: '10px 24px', backgroundColor: '#2c3e50', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' },
-  loading: { textAlign: 'center', padding: '60px 20px', color: '#7f8c8d' },
-  empty: { textAlign: 'center', padding: '60px 20px', color: '#7f8c8d' },
-  emptyHint: { fontSize: '14px', marginTop: '8px', color: '#3498db' },
-};
-
-const responsiveStyles = {
-  mobile: { main: { ...styles.main, padding: '20px 15px' }, filters: { ...styles.filters, flexDirection: 'column', alignItems: 'stretch' }, grid: { ...styles.grid, gridTemplateColumns: '1fr', gap: '16px' } },
-  tablet: { main: { ...styles.main, padding: '30px 15px' }, grid: { ...styles.grid, gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' } }
 };
 
 export default Matches;

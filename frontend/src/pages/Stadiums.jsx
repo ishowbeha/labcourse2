@@ -1,38 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Container, Row, Col, Card, Button, Modal, Form, Alert, Badge,
+} from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import Navbar from '../components/Navbar';
+import LazyNavbar from '../components/layout/LazyNavbar';
 import axios from 'axios';
 import OrderService from '../services/OrderService';
-
-// Custom hook for responsive styles
-const useResponsiveStyles = () => {
-  const [screenSize, setScreenSize] = useState('desktop');
-
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      if (width <= 768) {
-        setScreenSize('mobile');
-      } else if (width <= 1024) {
-        setScreenSize('tablet');
-      } else {
-        setScreenSize('desktop');
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return screenSize;
-};
 
 const Stadiums = () => {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
-  const screenSize = useResponsiveStyles();
 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedStadium, setSelectedStadium] = useState(null);
@@ -588,562 +566,219 @@ const Stadiums = () => {
     }
   ];
 
+  const paymentMethods = [
+    { id: 'credit-card', name: 'Credit Card', icon: '💳' },
+    { id: 'paypal', name: 'PayPal', icon: '🅿️' },
+    { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
+  ];
+
   return (
-    <div style={styles.container}>
-      <Navbar />
+    <div className="min-vh-100 bg-light">
+      <LazyNavbar />
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
-        <div style={styles.header}>
-          <h1>🏟️ Stadiums</h1>
-          <p>Explore our partner stadiums and their seating arrangements</p>
+      <Container className="py-4 py-md-5">
+        <div className="text-center mb-4">
+          <h1 className="h2">🏟️ Stadiums</h1>
+          <p className="text-muted">Explore our partner stadiums and their seating arrangements</p>
         </div>
 
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.grid : screenSize === 'tablet' ? responsiveStyles.tablet.grid : styles.grid}>
+        <Row className="g-4">
           {stadiums.map(stadium => (
-            <div key={stadium.id} style={styles.card}>
-              <div style={styles.cardHeader}>
-                <div>
-                  <h3 style={styles.stadiumName}>{stadium.name}</h3>
-                  <span style={styles.city}>{stadium.city}, {stadium.country}</span>
-                </div>
-              </div>
-              
-              <p style={styles.description}>{stadium.description}</p>
-              
-              <div style={styles.info}>
-                <div style={styles.infoItem}>
-                  <span style={styles.infoLabel}>Capacity</span>
-                  <span style={styles.infoValue}>{stadium.capacity.toLocaleString()} seats</span>
-                </div>
-                <div style={styles.infoItem}>
-                  <span style={styles.infoLabel}>Opened</span>
-                  <span style={styles.infoValue}>{stadium.opened}</span>
-                </div>
-              </div>
-
-              <div style={styles.sections}>
-                <h4 style={styles.sectionsTitle}>Seating Sections</h4>
-                {stadium.sections.map((section, idx) => (
-                  <div key={idx} style={styles.sectionRow}>
-                    <span style={styles.sectionName}>{section.name}</span>
-                    <span style={styles.sectionSeats}>{section.seats.toLocaleString()} seats</span>
-                    <span style={styles.sectionPrice}>x{section.priceMultiplier}</span>
+            <Col key={stadium.id} xs={12} md={6} xl={4}>
+              <Card className="h-100 shadow-sm border-0 d-flex flex-column">
+                <Card.Body className="d-flex flex-column">
+                  <div className="mb-3">
+                    <Card.Title className="h5">{stadium.name}</Card.Title>
+                    <Badge bg="primary">{stadium.city}, {stadium.country}</Badge>
                   </div>
-                ))}
-              </div>
 
-              <div style={styles.buttonGroup}>
-                <button style={styles.mapBtn} onClick={() => handleViewMap(stadium)}>🗺️ View Map</button>
-                <button style={styles.buyPassBtn} onClick={() => handleBuyPass(stadium)}>🎟️ Buy Season Pass</button>
-              </div>
-            </div>
+                  <Card.Text className="text-muted small">{stadium.description}</Card.Text>
+
+                  <div className="d-flex gap-4 bg-light rounded p-3 mb-3">
+                    <div>
+                      <div className="small text-muted">Capacity</div>
+                      <div className="fw-bold">{stadium.capacity.toLocaleString()} seats</div>
+                    </div>
+                    <div>
+                      <div className="small text-muted">Opened</div>
+                      <div className="fw-bold">{stadium.opened}</div>
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <h4 className="h6">Seating Sections</h4>
+                    {stadium.sections.map((section, idx) => (
+                      <div key={idx} className="d-flex justify-content-between py-2 border-bottom small">
+                        <span className="fw-medium">{section.name}</span>
+                        <span className="text-muted">{section.seats.toLocaleString()} seats</span>
+                        <span className="text-success fw-semibold">x{section.priceMultiplier}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="d-flex gap-2 mt-auto">
+                    <Button variant="outline-secondary" className="flex-fill" onClick={() => handleViewMap(stadium)}>
+                      🗺️ View Map
+                    </Button>
+                    <Button variant="success" className="flex-fill" onClick={() => handleBuyPass(stadium)}>
+                      🎟️ Buy Season Pass
+                    </Button>
+                  </div>
+                </Card.Body>
+              </Card>
+            </Col>
           ))}
-        </div>
+        </Row>
+      </Container>
 
-        {/* Purchase Pass Modal */}
-        {showPurchaseModal && selectedStadium && (
-          <div style={styles.modalOverlay} onClick={() => setShowPurchaseModal(false)}>
-            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>🎫 Buy Season Stadium Pass</h2>
-                <button style={styles.modalCloseBtn} onClick={() => setShowPurchaseModal(false)}>&times;</button>
-              </div>
+      <Modal show={showPurchaseModal && !!selectedStadium} onHide={() => setShowPurchaseModal(false)} centered scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>🎫 Buy Season Stadium Pass</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedStadium && !purchaseSuccess ? (
+            <>
+              <Alert variant="light" className="border">
+                <Alert.Heading as="h6" className="mb-2">🏟️ Selected Stadium</Alert.Heading>
+                <p className="fw-bold mb-1">{selectedStadium.name}</p>
+                <p className="text-muted small mb-0">{selectedStadium.city}, {selectedStadium.country}</p>
+              </Alert>
 
-              {!purchaseSuccess ? (
-                <>
-                  <div style={styles.summaryBox}>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50' }}>🏟️ Selected Stadium</h4>
-                    <p style={{ margin: 0, fontWeight: 'bold', fontSize: '16px' }}>{selectedStadium.name}</p>
-                    <p style={{ margin: '4px 0 0 0', color: '#7f8c8d', fontSize: '14px' }}>{selectedStadium.city}, {selectedStadium.country}</p>
-                  </div>
+              <Alert variant="light" className="border">
+                <Alert.Heading as="h6" className="mb-2">🎁 Season Pass Benefits</Alert.Heading>
+                <ul className="small mb-0 ps-3">
+                  <li>Access to all matches at {selectedStadium.name} for 1 year</li>
+                  <li>Priority booking & reservation window</li>
+                  <li>15% off official club merch & food inside stadium</li>
+                  <li>Dedicated fast-track VIP entrance lanes</li>
+                </ul>
+              </Alert>
 
-                  <div style={styles.summaryBox}>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50' }}>🎁 Season Pass Benefits</h4>
-                    <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
-                      <li>Access to all matches at {selectedStadium.name} for 1 year</li>
-                      <li>Priority booking & reservation window</li>
-                      <li>15% off official club merch & food inside stadium</li>
-                      <li>Dedicated fast-track VIP entrance lanes</li>
-                    </ul>
-                  </div>
-
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={styles.sectionsTitle}>Select Payment Method</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {[
-                        { id: 'credit-card', name: 'Credit Card', icon: '💳' },
-                        { id: 'paypal', name: 'PayPal', icon: '🅿️' },
-                        { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' }
-                      ].map(pm => (
-                        <div
-                          key={pm.id}
-                          style={{
-                            ...styles.paymentCard,
-                            borderColor: paymentMethod === pm.id ? '#2c3e50' : '#e9ecef',
-                            backgroundColor: paymentMethod === pm.id ? '#f0f4f8' : 'white',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: '2px solid #e9ecef',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px'
-                          }}
-                          onClick={() => setPaymentMethod(pm.id)}
-                        >
-                          <span>{pm.icon}</span>
-                          <span style={{ fontWeight: '600', fontSize: '14px' }}>{pm.name}</span>
-                          {paymentMethod === pm.id && <span style={{ marginLeft: 'auto', color: '#27ae60', fontWeight: 'bold' }}>✓</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {paymentMethod === 'credit-card' && (
-                    <div style={{ ...styles.cardForm, padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={styles.formLabel}>Card Number</label>
-                        <input style={styles.formInput} placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
-                      </div>
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={styles.formLabel}>Cardholder Name</label>
-                        <input style={styles.formInput} placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
-                      </div>
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={styles.formLabel}>Expiry Date</label>
-                          <input style={styles.formInput} placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={styles.formLabel}>CVC</label>
-                          <input style={styles.formInput} placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {error && <div style={{ ...styles.errorBanner, margin: '10px 0' }}>{error}</div>}
-
-                  <div style={{ ...styles.priceBreakdown, padding: '12px', borderRadius: '8px', backgroundColor: '#f8f9fa', marginBottom: '20px' }}>
-                    <div style={styles.summaryRow}><span>Original Price</span><span style={{ textDecoration: 'line-through', color: '#999' }}>€299.99</span></div>
-                    <div style={styles.summaryRow}><span style={{ color: '#27ae60' }}>Season Pass Discount (33%)</span><span style={{ color: '#27ae60', fontWeight: 'bold' }}>-€100.00</span></div>
-                    <div style={{ ...styles.summaryRow, ...styles.totalRow, borderTop: '1px solid #ddd', paddingTop: '8px', marginTop: '8px' }}>
-                      <span>Total Price</span>
-                      <span style={{ fontWeight: 'bold', fontSize: '18px', color: '#2c3e50' }}>€199.99</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button style={{ ...styles.secondaryBtn, flex: 1 }} onClick={() => setShowPurchaseModal(false)}>Cancel</button>
-                    <button
-                      style={{ ...styles.primaryBtn, backgroundColor: '#27ae60', flex: 1.5, opacity: purchasing || !paymentMethod ? 0.6 : 1 }}
-                      onClick={handleConfirmPurchase}
-                      disabled={purchasing || !paymentMethod}
+              <Form.Group className="mb-4">
+                <Form.Label className="fw-semibold">Select Payment Method</Form.Label>
+                <div className="d-flex flex-column gap-2">
+                  {paymentMethods.map(pm => (
+                    <Card
+                      key={pm.id}
+                      className={`mb-0 ${paymentMethod === pm.id ? 'border-dark bg-light' : ''}`}
+                      role="button"
+                      onClick={() => setPaymentMethod(pm.id)}
                     >
-                      {purchasing ? '⏳ Processing...' : '✅ Purchase Pass (€199.99)'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <span style={{ fontSize: '64px' }}>✅</span>
-                  <h3 style={{ color: '#27ae60', margin: '16px 0 8px 0' }}>Season Pass Activated!</h3>
-                  <p style={{ color: '#555', fontSize: '14px', lineHeight: '1.5' }}>
-                    Congratulations! You have successfully purchased a 1-Year Season Stadium Pass for <strong>{selectedStadium.name}</strong>.
-                  </p>
-                  <div style={{ backgroundColor: '#f8f9fa', padding: '12px', borderRadius: '8px', margin: '20px 0', fontSize: '14px' }}>
-                    <p style={{ margin: '0 0 6px 0', fontWeight: '600' }}>Order Number: {lastOrderNum}</p>
-                    <p style={{ margin: 0 }}>Valid until: {new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]}</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                    <button style={styles.primaryBtn} onClick={() => { setShowPurchaseModal(false); navigate('/orders'); }}>View My Orders</button>
-                    <button style={styles.secondaryBtn} onClick={() => { setShowPurchaseModal(false); setPurchaseSuccess(false); }}>Close</button>
-                  </div>
+                      <Card.Body className="py-2 d-flex align-items-center gap-2">
+                        <span>{pm.icon}</span>
+                        <span className="fw-semibold small">{pm.name}</span>
+                        {paymentMethod === pm.id && <span className="ms-auto text-success fw-bold">✓</span>}
+                      </Card.Body>
+                    </Card>
+                  ))}
                 </div>
+              </Form.Group>
+
+              {paymentMethod === 'credit-card' && (
+                <Card className="mb-4">
+                  <Card.Body>
+                    <Form.Group className="mb-3">
+                      <Form.Label className="small fw-semibold">Card Number</Form.Label>
+                      <Form.Control placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
+                    </Form.Group>
+                    <Form.Group className="mb-3">
+                      <Form.Label className="small fw-semibold">Cardholder Name</Form.Label>
+                      <Form.Control placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
+                    </Form.Group>
+                    <Row>
+                      <Col>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="small fw-semibold">Expiry Date</Form.Label>
+                          <Form.Control placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
+                        </Form.Group>
+                      </Col>
+                      <Col>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="small fw-semibold">CVC</Form.Label>
+                          <Form.Control placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* View Map Modal */}
-        {showMapModal && mapStadium && (
-          <div style={styles.modalOverlay} onClick={() => setShowMapModal(false)}>
-            <div style={{ ...styles.modal, width: '600px' }} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>🗺️ {mapStadium.name} - Location Map</h2>
-                <button style={styles.modalCloseBtn} onClick={() => setShowMapModal(false)}>&times;</button>
-              </div>
-              
-              <div style={{ marginBottom: '16px' }}>
-                <p style={{ margin: '0 0 4px 0', fontWeight: 'bold' }}>{mapStadium.name}</p>
-                <p style={{ margin: 0, color: '#7f8c8d', fontSize: '14px' }}>Location: {mapStadium.city}, {mapStadium.country}</p>
-              </div>
+              {error && <Alert variant="danger">{error}</Alert>}
 
-              <div style={{ 
-                width: '100%', 
-                height: '350px', 
-                backgroundColor: '#e5e9f0', 
-                borderRadius: '12px', 
-                position: 'relative', 
-                overflow: 'hidden', 
-                border: '1px solid #ccc',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundImage: 'radial-gradient(circle, #d8dee9 10%, transparent 10%), radial-gradient(circle, #d8dee9 10%, transparent 10%)',
-                  backgroundSize: '20px 20px',
-                  backgroundPosition: '0 0, 10px 10px',
-                  opacity: 0.5
-                }} />
-                
-                <div style={{ width: '100%', height: '4px', backgroundColor: '#d8dee9', position: 'absolute', top: '40%', transform: 'rotate(-15deg)' }} />
-                <div style={{ width: '100%', height: '4px', backgroundColor: '#d8dee9', position: 'absolute', top: '60%', transform: 'rotate(25deg)' }} />
-                <div style={{ width: '4px', height: '100%', backgroundColor: '#d8dee9', position: 'absolute', left: '30%', transform: 'rotate(5deg)' }} />
-                <div style={{ width: '4px', height: '100%', backgroundColor: '#d8dee9', position: 'absolute', left: '70%', transform: 'rotate(-5deg)' }} />
-
-                <div style={{
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ fontSize: '48px' }}>🏟️</span>
-                  <div style={{ 
-                    backgroundColor: '#2c3e50', 
-                    color: 'white', 
-                    padding: '8px 16px', 
-                    borderRadius: '20px', 
-                    fontSize: '13px', 
-                    fontWeight: 'bold',
-                    boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
-                  }}>
-                    {mapStadium.name}
+              <Card className="bg-light">
+                <Card.Body className="py-2">
+                  <div className="d-flex justify-content-between small py-1">
+                    <span>Original Price</span>
+                    <span className="text-muted text-decoration-line-through">€299.99</span>
                   </div>
-                  <div style={{ 
-                    width: '12px', 
-                    height: '12px', 
-                    backgroundColor: '#3498db', 
-                    borderRadius: '50%', 
-                    border: '2px solid white',
-                    boxShadow: '0 0 0 6px rgba(52, 152, 219, 0.4)'
-                  }} />
-                </div>
-
-                <div style={{
-                  position: 'absolute',
-                  bottom: '12px',
-                  right: '12px',
-                  backgroundColor: 'rgba(255,255,255,0.9)',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  color: '#555'
-                }}>
-                  Lat: {(30 + mapStadium.id * 1.5).toFixed(4)}°, Lon: {(-90 - mapStadium.id * 2.3).toFixed(4)}°
-                </div>
-              </div>
-              
-              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                <button style={styles.primaryBtn} onClick={() => setShowMapModal(false)}>Close Map</button>
+                  <div className="d-flex justify-content-between small py-1 text-success">
+                    <span>Season Pass Discount (33%)</span>
+                    <span className="fw-bold">-€100.00</span>
+                  </div>
+                  <div className="d-flex justify-content-between pt-2 mt-2 border-top fw-bold">
+                    <span>Total Price</span>
+                    <span className="fs-5">€199.99</span>
+                  </div>
+                </Card.Body>
+              </Card>
+            </>
+          ) : selectedStadium && purchaseSuccess ? (
+            <div className="text-center py-3">
+              <div className="display-3">✅</div>
+              <h3 className="text-success mt-3">Season Pass Activated!</h3>
+              <p className="text-muted small">
+                Congratulations! You have successfully purchased a 1-Year Season Stadium Pass for <strong>{selectedStadium.name}</strong>.
+              </p>
+              <Alert variant="light" className="text-start small">
+                <p className="mb-1 fw-semibold">Order Number: {lastOrderNum}</p>
+                <p className="mb-0">Valid until: {new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]}</p>
+              </Alert>
+              <div className="d-flex gap-2 justify-content-center flex-wrap">
+                <Button variant="dark" onClick={() => { setShowPurchaseModal(false); navigate('/orders'); }}>View My Orders</Button>
+                <Button variant="outline-secondary" onClick={() => { setShowPurchaseModal(false); setPurchaseSuccess(false); }}>Close</Button>
               </div>
             </div>
-          </div>
+          ) : null}
+        </Modal.Body>
+        {selectedStadium && !purchaseSuccess && (
+          <Modal.Footer>
+            <Button variant="outline-secondary" onClick={() => setShowPurchaseModal(false)}>Cancel</Button>
+            <Button variant="success" onClick={handleConfirmPurchase} disabled={purchasing || !paymentMethod}>
+              {purchasing ? '⏳ Processing...' : '✅ Purchase Pass (€199.99)'}
+            </Button>
+          </Modal.Footer>
         )}
-      </main>
+      </Modal>
+
+      <Modal show={showMapModal && !!mapStadium} onHide={() => setShowMapModal(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>🗺️ {mapStadium?.name} - Location Map</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {mapStadium && (
+            <>
+              <p className="fw-bold mb-1">{mapStadium.name}</p>
+              <p className="text-muted small mb-3">Location: {mapStadium.city}, {mapStadium.country}</p>
+
+              <div className="stadium-map-preview rounded border position-relative overflow-hidden d-flex align-items-center justify-content-center">
+                <div className="text-center position-relative z-1">
+                  <div className="display-4">🏟️</div>
+                  <Badge bg="dark" className="px-3 py-2 mt-2">{mapStadium.name}</Badge>
+                  <div className="map-marker-dot mx-auto mt-2" />
+                </div>
+                <Badge bg="light" text="dark" className="position-absolute bottom-0 end-0 m-2 font-monospace small">
+                  Lat: {(30 + mapStadium.id * 1.5).toFixed(4)}°, Lon: {(-90 - mapStadium.id * 2.3).toFixed(4)}°
+                </Badge>
+              </div>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="dark" onClick={() => setShowMapModal(false)}>Close Map</Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-    gap: '24px',
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '24px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '12px',
-  },
-  stadiumName: {
-    margin: '0',
-    fontSize: '18px',
-    color: '#2c3e50',
-    flex: 1,
-  },
-  city: {
-    backgroundColor: '#3498db',
-    color: 'white',
-    padding: '4px 12px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    display: 'inline-block',
-    marginTop: '6px',
-  },
-  description: {
-    fontSize: '14px',
-    color: '#7f8c8d',
-    marginBottom: '16px',
-    lineHeight: '1.5',
-  },
-  info: {
-    display: 'flex',
-    gap: '24px',
-    marginBottom: '16px',
-    padding: '12px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-  },
-  infoItem: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  infoLabel: {
-    fontSize: '12px',
-    color: '#7f8c8d',
-  },
-  infoValue: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  sections: {
-    marginBottom: '16px',
-  },
-  sectionsTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '14px',
-    color: '#2c3e50',
-  },
-  sectionRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '8px 0',
-    borderBottom: '1px solid #eee',
-    fontSize: '14px',
-  },
-  sectionName: {
-    color: '#2c3e50',
-    fontWeight: '500',
-  },
-  sectionSeats: {
-    color: '#7f8c8d',
-  },
-  sectionPrice: {
-    color: '#27ae60',
-    fontWeight: '600',
-  },
-  buttonGroup: {
-    display: 'flex',
-    gap: '10px',
-    marginTop: 'auto',
-  },
-  mapBtn: {
-    flex: 1,
-    padding: '12px',
-    backgroundColor: '#f0f2f5',
-    color: '#2c3e50',
-    border: '1px solid #dcdfe6',
-    borderRadius: '8px',
-    fontSize: '13px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  buyPassBtn: {
-    flex: 1.5,
-    padding: '12px',
-    backgroundColor: '#27ae60',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '13px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    backdropFilter: 'blur(3px)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000,
-  },
-  modal: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '16px',
-    width: '500px',
-    maxWidth: '90%',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-    position: 'relative',
-    textAlign: 'left',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  modalCloseBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '28px',
-    fontWeight: '300',
-    color: '#95a5a6',
-    cursor: 'pointer',
-    padding: '0 8px',
-    lineHeight: 1,
-    transition: 'color 0.2s',
-  },
-  summaryBox: {
-    backgroundColor: '#f8f9fa',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    border: '1px solid #e9ecef',
-  },
-  paymentCard: {
-    transition: 'all 0.2s',
-  },
-  cardForm: {
-    backgroundColor: '#fff',
-    border: '1px solid #e9ecef',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-  },
-  formLabel: {
-    display: 'block',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: '4px',
-  },
-  formInput: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  },
-  errorBanner: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    padding: '10px 12px',
-    borderRadius: '6px',
-    fontSize: '13px',
-    textAlign: 'center',
-  },
-  priceBreakdown: {
-    border: '1px solid #e9ecef',
-  },
-  summaryRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '4px 0',
-    fontSize: '13px',
-    color: '#555',
-  },
-  totalRow: {
-    fontWeight: 'bold',
-    fontSize: '15px',
-    color: '#2c3e50',
-  },
-  primaryBtn: {
-    padding: '10px 16px',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  secondaryBtn: {
-    padding: '10px 16px',
-    backgroundColor: 'transparent',
-    color: '#2c3e50',
-    border: '1px solid #2c3e50',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    main: {
-      ...styles.main,
-      padding: '20px 15px',
-    },
-    grid: {
-      ...styles.grid,
-      gridTemplateColumns: '1fr',
-      gap: '16px',
-    },
-  },
-  tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    grid: {
-      ...styles.grid,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '20px',
-    },
-  }
 };
 
 export default Stadiums;

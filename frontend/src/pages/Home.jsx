@@ -1,44 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Container, Row, Col, Card, Button, Modal, Form, Alert, Badge, Spinner,
+} from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import Navbar from '../components/Navbar';
+import LazyNavbar from '../components/layout/LazyNavbar';
 import MatchService from '../services/MatchService';
 import FootballService from '../services/FootballService';
 import { getFlagEmoji } from '../utils/flags';
 import axios from 'axios';
 import OrderService from '../services/OrderService';
 
-// Custom hook for responsive styles
-const useResponsiveStyles = () => {
-  const [screenSize, setScreenSize] = useState('desktop');
-
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      if (width <= 768) {
-        setScreenSize('mobile');
-      } else if (width <= 1024) {
-        setScreenSize('tablet');
-      } else {
-        setScreenSize('desktop');
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return screenSize;
-};
-
 const Home = () => {
   const { user, isAdmin, logout } = useAuth();
   const { connected, onlineCount } = useSocket();
   const [upcomingMatches, setUpcomingMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
-  const screenSize = useResponsiveStyles();
   const navigate = useNavigate();
 
   const [showVipModal, setShowVipModal] = useState(false);
@@ -55,7 +33,6 @@ const Home = () => {
   const [userOrders, setUserOrders] = useState([]);
   const [allUpcomingMatches, setAllUpcomingMatches] = useState([]);
 
-  // Fetch orders from API and localStorage
   const fetchUserOrders = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -72,7 +49,6 @@ const Home = () => {
     } catch (err) {
       console.warn('Failed to fetch orders from API in Home.jsx:', err);
     }
-    // Fallback to localStorage
     const localOrders = OrderService.getOrders();
     setUserOrders(localOrders || []);
   };
@@ -92,15 +68,14 @@ const Home = () => {
     return digits;
   };
 
-  // Determine if the user has already bought a VIP pass this calendar month
   const today = new Date();
   const currentYearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-  
+
   const hasVipThisMonth = userOrders.some(order => {
     const notesStr = order.notes || '';
     const isVipPass = notesStr.includes('VIP Match Experience');
     if (!isVipPass) return false;
-    
+
     const dateStr = order.created_at || order.date || '';
     return dateStr.startsWith(currentYearMonth);
   });
@@ -109,9 +84,8 @@ const Home = () => {
     if (!matchData) return 150;
     const basePrice = matchData.basePrice || matchData.base_price || 89;
     const stadium = (matchData.stadiumName || matchData.stadium_name || '').toLowerCase();
-    
-    // Multipliers based on stadium name
-    let multiplier = 1.7; // default fallback
+
+    let multiplier = 1.7;
     if (stadium.includes('mercedes-benz')) multiplier = 4.5;
     else if (stadium.includes('gillette')) multiplier = 4.0;
     else if (stadium.includes('at&t')) multiplier = 4.0;
@@ -138,13 +112,12 @@ const Home = () => {
     else if (stadium.includes('mitrovica')) multiplier = 1.5;
     else if (stadium.includes('ferizaj')) multiplier = 1.3;
     else if (stadium.includes('peja')) multiplier = 1.3;
-    
+
     const calculated = basePrice * multiplier;
     return Math.min(150, Math.round(calculated * 100) / 100);
   };
 
   const handleBuyVipExperience = () => {
-    // Refresh orders to make sure constraint check is up-to-date
     fetchUserOrders();
     setVipMatchId(allUpcomingMatches[0]?.id || '');
     setPaymentMethod('');
@@ -186,7 +159,7 @@ const Home = () => {
       const originalPrice = selectedMatch ? getMatchVipPrice(selectedMatch) : 150.00;
       const discountAmount = Math.round(originalPrice * 0.28 * 100) / 100;
       const finalPrice = Math.round((originalPrice - discountAmount) * 100) / 100;
-      
+
       const pmName = [
         { id: 'credit-card', name: 'Credit Card' },
         { id: 'paypal', name: 'PayPal' },
@@ -204,7 +177,6 @@ const Home = () => {
       let orderNumber = '';
       let apiPurchaseSucceeded = false;
 
-      // Save order to backend
       try {
         const token = localStorage.getItem('token');
         const response = await axios.post('/api/orders/simple-purchase', {
@@ -233,7 +205,6 @@ const Home = () => {
         orderNumber = OrderService.generateOrderNumber();
       }
 
-      // Save order to localStorage
       const order = {
         id: Date.now() + Math.random(),
         orderNumber,
@@ -256,7 +227,6 @@ const Home = () => {
       };
       OrderService.saveOrder(order);
 
-      // Log activity
       try {
         const token = localStorage.getItem('token');
         await axios.post('/api/logs/activity', {
@@ -271,7 +241,6 @@ const Home = () => {
         });
       } catch (e) {}
 
-      // Refresh orders immediately so hasVipThisMonth is updated
       fetchUserOrders();
       setLastOrderNum(orderNumber);
       setPurchaseSuccess(true);
@@ -315,16 +284,13 @@ const Home = () => {
 
   const fetchUpcomingMatches = async () => {
     try {
-      // Fetch both local DB matches and API matches
       const [localMatches, apiData] = await Promise.all([
         MatchService.getUpcomingMatches().catch(() => []),
         FootballService.getUpcomingFootballMatches(50).catch(() => [])
       ]);
 
-      // Combine local matches with API matches that are FIFA World Cup 2026
       const allMatches = [];
 
-      // Add local WC matches
       localMatches.forEach(m => {
         if ((m.competition || '').toLowerCase().includes('world cup')) {
           allMatches.push({
@@ -334,7 +300,6 @@ const Home = () => {
         }
       });
 
-      // Add API WC matches (avoiding duplicates with local ones)
       const localKeys = new Set();
       localMatches.forEach(m => {
         if ((m.competition || '').toLowerCase().includes('world cup')) {
@@ -367,22 +332,19 @@ const Home = () => {
         }
       });
 
-      // Sort by date (closest first), filter out past matches, and take top 4
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
+      const todayStr = now.toISOString().split('T')[0];
       const currentTime = now.toTimeString().split(' ')[0].substring(0, 5);
 
       const upcomingSorted = allMatches
         .filter(m => {
           if (!m._sortDate) return false;
-          // Exclude past matches
-          // Exclude Brazil vs Serbia match (removed upon request)
           const home = (m.homeTeam || '').toLowerCase();
           const away = (m.awayTeam || '').toLowerCase();
           if ((home.includes('brazil') && away.includes('serbia')) || (home.includes('serbia') && away.includes('brazil'))) {
             return false;
           }
-          return m._sortDate > today || (m._sortDate === today && (!m.matchTime || m.matchTime >= currentTime));
+          return m._sortDate > todayStr || (m._sortDate === todayStr && (!m.matchTime || m.matchTime >= currentTime));
         })
         .sort((a, b) => {
           if (!a._sortDate) return 1;
@@ -403,10 +365,10 @@ const Home = () => {
     if (!dateString || dateString === 'TBD' || dateString === 'TBA') return 'To Be Announced';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'To Be Announced';
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -415,906 +377,351 @@ const Home = () => {
   const currentDiscount = Math.round(currentVipPrice * 0.28 * 100) / 100;
   const currentTotal = Math.round((currentVipPrice - currentDiscount) * 100) / 100;
 
-  return (
-    <div style={styles.container}>
-      <Navbar />
+  const vipSelectedMatch = allUpcomingMatches.find(m => m.id === vipMatchId);
 
-      <main style={screenSize === 'mobile' ? responsiveStyles.mobile.main : screenSize === 'tablet' ? responsiveStyles.tablet.main : styles.main}>
-        <div style={styles.welcome}>
-          <h1>🏟️ Welcome, {user?.firstName || user?.first_name}!</h1>
-          <p style={styles.subtitle}>Stadium Ticket Management System</p>
+  const offers = [
+    {
+      badge: 'BEST VALUE',
+      badgeVariant: 'success',
+      icon: '🏟️',
+      title: 'Season Stadium Pass',
+      description: 'Get unlimited access to all matches at your favorite stadium for an entire year! Perfect for die-hard fans who never want to miss a game.',
+      originalPrice: '€299.99',
+      currentPrice: '€199.99/year',
+      discount: 'Save 33%',
+      features: ['Access to ALL home matches', 'Priority seat selection', '10% off merchandise', 'Exclusive fan events'],
+      onClick: () => navigate('/stadiums'),
+      buttonText: 'Choose Your Stadium →',
+    },
+    {
+      badge: 'POPULAR',
+      badgeVariant: 'primary',
+      icon: '👨‍👩‍👧‍👦',
+      title: 'Family Pack (4 Tickets)',
+      description: 'Bring the whole family to the match! Get 4 tickets at a special price with snacks and drinks included.',
+      originalPrice: '€120.00',
+      currentPrice: '€89.99/match',
+      discount: 'Save 25%',
+      features: ['4 match tickets', 'Snack & drink combo', 'Kids activity pack', 'Flexible date selection'],
+      onClick: () => navigate('/matches'),
+      buttonText: 'Book Now →',
+    },
+    {
+      badge: 'PREMIUM',
+      badgeVariant: 'warning',
+      icon: '⭐',
+      title: 'VIP Match Experience',
+      description: 'Experience the ultimate match day with VIP treatment. Premium seating, hospitality lounge, and meet & greet opportunities.',
+      originalPrice: '€150.00',
+      currentPrice: '€108.00/match',
+      discount: 'Save 28%',
+      features: ['VIP lounge access', 'Premium seating', 'Gourmet dining', 'Free parking'],
+      onClick: handleBuyVipExperience,
+      buttonText: 'Upgrade Your Experience →',
+    },
+  ];
+
+  const quickActions = [
+    { href: '/matches', icon: '⚽', label: 'Browse Matches' },
+    { href: '/stadiums', icon: '🏟️', label: 'View Stadiums' },
+    { href: '/tickets', icon: '🎫', label: 'My Tickets' },
+    { href: '/orders', icon: '📋', label: 'Order History' },
+  ];
+
+  const paymentMethods = [
+    { id: 'credit-card', name: 'Credit Card', icon: '💳' },
+    { id: 'paypal', name: 'PayPal', icon: '🅿️' },
+    { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
+  ];
+
+  return (
+    <div className="min-vh-100 bg-light">
+      <LazyNavbar />
+
+      <Container className="py-4 py-md-5">
+        <div className="text-center mb-4 mb-md-5">
+          <h1 className="h2">🏟️ Welcome, {user?.firstName || user?.first_name}!</h1>
+          <p className="text-muted fs-5">Stadium Ticket Management System</p>
           {connected && (
-            <p style={styles.onlineStatus}>
-              <span style={styles.onlineDot}></span>
+            <p className="text-success small mb-0">
+              <span className="d-inline-block rounded-circle bg-success me-1 online-dot" />
               {onlineCount} user{onlineCount !== 1 ? 's' : ''} online
             </p>
           )}
         </div>
 
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.dashboard : screenSize === 'tablet' ? responsiveStyles.tablet.dashboard : styles.dashboard}>
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>⚽ Matches</h3>
-            <p>Browse upcoming football matches and purchase tickets.</p>
-            <a href="/matches" style={styles.cardLink}>View Matches →</a>
-          </div>
+        <Row className="g-4 mb-4 mb-md-5">
+          <Col md={6} lg={4}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body>
+                <Card.Title>⚽ Matches</Card.Title>
+                <Card.Text>Browse upcoming football matches and purchase tickets.</Card.Text>
+                <Card.Link href="/matches">View Matches →</Card.Link>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} lg={4}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body>
+                <Card.Title>🎫 My Tickets</Card.Title>
+                <Card.Text>View and manage your purchased tickets.</Card.Text>
+                <Card.Link href="/tickets">View Tickets →</Card.Link>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} lg={4}>
+            <Card className="h-100 shadow-sm border-0">
+              <Card.Body>
+                <Card.Title>📋 Orders</Card.Title>
+                <Card.Text>Check your order history and status.</Card.Text>
+                <Card.Link href="/orders">View Orders →</Card.Link>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
 
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>🎫 My Tickets</h3>
-            <p>View and manage your purchased tickets.</p>
-            <a href="/tickets" style={styles.cardLink}>View Tickets →</a>
-          </div>
-
-          <div style={styles.card}>
-            <h3 style={styles.cardTitle}>📋 Orders</h3>
-            <p>Check your order history and status.</p>
-            <a href="/orders" style={styles.cardLink}>View Orders →</a>
-          </div>
-        </div>
-
-        {/* Upcoming Featured Matches */}
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.section : screenSize === 'tablet' ? responsiveStyles.tablet.section : styles.section}>
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.sectionHeader : styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>🔥 Upcoming Featured Matches</h2>
-            <a href="/matches" style={styles.viewAllLink}>View All Matches →</a>
-          </div>
-          
-          {loadingMatches ? (
-            <div style={styles.loadingText}>Loading matches...</div>
-          ) : upcomingMatches.length > 0 ? (
-            <div style={screenSize === 'mobile' ? responsiveStyles.mobile.matchesGrid : screenSize === 'tablet' ? responsiveStyles.tablet.matchesGrid : styles.matchesGrid}>
-              {upcomingMatches.map(match => (
-                <div key={match.id} style={styles.matchCard}>
-                  <div style={styles.matchTeams}>
-                    <span style={styles.teamName}>{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
-                    <span style={styles.vs}>VS</span>
-                    <span style={styles.teamName}>{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
-                  </div>
-                  <div style={styles.matchInfo}>
-                    <span style={styles.matchDate}>📅 {formatDate(match.matchDate)}</span>
-                    <span style={styles.matchCompetition}>🏆 {match.competition || 'FIFA World Cup 2026'}</span>
-                  </div>
-                  <div style={styles.matchFooter}>
-                    <span style={styles.matchStadium}>{getRealStadium(match.homeTeam, match.stadiumName)}</span>
-                    <button
-                      onClick={() => navigate(`/tickets?matchId=${match.id}`, { state: { match } })}
-                      style={styles.buyTicketsBtn}
-                    >
-                      Get Tickets →
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={styles.noMatches}>No upcoming matches available at the moment.</div>
-          )}
-        </div>
-
-        {/* Special Offers */}
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.section : screenSize === 'tablet' ? responsiveStyles.tablet.section : styles.section}>
-          <h2 style={styles.sectionTitle}>🎁 Special Offers & Promotions</h2>
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.offersGrid : screenSize === 'tablet' ? responsiveStyles.tablet.offersGrid : styles.offersGrid}>
-            {/* Yearly Stadium Pass */}
-            <div style={styles.offerCard}>
-              <div style={styles.offerBadge}>BEST VALUE</div>
-              <div style={styles.offerHeader}>
-                <span style={styles.offerIcon}>🏟️</span>
-                <h3 style={styles.offerTitle}>Season Stadium Pass</h3>
-              </div>
-              <p style={styles.offerDescription}>
-                Get unlimited access to all matches at your favorite stadium for an entire year! 
-                Perfect for die-hard fans who never want to miss a game.
-              </p>
-              <div style={styles.offerPricing}>
-                <span style={styles.offerOriginalPrice}>€299.99</span>
-                <span style={styles.offerCurrentPrice}>€199.99/year</span>
-                <span style={styles.offerDiscount}>Save 33%</span>
-              </div>
-              <div style={styles.offerFeatures}>
-                <div style={styles.offerFeature}>✓ Access to ALL home matches</div>
-                <div style={styles.offerFeature}>✓ Priority seat selection</div>
-                <div style={styles.offerFeature}>✓ 10% off merchandise</div>
-                <div style={styles.offerFeature}>✓ Exclusive fan events</div>
-              </div>
-              <button onClick={() => navigate('/stadiums')} style={styles.offerBtn}>
-                Choose Your Stadium →
-              </button>
+        <Card className="shadow-sm border-0 mb-4">
+          <Card.Body>
+            <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-4">
+              <Card.Title as="h2" className="h4 mb-0">🔥 Upcoming Featured Matches</Card.Title>
+              <Card.Link href="/matches">View All Matches →</Card.Link>
             </div>
 
-            {/* Family Package */}
-            <div style={styles.offerCard}>
-              <div style={styles.offerBadgeSecondary}>POPULAR</div>
-              <div style={styles.offerHeader}>
-                <span style={styles.offerIcon}>👨‍👩‍👧‍👦</span>
-                <h3 style={styles.offerTitle}>Family Pack (4 Tickets)</h3>
+            {loadingMatches ? (
+              <div className="text-center py-4">
+                <Spinner animation="border" size="sm" role="status" />
+                <span className="text-muted ms-2">Loading matches...</span>
               </div>
-              <p style={styles.offerDescription}>
-                Bring the whole family to the match! Get 4 tickets at a special price 
-                with snacks and drinks included.
-              </p>
-              <div style={styles.offerPricing}>
-                <span style={styles.offerOriginalPrice}>€120.00</span>
-                <span style={styles.offerCurrentPrice}>€89.99/match</span>
-                <span style={styles.offerDiscount}>Save 25%</span>
-              </div>
-              <div style={styles.offerFeatures}>
-                <div style={styles.offerFeature}>✓ 4 match tickets</div>
-                <div style={styles.offerFeature}>✓ Snack & drink combo</div>
-                <div style={styles.offerFeature}>✓ Kids activity pack</div>
-                <div style={styles.offerFeature}>✓ Flexible date selection</div>
-              </div>
-              <button onClick={() => navigate('/matches')} style={styles.offerBtn}>
-                Book Now →
-              </button>
-            </div>
+            ) : upcomingMatches.length > 0 ? (
+              <Row className="g-3">
+                {upcomingMatches.map(match => (
+                  <Col key={match.id} md={6} lg={4}>
+                    <Card className="bg-light h-100">
+                      <Card.Body>
+                        <div className="d-flex justify-content-center align-items-center gap-2 mb-3 flex-wrap">
+                          <span className="fw-semibold">{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
+                          <Badge bg="danger">VS</Badge>
+                          <span className="fw-semibold">{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center py-2 border-top border-bottom mb-3 small">
+                          <span>📅 {formatDate(match.matchDate)}</span>
+                          <Badge bg="warning" text="dark">🏆 {match.competition || 'FIFA World Cup 2026'}</Badge>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <small className="text-muted">{getRealStadium(match.homeTeam, match.stadiumName)}</small>
+                          <Button
+                            size="sm"
+                            variant="success"
+                            onClick={() => navigate(`/tickets?matchId=${match.id}`, { state: { match } })}
+                          >
+                            Get Tickets →
+                          </Button>
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <p className="text-center text-muted fst-italic mb-0">No upcoming matches available at the moment.</p>
+            )}
+          </Card.Body>
+        </Card>
 
-            {/* VIP Experience */}
-            <div style={styles.offerCard}>
-              <div style={styles.offerBadgePremium}>PREMIUM</div>
-              <div style={styles.offerHeader}>
-                <span style={styles.offerIcon}>⭐</span>
-                <h3 style={styles.offerTitle}>VIP Match Experience</h3>
-              </div>
-              <p style={styles.offerDescription}>
-                Experience the ultimate match day with VIP treatment. 
-                Premium seating, hospitality lounge, and meet & greet opportunities.
-              </p>
-              <div style={styles.offerPricing}>
-                <span style={styles.offerOriginalPrice}>€150.00</span>
-                <span style={styles.offerCurrentPrice}>€108.00/match</span>
-                <span style={styles.offerDiscount}>Save 28%</span>
-              </div>
-              <div style={styles.offerFeatures}>
-                <div style={styles.offerFeature}>✓ VIP lounge access</div>
-                <div style={styles.offerFeature}>✓ Premium seating</div>
-                <div style={styles.offerFeature}>✓ Gourmet dining</div>
-                <div style={styles.offerFeature}>✓ Free parking</div>
-              </div>
-              <button onClick={handleBuyVipExperience} style={styles.offerBtn}>
-                Upgrade Your Experience →
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div style={screenSize === 'mobile' ? responsiveStyles.mobile.section : screenSize === 'tablet' ? responsiveStyles.tablet.section : styles.section}>
-          <h2 style={styles.sectionTitle}>⚡ Quick Actions</h2>
-          <div style={screenSize === 'mobile' ? responsiveStyles.mobile.quickActions : screenSize === 'tablet' ? responsiveStyles.tablet.quickActions : styles.quickActions}>
-            <a href="/matches" style={styles.quickActionBtn}>
-              <span style={styles.quickActionIcon}>⚽</span>
-              <span>Browse Matches</span>
-            </a>
-            <a href="/stadiums" style={styles.quickActionBtn}>
-              <span style={styles.quickActionIcon}>🏟️</span>
-              <span>View Stadiums</span>
-            </a>
-            <a href="/tickets" style={styles.quickActionBtn}>
-              <span style={styles.quickActionIcon}>🎫</span>
-              <span>My Tickets</span>
-            </a>
-            <a href="/orders" style={styles.quickActionBtn}>
-              <span style={styles.quickActionIcon}>📋</span>
-              <span>Order History</span>
-            </a>
-          </div>
-        </div>
-
-        {/* VIP Match Experience Modal */}
-        {showVipModal && (
-          <div style={styles.modalOverlay} onClick={() => setShowVipModal(false)}>
-            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>⭐ VIP Match Experience Upgrade</h2>
-                <button style={styles.modalCloseBtn} onClick={() => setShowVipModal(false)}>&times;</button>
-              </div>
-
-              {!purchaseSuccess ? (
-                <>
-                  <div style={styles.summaryBox}>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#2c3e50' }}>🎁 VIP Premium Benefits</h4>
-                    <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
-                      <li>Access to VIP hospitality lounge & gourmet dining</li>
-                      <li>Best category seat selection at the stadium</li>
-                      <li>Free stadium parking voucher & activity guide</li>
-                      <li>VIP fast-track security access lanes</li>
-                    </ul>
-                  </div>
-
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={styles.sectionsTitle}>Select Match for VIP Upgrade</h4>
-                    {allUpcomingMatches.length > 0 ? (
-                      <select
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px solid #e9ecef',
-                          borderRadius: '8px',
-                          fontSize: '14px',
-                          color: '#2c3e50',
-                          backgroundColor: '#f8f9fa',
-                          fontWeight: '600',
-                          outline: 'none',
-                          cursor: 'pointer'
-                        }}
-                        value={vipMatchId}
-                        onChange={(e) => setVipMatchId(e.target.value)}
-                      >
-                        {allUpcomingMatches.map(m => (
-                          <option key={m.id} value={m.id}>
-                            {m.homeTeam} vs {m.awayTeam} ({formatDate(m.matchDate)})
-                          </option>
+        <Card className="shadow-sm border-0 mb-4">
+          <Card.Body>
+            <Card.Title as="h2" className="h4 mb-4">🎁 Special Offers & Promotions</Card.Title>
+            <Row className="g-4">
+              {offers.map((offer) => (
+                <Col key={offer.title} md={6} lg={4}>
+                  <Card className="h-100 border-2 position-relative overflow-hidden">
+                    <Badge bg={offer.badgeVariant} className="position-absolute top-0 end-0 m-2 offer-ribbon">
+                      {offer.badge}
+                    </Badge>
+                    <Card.Body className="d-flex flex-column">
+                      <div className="d-flex align-items-center gap-2 mb-2 mt-2">
+                        <span className="fs-3">{offer.icon}</span>
+                        <Card.Title className="h5 mb-0">{offer.title}</Card.Title>
+                      </div>
+                      <Card.Text className="small text-muted">{offer.description}</Card.Text>
+                      <div className="bg-light rounded p-3 mb-3 d-flex flex-wrap align-items-center gap-2">
+                        <span className="text-muted text-decoration-line-through">{offer.originalPrice}</span>
+                        <span className="text-danger fw-bold fs-5">{offer.currentPrice}</span>
+                        <Badge bg="danger">{offer.discount}</Badge>
+                      </div>
+                      <ul className="list-unstyled small flex-grow-1 mb-3">
+                        {offer.features.map((f) => (
+                          <li key={f} className="py-1">✓ {f}</li>
                         ))}
-                      </select>
-                    ) : (
-                      <p style={{ margin: 0, color: '#e74c3c', fontSize: '14px', fontWeight: '600' }}>No upcoming matches available for VIP upgrade.</p>
-                    )}
-                  </div>
+                      </ul>
+                      <Button variant="dark" className="w-100 mt-auto" onClick={offer.onClick}>
+                        {offer.buttonText}
+                      </Button>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </Card.Body>
+        </Card>
 
-                  {hasVipThisMonth && (
-                    <div style={{ ...styles.errorBanner, margin: '0 0 20px 0', backgroundColor: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
-                      ⚠️ <strong>Monthly Limit Exceeded:</strong> You have already purchased a VIP Match Experience this calendar month. Limit: 1 per month.
-                    </div>
-                  )}
+        <Card className="shadow-sm border-0">
+          <Card.Body>
+            <Card.Title as="h2" className="h4 mb-4">⚡ Quick Actions</Card.Title>
+            <Row className="g-3">
+              {quickActions.map((action) => (
+                <Col key={action.href} xs={12} sm={6} md={3}>
+                  <a href={action.href} className="d-flex align-items-center gap-3 p-3 bg-light rounded text-decoration-none text-dark border fw-semibold quick-action-link">
+                    <span className="fs-4">{action.icon}</span>
+                    <span>{action.label}</span>
+                  </a>
+                </Col>
+              ))}
+            </Row>
+          </Card.Body>
+        </Card>
+      </Container>
 
-                  <div style={{ marginBottom: '20px' }}>
-                    <h4 style={styles.sectionsTitle}>Select Payment Method</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {[
-                        { id: 'credit-card', name: 'Credit Card', icon: '💳' },
-                        { id: 'paypal', name: 'PayPal', icon: '🅿️' },
-                        { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' }
-                      ].map(pm => (
-                        <div
-                          key={pm.id}
-                          style={{
-                            ...styles.paymentCard,
-                            borderColor: paymentMethod === pm.id ? '#2c3e50' : '#e9ecef',
-                            backgroundColor: paymentMethod === pm.id ? '#f0f4f8' : 'white',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: '2px solid #e9ecef',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px'
-                          }}
-                          onClick={() => {
-                            if (!hasVipThisMonth) setPaymentMethod(pm.id);
-                          }}
-                        >
-                          <span>{pm.icon}</span>
-                          <span style={{ fontWeight: '600', fontSize: '14px' }}>{pm.name}</span>
-                          {paymentMethod === pm.id && <span style={{ marginLeft: 'auto', color: '#27ae60', fontWeight: 'bold' }}>✓</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+      <Modal show={showVipModal} onHide={() => setShowVipModal(false)} centered scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title>⭐ VIP Match Experience Upgrade</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {!purchaseSuccess ? (
+            <>
+              <Alert variant="light" className="border">
+                <Alert.Heading as="h6" className="mb-2">🎁 VIP Premium Benefits</Alert.Heading>
+                <ul className="small mb-0 ps-3">
+                  <li>Access to VIP hospitality lounge & gourmet dining</li>
+                  <li>Best category seat selection at the stadium</li>
+                  <li>Free stadium parking voucher & activity guide</li>
+                  <li>VIP fast-track security access lanes</li>
+                </ul>
+              </Alert>
 
-                  {paymentMethod === 'credit-card' && !hasVipThisMonth && (
-                    <div style={{ ...styles.cardForm, padding: '16px', borderRadius: '8px', marginBottom: '20px' }}>
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={styles.formLabel}>Card Number</label>
-                        <input style={styles.formInput} placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
-                      </div>
-                      <div style={{ marginBottom: '12px' }}>
-                        <label style={styles.formLabel}>Cardholder Name</label>
-                        <input style={styles.formInput} placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
-                      </div>
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={styles.formLabel}>Expiry Date</label>
-                          <input style={styles.formInput} placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <label style={styles.formLabel}>CVC</label>
-                          <input style={styles.formInput} placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+              <Form.Group className="mb-4">
+                <Form.Label className="fw-semibold">Select Match for VIP Upgrade</Form.Label>
+                {allUpcomingMatches.length > 0 ? (
+                  <Form.Select value={vipMatchId} onChange={(e) => setVipMatchId(e.target.value)}>
+                    {allUpcomingMatches.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.homeTeam} vs {m.awayTeam} ({formatDate(m.matchDate)})
+                      </option>
+                    ))}
+                  </Form.Select>
+                ) : (
+                  <Alert variant="danger" className="mb-0 py-2">No upcoming matches available for VIP upgrade.</Alert>
+                )}
+              </Form.Group>
 
-                  {error && <div style={{ ...styles.errorBanner, margin: '10px 0' }}>{error}</div>}
-
-                  <div style={{ ...styles.priceBreakdown, padding: '12px', borderRadius: '8px', backgroundColor: '#f8f9fa', marginBottom: '20px' }}>
-                    <div style={styles.summaryRow}><span>Original Price</span><span style={{ textDecoration: 'line-through', color: '#999' }}>€{currentVipPrice.toFixed(2)}</span></div>
-                    <div style={styles.summaryRow}><span style={{ color: '#27ae60' }}>VIP Package Discount (28%)</span><span style={{ color: '#27ae60', fontWeight: 'bold' }}>-€{currentDiscount.toFixed(2)}</span></div>
-                    <div style={{ ...styles.summaryRow, ...styles.totalRow, borderTop: '1px solid #ddd', paddingTop: '8px', marginTop: '8px' }}>
-                      <span>Total Price</span>
-                      <span style={{ fontWeight: 'bold', fontSize: '18px', color: '#2c3e50' }}>€{currentTotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button style={{ ...styles.secondaryBtn, flex: 1 }} onClick={() => setShowVipModal(false)}>Cancel</button>
-                    <button
-                      style={{ ...styles.primaryBtn, backgroundColor: '#27ae60', flex: 1.5, opacity: purchasing || !paymentMethod || hasVipThisMonth ? 0.6 : 1 }}
-                      onClick={handleConfirmVipPurchase}
-                      disabled={purchasing || !paymentMethod || hasVipThisMonth}
-                    >
-                      {purchasing ? '⏳ Processing...' : `✅ Purchase VIP Pass (€${currentTotal.toFixed(2)})`}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <span style={{ fontSize: '64px' }}>✅</span>
-                  <h3 style={{ color: '#27ae60', margin: '16px 0 8px 0' }}>VIP Upgrade Activated!</h3>
-                  <p style={{ color: '#555', fontSize: '14px', lineHeight: '1.5' }}>
-                    Congratulations! You have successfully upgraded to the VIP Match Experience for <strong>{allUpcomingMatches.find(m => m.id === vipMatchId) ? `${allUpcomingMatches.find(m => m.id === vipMatchId).homeTeam} vs ${allUpcomingMatches.find(m => m.id === vipMatchId).awayTeam}` : 'your selected match'}</strong>.
-                  </p>
-                  <div style={{ backgroundColor: '#f8f9fa', padding: '12px', borderRadius: '8px', margin: '20px 0', fontSize: '14px' }}>
-                    <p style={{ margin: '0 0 6px 0', fontWeight: '600' }}>Order Number: {lastOrderNum}</p>
-                    <p style={{ margin: 0 }}>VIP Pass status: Active</p>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                    <button style={styles.primaryBtn} onClick={() => { setShowVipModal(false); navigate('/orders'); }}>View My Orders</button>
-                    <button style={styles.secondaryBtn} onClick={() => { setShowVipModal(false); setPurchaseSuccess(false); }}>Close</button>
-                  </div>
-                </div>
+              {hasVipThisMonth && (
+                <Alert variant="warning">
+                  ⚠️ <strong>Monthly Limit Exceeded:</strong> You have already purchased a VIP Match Experience this calendar month. Limit: 1 per month.
+                </Alert>
               )}
+
+              <Form.Group className="mb-4">
+                <Form.Label className="fw-semibold">Select Payment Method</Form.Label>
+                <div className="d-flex flex-column gap-2">
+                  {paymentMethods.map(pm => (
+                    <Card
+                      key={pm.id}
+                      className={`mb-0 ${paymentMethod === pm.id ? 'border-dark bg-light' : ''}`}
+                      role="button"
+                      onClick={() => { if (!hasVipThisMonth) setPaymentMethod(pm.id); }}
+                    >
+                      <Card.Body className="py-2 d-flex align-items-center gap-2">
+                        <span>{pm.icon}</span>
+                        <span className="fw-semibold small">{pm.name}</span>
+                        {paymentMethod === pm.id && <span className="ms-auto text-success fw-bold">✓</span>}
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </div>
+              </Form.Group>
+
+              {paymentMethod === 'credit-card' && !hasVipThisMonth && (
+                <Card className="mb-4">
+                  <Card.Body>
+                    <Form.Group className="mb-3">
+                      <Form.Label className="small fw-semibold">Card Number</Form.Label>
+                      <Form.Control placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
+                    </Form.Group>
+                    <Form.Group className="mb-3">
+                      <Form.Label className="small fw-semibold">Cardholder Name</Form.Label>
+                      <Form.Control placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
+                    </Form.Group>
+                    <Row>
+                      <Col>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="small fw-semibold">Expiry Date</Form.Label>
+                          <Form.Control placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
+                        </Form.Group>
+                      </Col>
+                      <Col>
+                        <Form.Group className="mb-0">
+                          <Form.Label className="small fw-semibold">CVC</Form.Label>
+                          <Form.Control placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  </Card.Body>
+                </Card>
+              )}
+
+              {error && <Alert variant="danger">{error}</Alert>}
+
+              <Card className="bg-light mb-0">
+                <Card.Body className="py-2">
+                  <div className="d-flex justify-content-between small py-1">
+                    <span>Original Price</span>
+                    <span className="text-muted text-decoration-line-through">€{currentVipPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="d-flex justify-content-between small py-1 text-success">
+                    <span>VIP Package Discount (28%)</span>
+                    <span className="fw-bold">-€{currentDiscount.toFixed(2)}</span>
+                  </div>
+                  <div className="d-flex justify-content-between pt-2 mt-2 border-top fw-bold">
+                    <span>Total Price</span>
+                    <span className="fs-5">€{currentTotal.toFixed(2)}</span>
+                  </div>
+                </Card.Body>
+              </Card>
+            </>
+          ) : (
+            <div className="text-center py-3">
+              <div className="display-3">✅</div>
+              <h3 className="text-success mt-3">VIP Upgrade Activated!</h3>
+              <p className="text-muted small">
+                Congratulations! You have successfully upgraded to the VIP Match Experience for{' '}
+                <strong>{vipSelectedMatch ? `${vipSelectedMatch.homeTeam} vs ${vipSelectedMatch.awayTeam}` : 'your selected match'}</strong>.
+              </p>
+              <Alert variant="light" className="text-start small">
+                <p className="mb-1 fw-semibold">Order Number: {lastOrderNum}</p>
+                <p className="mb-0">VIP Pass status: Active</p>
+              </Alert>
+              <div className="d-flex gap-2 justify-content-center flex-wrap">
+                <Button variant="dark" onClick={() => { setShowVipModal(false); navigate('/orders'); }}>View My Orders</Button>
+                <Button variant="outline-secondary" onClick={() => { setShowVipModal(false); setPurchaseSuccess(false); }}>Close</Button>
+              </div>
             </div>
-          </div>
+          )}
+        </Modal.Body>
+        {!purchaseSuccess && (
+          <Modal.Footer>
+            <Button variant="outline-secondary" onClick={() => setShowVipModal(false)}>Cancel</Button>
+            <Button
+              variant="success"
+              onClick={handleConfirmVipPurchase}
+              disabled={purchasing || !paymentMethod || hasVipThisMonth}
+            >
+              {purchasing ? '⏳ Processing...' : `✅ Purchase VIP Pass (€${currentTotal.toFixed(2)})`}
+            </Button>
+          </Modal.Footer>
         )}
-      </main>
+      </Modal>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-  },
-  nav: {
-    backgroundColor: '#2c3e50',
-    padding: '15px 0',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  navContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '0 20px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  navTitle: {
-    color: 'white',
-    fontSize: '20px',
-    fontWeight: 'bold',
-  },
-  navLinks: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  navLink: {
-    color: 'white',
-    textDecoration: 'none',
-    fontSize: '14px',
-  },
-  userName: {
-    color: '#bdc3c7',
-    fontSize: '14px',
-  },
-  logoutBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid white',
-    color: 'white',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '13px',
-  },
-  main: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
-  welcome: {
-    textAlign: 'center',
-    marginBottom: '40px',
-  },
-  subtitle: {
-    color: '#7f8c8d',
-    fontSize: '18px',
-    marginTop: '10px',
-  },
-  onlineStatus: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    fontSize: '14px',
-    color: '#27ae60',
-    marginTop: '10px',
-  },
-  onlineDot: {
-    width: '8px',
-    height: '8px',
-    backgroundColor: '#27ae60',
-    borderRadius: '50%',
-    animation: 'pulse 2s infinite',
-  },
-  dashboard: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '20px',
-    marginBottom: '40px',
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-  },
-  cardTitle: {
-    margin: '0 0 12px 0',
-    fontSize: '18px',
-    color: '#2c3e50',
-  },
-  cardLink: {
-    display: 'inline-block',
-    marginTop: '12px',
-    color: '#3498db',
-    textDecoration: 'none',
-    fontWeight: '600',
-  },
-  section: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '12px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-    marginBottom: '30px',
-  },
-  sectionHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-  },
-  sectionTitle: {
-    margin: '0',
-    color: '#2c3e50',
-  },
-  viewAllLink: {
-    color: '#3498db',
-    textDecoration: 'none',
-    fontWeight: '600',
-    fontSize: '14px',
-  },
-  loadingText: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#7f8c8d',
-  },
-  noMatches: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#7f8c8d',
-    fontStyle: 'italic',
-  },
-  matchesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '16px',
-  },
-  matchCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    padding: '16px',
-    border: '1px solid #e9ecef',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-  },
-  matchTeams: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '12px',
-  },
-  teamName: {
-    fontWeight: '600',
-    fontSize: '16px',
-    color: '#2c3e50',
-  },
-  vs: {
-    color: '#e74c3c',
-    fontWeight: 'bold',
-    fontSize: '12px',
-  },
-  matchInfo: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '12px',
-    padding: '8px 0',
-    borderTop: '1px solid #dee2e6',
-    borderBottom: '1px solid #dee2e6',
-  },
-  matchDate: {
-    fontSize: '13px',
-    color: '#555',
-  },
-  matchCompetition: {
-    fontSize: '12px',
-    color: '#f39c12',
-    backgroundColor: '#fef9e7',
-    padding: '2px 8px',
-    borderRadius: '4px',
-  },
-  matchFooter: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  matchStadium: {
-    fontSize: '12px',
-    color: '#7f8c8d',
-  },
-  buyTicketsBtn: {
-    backgroundColor: '#27ae60',
-    color: 'white',
-    padding: '6px 16px',
-    borderRadius: '6px',
-    textDecoration: 'none',
-    fontSize: '13px',
-    fontWeight: '600',
-    transition: 'background-color 0.2s',
-    border: 'none',
-    cursor: 'pointer',
-  },
-  quickActions: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px',
-  },
-  quickActionBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    textDecoration: 'none',
-    color: '#2c3e50',
-    fontWeight: '600',
-    transition: 'background-color 0.2s, transform 0.2s',
-    border: '1px solid #e9ecef',
-  },
-  quickActionIcon: {
-    fontSize: '24px',
-  },
-  // Special Offers styles
-  offersGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '20px',
-  },
-  offerCard: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '24px',
-    border: '2px solid #e9ecef',
-    position: 'relative',
-    overflow: 'hidden',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  offerBadge: {
-    position: 'absolute',
-    top: '12px',
-    right: '-30px',
-    backgroundColor: '#27ae60',
-    color: 'white',
-    padding: '4px 40px',
-    fontSize: '11px',
-    fontWeight: 'bold',
-    transform: 'rotate(45deg)',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-  },
-  offerBadgeSecondary: {
-    position: 'absolute',
-    top: '12px',
-    right: '-25px',
-    backgroundColor: '#3498db',
-    color: 'white',
-    padding: '4px 35px',
-    fontSize: '11px',
-    fontWeight: 'bold',
-    transform: 'rotate(45deg)',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-  },
-  offerBadgePremium: {
-    position: 'absolute',
-    top: '12px',
-    right: '-25px',
-    backgroundColor: '#f39c12',
-    color: 'white',
-    padding: '4px 35px',
-    fontSize: '11px',
-    fontWeight: 'bold',
-    transform: 'rotate(45deg)',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-  },
-  offerHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginBottom: '12px',
-    marginTop: '8px',
-  },
-  offerIcon: {
-    fontSize: '32px',
-  },
-  offerTitle: {
-    margin: '0',
-    fontSize: '18px',
-    color: '#2c3e50',
-    fontWeight: '700',
-  },
-  offerDescription: {
-    fontSize: '14px',
-    color: '#555',
-    lineHeight: '1.5',
-    marginBottom: '16px',
-  },
-  offerPricing: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    flexWrap: 'wrap',
-    marginBottom: '16px',
-    padding: '12px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-  },
-  offerOriginalPrice: {
-    fontSize: '16px',
-    color: '#95a5a6',
-    textDecoration: 'line-through',
-  },
-  offerCurrentPrice: {
-    fontSize: '22px',
-    color: '#e74c3c',
-    fontWeight: '700',
-  },
-  offerDiscount: {
-    backgroundColor: '#e74c3c',
-    color: 'white',
-    padding: '2px 8px',
-    borderRadius: '4px',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  offerFeatures: {
-    marginBottom: '20px',
-    flexGrow: 1,
-  },
-  offerFeature: {
-    fontSize: '13px',
-    color: '#2c3e50',
-    padding: '4px 0',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  offerBtn: {
-    display: 'block',
-    width: '100%',
-    border: 'none',
-    cursor: 'pointer',
-    textAlign: 'center',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    textDecoration: 'none',
-    fontWeight: '600',
-    fontSize: '14px',
-    transition: 'background-color 0.2s',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    backdropFilter: 'blur(3px)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000,
-  },
-  modal: {
-    backgroundColor: 'white',
-    padding: '24px',
-    borderRadius: '16px',
-    width: '500px',
-    maxWidth: '90%',
-    maxHeight: '90vh',
-    overflowY: 'auto',
-    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.2)',
-    position: 'relative',
-    textAlign: 'left',
-  },
-  modalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '20px',
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-  },
-  modalTitle: {
-    margin: 0,
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  modalCloseBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '28px',
-    fontWeight: '300',
-    color: '#95a5a6',
-    cursor: 'pointer',
-    padding: '0 8px',
-    lineHeight: 1,
-    transition: 'color 0.2s',
-  },
-  summaryBox: {
-    backgroundColor: '#f8f9fa',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    border: '1px solid #e9ecef',
-  },
-  sectionsTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '14px',
-    color: '#2c3e50',
-    fontWeight: '600'
-  },
-  paymentCard: {
-    transition: 'all 0.2s',
-  },
-  cardForm: {
-    backgroundColor: '#fff',
-    border: '1px solid #e9ecef',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-  },
-  formLabel: {
-    display: 'block',
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: '4px',
-  },
-  formInput: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  },
-  errorBanner: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    padding: '10px 12px',
-    borderRadius: '6px',
-    fontSize: '13px',
-    textAlign: 'center',
-  },
-  priceBreakdown: {
-    border: '1px solid #e9ecef',
-  },
-  summaryRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '4px 0',
-    fontSize: '13px',
-    color: '#555',
-  },
-  totalRow: {
-    fontWeight: 'bold',
-    fontSize: '15px',
-    color: '#2c3e50',
-  },
-  primaryBtn: {
-    padding: '10px 16px',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  secondaryBtn: {
-    padding: '10px 16px',
-    backgroundColor: 'transparent',
-    color: '#2c3e50',
-    border: '1px solid #2c3e50',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    main: {
-      ...styles.main,
-      padding: '20px 15px',
-    },
-    dashboard: {
-      ...styles.dashboard,
-      gridTemplateColumns: '1fr',
-      gap: '15px',
-    },
-    section: {
-      ...styles.section,
-      padding: '16px',
-    },
-    sectionHeader: {
-      ...styles.sectionHeader,
-      flexDirection: 'column',
-      alignItems: 'flex-start',
-      gap: '10px',
-    },
-    matchesGrid: {
-      ...styles.matchesGrid,
-      gridTemplateColumns: '1fr',
-      gap: '12px',
-    },
-    offersGrid: {
-      ...styles.offersGrid,
-      gridTemplateColumns: '1fr',
-      gap: '16px',
-    },
-    quickActions: {
-      ...styles.quickActions,
-      gridTemplateColumns: '1fr',
-      gap: '12px',
-    },
-  },
-  tablet: {
-    main: {
-      ...styles.main,
-      padding: '30px 15px',
-    },
-    dashboard: {
-      ...styles.dashboard,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '16px',
-    },
-    section: {
-      ...styles.section,
-      padding: '20px',
-    },
-    matchesGrid: {
-      ...styles.matchesGrid,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '14px',
-    },
-    offersGrid: {
-      ...styles.offersGrid,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '16px',
-    },
-    quickActions: {
-      ...styles.quickActions,
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '14px',
-    },
-  }
 };
 
 export default Home;

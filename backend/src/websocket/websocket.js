@@ -52,8 +52,16 @@ const setupWebSocket = (io, pool) => {
     // Join user to their own room
     socket.join(`user:${socket.userId}`);
 
+    const getOnlineUsersPayload = () => ({
+      count: connectedUsers.size,
+      users: Array.from(connectedUsers.entries()).map(([userId, info]) => ({
+        userId: Number(userId),
+        ...info,
+      })),
+    });
+
     // Broadcast online user count
-    io.emit('online-users', { count: connectedUsers.size, users: Array.from(connectedUsers.values()) });
+    io.emit('online-users', getOnlineUsersPayload());
 
     // Send welcome message
     socket.emit('welcome', {
@@ -76,11 +84,15 @@ const setupWebSocket = (io, pool) => {
         status: 'delivered'
       };
 
-      // Save message to database using pool
+      // Save message for recipient and sender history
       try {
         await pool.query(
-          'INSERT INTO notifications (user_id, type, title, message, is_read, created_at) VALUES (?, ?, ?, ?, false, NOW())',
-          [to, 'message', `New message from ${socket.userName}`, message]
+          'INSERT INTO notifications (user_id, type, title, message, is_read, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, false, ?, NOW(), NOW())',
+          [to, 'message', `New message from ${socket.userName}`, message, socket.userId]
+        );
+        await pool.query(
+          'INSERT INTO notifications (user_id, type, title, message, is_read, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, true, ?, NOW(), NOW())',
+          [socket.userId, 'message_sent', `Message to user #${to}`, message, socket.userId]
         );
       } catch (error) {
         console.error('Error saving message:', error.message);
@@ -129,7 +141,7 @@ const setupWebSocket = (io, pool) => {
       connectedUsers.delete(socket.userId);
       
       // Broadcast updated online count
-      io.emit('online-users', { count: connectedUsers.size, users: Array.from(connectedUsers.values()) });
+      io.emit('online-users', getOnlineUsersPayload());
     });
   });
 

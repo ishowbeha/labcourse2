@@ -11,5 +11,18 @@ export default defineConfig({
         changeOrigin: true
       }
     }
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-bootstrap': ['react-bootstrap', 'bootstrap'],
+          'vendor-zustand': ['zustand'],
+          'vendor-pdf': ['jspdf'],
+          'vendor-socket': ['socket.io-client'],
+        },
+      },
+    },
+  },
 })

@@ -30,7 +30,8 @@ const defineAssociations = () => {
   User.hasMany(Order, { foreignKey: 'userId', as: 'orders' });
   User.hasMany(Order, { foreignKey: 'createdBy', as: 'createdOrders' });
   User.hasMany(Payment, { foreignKey: 'createdBy', as: 'createdPayments' });
-  User.hasMany(Setting, { foreignKey: 'createdBy' });
+  User.hasMany(Setting, { foreignKey: 'createdBy', as: 'createdSettings' });
+  User.hasMany(Setting, { foreignKey: 'updatedBy', as: 'updatedSettings' });
 
   // Role associations
   Role.belongsToMany(User, { through: UserRole, foreignKey: 'roleId', otherKey: 'userId' });

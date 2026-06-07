@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
-import useResponsiveStyles from '../hooks/useResponsiveStyles';
 
 const Login = () => {
-  const screenSize = useResponsiveStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,9 +17,8 @@ const Login = () => {
     setLoading(true);
 
     const result = await login(email, password);
-    
+
     if (result.success) {
-      // Role-based redirection
       if (isAdmin()) {
         navigate('/admin/dashboard');
       } else {
@@ -29,196 +27,74 @@ const Login = () => {
     } else {
       setError(result.message);
     }
-    
+
     setLoading(false);
   };
 
   return (
-    <div style={screenSize === 'mobile' ? responsiveStyles.mobile.container : styles.container}>
-      <div style={screenSize === 'mobile' ? responsiveStyles.mobile.card : styles.card}>
-        <div style={styles.header}>
-          <h1 style={styles.title}>🏟️ Stadium Tickets</h1>
-          <p style={styles.subtitle}>Sign in to your account</p>
-        </div>
+    <div className="min-vh-100 d-flex align-items-center bg-light py-4">
+      <Container>
+        <Row className="justify-content-center">
+          <Col xs={12} sm={10} md={8} lg={5} xl={4}>
+            <Card className="shadow border-0">
+              <Card.Body className="p-4 p-md-5">
+                <div className="text-center mb-4">
+                  <h1 className="h3 text-dark">🏟️ Stadium Tickets</h1>
+                  <p className="text-muted mb-0">Sign in to your account</p>
+                </div>
 
-        {error && (
-          <div style={styles.error}>
-            {error}
-          </div>
-        )}
+                {error && <Alert variant="danger">{error}</Alert>}
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="email">Email</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              style={styles.input}
-              required
-            />
-          </div>
+                <Form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+                  <Form.Group>
+                    <Form.Label htmlFor="email">Email</Form.Label>
+                    <Form.Control
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </Form.Group>
 
-          <div style={styles.formGroup}>
-            <label style={styles.label} htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              style={styles.input}
-              required
-            />
-          </div>
+                  <Form.Group>
+                    <Form.Label htmlFor="password">Password</Form.Label>
+                    <Form.Control
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                    />
+                  </Form.Group>
 
-          <button
-            type="submit"
-            style={styles.button}
-            disabled={loading}
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+                  <Button type="submit" variant="dark" size="lg" disabled={loading} className="mt-2">
+                    {loading ? 'Signing in...' : 'Sign In'}
+                  </Button>
+                </Form>
 
-        <div style={styles.footer}>
-          <p>
-            Don't have an account?{' '}
-            <Link to="/register" style={styles.link}>Register</Link>
-          </p>
-        </div>
+                <div className="text-center mt-4 pt-4 border-top text-muted">
+                  <p className="mb-0">
+                    Don&apos;t have an account?{' '}
+                    <Link to="/register" className="fw-semibold text-dark text-decoration-none">
+                      Register
+                    </Link>
+                  </p>
+                </div>
 
-        <div style={styles.demoCredentials}>
-          <p style={styles.demoTitle}>Demo Credentials:</p>
-          <p style={styles.demoText}>Admin: admin@stadium.com / admin123</p>
-        </div>
-      </div>
+                <div className="mt-3 p-3 bg-light rounded text-center">
+                  <p className="mb-1 small fw-semibold text-secondary">Demo Credentials:</p>
+                  <p className="mb-0 small text-secondary font-monospace">Admin: admin@stadium.com / admin123</p>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: '20px',
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    padding: '40px',
-    width: '100%',
-    maxWidth: '400px',
-  },
-  header: {
-    textAlign: 'center',
-    marginBottom: '30px',
-  },
-  title: {
-    margin: '0 0 10px 0',
-    fontSize: '28px',
-    color: '#2c3e50',
-  },
-  subtitle: {
-    margin: '0',
-    color: '#7f8c8d',
-    fontSize: '16px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  formGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  input: {
-    padding: '12px 16px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '16px',
-    outline: 'none',
-    transition: 'border-color 0.2s',
-  },
-  button: {
-    padding: '14px 24px',
-    backgroundColor: '#2c3e50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    marginTop: '10px',
-  },
-  error: {
-    backgroundColor: '#fee2e2',
-    color: '#dc2626',
-    padding: '12px 16px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  footer: {
-    textAlign: 'center',
-    marginTop: '24px',
-    paddingTop: '24px',
-    borderTop: '1px solid #eee',
-    color: '#7f8c8d',
-  },
-  link: {
-    color: '#2c3e50',
-    fontWeight: '600',
-    textDecoration: 'none',
-  },
-  demoCredentials: {
-    marginTop: '20px',
-    padding: '16px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    textAlign: 'center',
-  },
-  demoTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#6c757d',
-  },
-  demoText: {
-    margin: '0',
-    fontSize: '13px',
-    color: '#6c757d',
-    fontFamily: 'monospace',
-  },
-};
-
-// Responsive styles
-const responsiveStyles = {
-  mobile: {
-    container: {
-      ...styles.container,
-      padding: '15px',
-    },
-    card: {
-      ...styles.card,
-      padding: '24px',
-      maxWidth: '100%',
-    },
-  },
 };
 
 export default Login;

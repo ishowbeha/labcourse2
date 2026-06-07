@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Dropdown, Badge, Button, ListGroup } from 'react-bootstrap';
 import { useSocket } from '../context/SocketContext';
 
 const NotificationBell = () => {
@@ -31,197 +32,89 @@ const NotificationBell = () => {
     return `${Math.floor(diff / 86400)}d ago`;
   };
 
+  const getMessageSenderId = (notification) =>
+    notification.data?.from || notification.fromUserId || null;
+
   const handleNotificationClick = (notification) => {
     markNotificationRead(notification.id);
     setShowDropdown(false);
+
+    if (notification.type === 'message') {
+      const senderId = getMessageSenderId(notification);
+      navigate(senderId ? `/chat?user=${senderId}` : '/chat');
+      return;
+    }
+
     if (['refund', 'order_confirmed', 'order_pending', 'ticket_purchase'].includes(notification.type)) {
       navigate('/orders');
     }
   };
 
   return (
-    <div style={styles.container}>
-      <button 
-        style={styles.bellButton}
-        onClick={() => setShowDropdown(!showDropdown)}
+    <Dropdown show={showDropdown} onToggle={(isOpen) => setShowDropdown(isOpen)} align="end">
+      <Dropdown.Toggle
+        as={Button}
+        variant="link"
+        className="text-white text-decoration-none p-2 position-relative border-0"
       >
-        <span style={styles.bellIcon}>🔔</span>
+        <span className="fs-5">🔔</span>
         {unreadCount > 0 && (
-          <span style={styles.badge}>{unreadCount > 99 ? '99+' : unreadCount}</span>
+          <Badge
+            bg="danger"
+            pill
+            className="position-absolute top-0 start-100 translate-middle"
+          >
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Badge>
         )}
-      </button>
+      </Dropdown.Toggle>
 
-      {showDropdown && (
-        <div style={styles.dropdown}>
-          <div style={styles.dropdownHeader}>
-            <h4 style={styles.dropdownTitle}>Notifications</h4>
-            {notifications.length > 0 && (
-              <button style={styles.clearBtn} onClick={clearNotifications}>
-                Clear all
-              </button>
-            )}
-          </div>
-
-          <div style={styles.notificationList}>
-            {notifications.length === 0 ? (
-              <div style={styles.emptyState}>
-                <p>No notifications yet</p>
-              </div>
-            ) : (
-              notifications.slice(0, 10).map(notification => (
-                <div 
-                  key={notification.id} 
-                  style={styles.notificationItem}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  <span style={styles.notificationIcon}>
-                    {getNotificationIcon(notification.type)}
-                  </span>
-                  <div style={styles.notificationContent}>
-                    <p style={styles.notificationTitle}>{notification.title}</p>
-                    <p style={styles.notificationMessage}>{notification.message}</p>
-                    <span style={styles.notificationTime}>{getTimeAgo(notification.timestamp)}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {notifications.length > 10 && (
-            <div style={styles.dropdownFooter}>
-              <p>{notifications.length - 10} more notifications</p>
-            </div>
+      <Dropdown.Menu className="shadow border-0 p-0" style={{ width: 'min(480px, 90vw)' }}>
+        <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
+          <h6 className="mb-0 fw-semibold">Notifications</h6>
+          {notifications.length > 0 && (
+            <Button variant="link" size="sm" className="p-0" onClick={clearNotifications}>
+              Clear all
+            </Button>
           )}
         </div>
-      )}
-    </div>
-  );
-};
 
-const styles = {
-  container: {
-    position: 'relative',
-    display: 'inline-block',
-  },
-  bellButton: {
-    position: 'relative',
-    backgroundColor: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '8px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bellIcon: {
-    fontSize: '20px',
-  },
-  badge: {
-    position: 'absolute',
-    top: '0',
-    right: '0',
-    backgroundColor: '#e74c3c',
-    color: 'white',
-    fontSize: '11px',
-    fontWeight: 'bold',
-    minWidth: '18px',
-    height: '18px',
-    borderRadius: '9px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '0 4px',
-  },
-  dropdown: {
-    position: 'absolute',
-    top: '100%',
-    right: '0',
-    marginTop: '8px',
-    width: '480px',
-    maxWidth: '90vw',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-    zIndex: 1000,
-    overflow: 'hidden',
-  },
-  dropdownHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px',
-    borderBottom: '1px solid #eee',
-  },
-  dropdownTitle: {
-    margin: 0,
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  clearBtn: {
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#3498db',
-    fontSize: '13px',
-    cursor: 'pointer',
-    padding: '4px 8px',
-    borderRadius: '4px',
-  },
-  notificationList: {
-    maxHeight: '400px',
-    overflowY: 'auto',
-  },
-  notificationItem: {
-    display: 'flex',
-    gap: '12px',
-    padding: '12px 16px',
-    borderBottom: '1px solid #f5f5f5',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
-  notificationIcon: {
-    fontSize: '24px',
-    flexShrink: 0,
-  },
-  notificationContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-  notificationTitle: {
-    margin: '0 0 4px 0',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#2c3e50',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  notificationMessage: {
-    margin: '0 0 4px 0',
-    fontSize: '13px',
-    color: '#7f8c8d',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  notificationTime: {
-    fontSize: '11px',
-    color: '#bdc3c7',
-  },
-  emptyState: {
-    padding: '40px 16px',
-    textAlign: 'center',
-    color: '#7f8c8d',
-  },
-  dropdownFooter: {
-    padding: '12px 16px',
-    textAlign: 'center',
-    fontSize: '13px',
-    color: '#7f8c8d',
-    borderTop: '1px solid #eee',
-    backgroundColor: '#f8f9fa',
-  },
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          {notifications.length === 0 ? (
+            <div className="text-center text-muted p-4">
+              <p className="mb-0">No notifications yet</p>
+            </div>
+          ) : (
+            <ListGroup variant="flush">
+              {notifications.slice(0, 10).map((notification) => (
+                <ListGroup.Item
+                  key={notification.id}
+                  action
+                  onClick={() => handleNotificationClick(notification)}
+                  className="d-flex gap-3 py-3"
+                >
+                  <span className="fs-4 flex-shrink-0">{getNotificationIcon(notification.type)}</span>
+                  <div className="min-w-0">
+                    <p className="mb-1 fw-semibold text-truncate">{notification.title}</p>
+                    <p className="mb-1 small text-muted text-truncate">{notification.message}</p>
+                    <span className="text-muted" style={{ fontSize: '11px' }}>
+                      {getTimeAgo(notification.timestamp)}
+                    </span>
+                  </div>
+                </ListGroup.Item>
+              ))}
+            </ListGroup>
+          )}
+        </div>
+
+        {notifications.length > 10 && (
+          <div className="text-center small text-muted p-2 border-top bg-light">
+            {notifications.length - 10} more notifications
+          </div>
+        )}
+      </Dropdown.Menu>
+    </Dropdown>
+  );
 };
 
 export default NotificationBell;

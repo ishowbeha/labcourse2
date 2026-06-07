@@ -127,8 +127,9 @@ class AuthRepository {
   // Refresh token management
   async createRefreshToken(userId, tokenHash, expiresAt) {
     const [result] = await this.pool.query(
-      'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
-      [userId, tokenHash, expiresAt]
+      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at, created_by, updated_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
+      [userId, tokenHash, expiresAt, userId, userId]
     );
     return result.insertId;
   }
@@ -143,7 +144,7 @@ class AuthRepository {
 
   async revokeRefreshToken(tokenHash) {
     const [result] = await this.pool.query(
-      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = ?',
+      'UPDATE refresh_tokens SET revoked_at = NOW(), updated_at = NOW() WHERE token_hash = ?',
       [tokenHash]
     );
     return result.affectedRows > 0;
@@ -151,8 +152,8 @@ class AuthRepository {
 
   async revokeAllUserRefreshTokens(userId) {
     const [result] = await this.pool.query(
-      'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL',
-      [userId]
+      'UPDATE refresh_tokens SET revoked_at = NOW(), updated_by = ?, updated_at = NOW() WHERE user_id = ? AND revoked_at IS NULL',
+      [userId, userId]
     );
     return result.affectedRows > 0;
   }

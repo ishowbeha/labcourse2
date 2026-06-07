@@ -15,19 +15,17 @@ async function run() {
       database: MYSQL_DATABASE || 'stadium_tickets'
     });
 
-    // Update admin_email
     const [r1] = await conn.execute(
-      'UPDATE system_settings SET setting_value = ? WHERE setting_key = ?',
+      'UPDATE settings SET value = ? WHERE `key` = ?',
       ['admin@stadium.com', 'admin_email']
     );
     console.log('admin_email updated:', r1.affectedRows, 'rows');
 
-    // Show all settings
     const [rows] = await conn.execute(
-      'SELECT setting_key, setting_value FROM system_settings ORDER BY category, setting_key'
+      'SELECT `key`, value FROM settings ORDER BY category, `key`'
     );
     console.log('\n--- Current Settings ---');
-    rows.forEach(r => console.log(`  ${r.setting_key} = ${r.setting_value}`));
+    rows.forEach(r => console.log(`  ${r.key} = ${r.value}`));
     console.log('------------------------\n');
   } catch(e) {
     console.error('DB error:', e.message);
