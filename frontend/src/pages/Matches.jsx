@@ -6,7 +6,7 @@ import {
 import MatchService from '../services/MatchService';
 import FootballService from '../services/FootballService';
 import LazyNavbar from '../components/layout/LazyNavbar';
-import { getFlagEmoji } from '../utils/flags';
+import { getFlagUrl } from '../utils/flags';
 import api from '../services/api';
 import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
@@ -443,11 +443,23 @@ const Matches = () => {
                       </div>
 
                       <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
-                        <span className="fw-bold">{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
+                        <span className="fw-bold d-flex align-items-center gap-1">
+                          {getFlagUrl(match.homeTeam)
+                            ? <img src={getFlagUrl(match.homeTeam)} alt={match.homeTeam} style={{ width: 24, height: 18, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                            : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                          }
+                          {match.homeTeam}
+                        </span>
                         <span className="text-danger fw-bold">
                           {isLive(match) && match.homeScore !== null ? `${match.homeScore} - ${match.awayScore}` : 'VS'}
                         </span>
-                        <span className="fw-bold">{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
+                        <span className="fw-bold d-flex align-items-center gap-1">
+                          {getFlagUrl(match.awayTeam)
+                            ? <img src={getFlagUrl(match.awayTeam)} alt={match.awayTeam} style={{ width: 24, height: 18, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                            : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                          }
+                          {match.awayTeam}
+                        </span>
                       </div>
 
                       <div className="small text-muted mb-3">

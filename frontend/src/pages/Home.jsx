@@ -8,7 +8,7 @@ import { useSocket } from '../context/SocketContext';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import MatchService from '../services/MatchService';
 import FootballService from '../services/FootballService';
-import { getFlagEmoji } from '../utils/flags';
+import { getFlagUrl } from '../utils/flags';
 import axios from 'axios';
 import OrderService from '../services/OrderService';
 
@@ -499,9 +499,21 @@ const Home = () => {
                     <Card className="bg-light h-100">
                       <Card.Body>
                         <div className="d-flex justify-content-center align-items-center gap-2 mb-3 flex-wrap">
-                          <span className="fw-semibold">{getFlagEmoji(match.homeTeam)} {match.homeTeam}</span>
+                          <span className="fw-semibold d-flex align-items-center gap-1">
+                            {getFlagUrl(match.homeTeam)
+                              ? <img src={getFlagUrl(match.homeTeam)} alt={match.homeTeam} style={{ width: 24, height: 18, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                              : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                            }
+                            {match.homeTeam}
+                          </span>
                           <Badge bg="danger">VS</Badge>
-                          <span className="fw-semibold">{getFlagEmoji(match.awayTeam)} {match.awayTeam}</span>
+                          <span className="fw-semibold d-flex align-items-center gap-1">
+                            {getFlagUrl(match.awayTeam)
+                              ? <img src={getFlagUrl(match.awayTeam)} alt={match.awayTeam} style={{ width: 24, height: 18, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                              : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                            }
+                            {match.awayTeam}
+                          </span>
                         </div>
                         <div className="d-flex justify-content-between align-items-center py-2 border-top border-bottom mb-3 small">
                           <span>📅 {formatDate(match.matchDate)}</span>

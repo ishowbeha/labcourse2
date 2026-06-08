@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Spinner } from 'react-bootstrap';
 import LazyNavbar from '../components/layout/LazyNavbar';
-import { getFlagEmoji } from '../utils/flags';
+import { getFlagUrl } from '../utils/flags';
 import api from '../services/api';
 
 const Favorites = () => {
@@ -75,9 +75,21 @@ const Favorites = () => {
                       <span className="text-warning fs-5">★</span>
                     </div>
                     <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
-                      <span className="fw-bold">{getFlagEmoji(fav.home_team)} {fav.home_team}</span>
+                      <span className="fw-bold d-flex align-items-center gap-1">
+                        {getFlagUrl(fav.home_team)
+                          ? <img src={getFlagUrl(fav.home_team)} alt={fav.home_team} style={{ width: 24, height: 18, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                          : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                        }
+                        {fav.home_team}
+                      </span>
                       <span className="text-danger fw-bold">VS</span>
-                      <span className="fw-bold">{getFlagEmoji(fav.away_team)} {fav.away_team}</span>
+                      <span className="fw-bold d-flex align-items-center gap-1">
+                        {getFlagUrl(fav.away_team)
+                          ? <img src={getFlagUrl(fav.away_team)} alt={fav.away_team} style={{ width: 24, height: 18, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                          : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                        }
+                        {fav.away_team}
+                      </span>
                     </div>
                     <div className="small text-muted mb-3">
                       <p className="mb-1">📅 {fav.match_date ? formatDate(fav.match_date) : 'Date TBD'}{fav.match_time ? ` at ${fav.match_time}` : ''}</p>

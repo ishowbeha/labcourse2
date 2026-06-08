@@ -12,7 +12,7 @@ import { useSettings } from '../context/SettingsContext';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import OrderService from '../services/OrderService';
 import axios from 'axios';
-import { getFlagEmoji } from '../utils/flags';
+import { getFlagUrl } from '../utils/flags';
 
 // ─── Seat Availability Helpers ───────────────────────────────────────────────
 
@@ -811,13 +811,21 @@ const Tickets = () => {
           {/* Match info card */}
           <Card className="shadow-sm border-0 mb-4">
             <Card.Body className="text-center">
-              <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
-                <span className="fs-5 fw-bold">
-                  {getFlagEmoji(match?.homeTeam)} {match?.homeTeam}
+                <div className="d-flex justify-content-center align-items-center gap-3 mb-3">
+                <span className="fs-5 fw-bold d-flex align-items-center gap-1">
+                  {getFlagUrl(match?.homeTeam)
+                    ? <img src={getFlagUrl(match?.homeTeam)} alt={match?.homeTeam} style={{ width: 26, height: 19, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                    : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                  }
+                  {match?.homeTeam}
                 </span>
                 <span className="text-danger fw-bold">VS</span>
-                <span className="fs-5 fw-bold">
-                  {getFlagEmoji(match?.awayTeam)} {match?.awayTeam}
+                <span className="fs-5 fw-bold d-flex align-items-center gap-1">
+                  {getFlagUrl(match?.awayTeam)
+                    ? <img src={getFlagUrl(match?.awayTeam)} alt={match?.awayTeam} style={{ width: 26, height: 19, borderRadius: 2, objectFit: 'cover', boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+                    : <span style={{ fontSize: '1.2em' }}>🏳️</span>
+                  }
+                  {match?.awayTeam}
                 </span>
               </div>
               <div className="text-muted">
