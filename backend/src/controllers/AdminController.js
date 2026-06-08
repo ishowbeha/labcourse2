@@ -302,6 +302,113 @@ class AdminController {
     }
   }
 
+  // ── Ticket Management ───────────────────────────────────────────────────────
+  async getTickets(req, res, next) {
+    try {
+      const {
+        page = 1, limit = 20,
+        status = '', matchId = '', sectionId = '',
+        search = '', sortBy = 'created_at', sortDir = 'desc'
+      } = req.query;
+
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const params = [];
+      let where = 'WHERE 1=1';
+
+      if (status) { where += ' AND t.status = ?'; params.push(status); }
+      if (matchId) { where += ' AND t.match_id = ?'; params.push(parseInt(matchId)); }
+      if (sectionId) { where += ' AND t.section_id = ?'; params.push(parseInt(sectionId)); }
+      if (search) {
+        where += ' AND (CONCAT(m.home_team, " vs ", m.away_team) LIKE ? OR s.name LIKE ? OR u.email LIKE ?)';
+        const q = `%${search}%`;
+        params.push(q, q, q);
+      }
+
+      const allowedSort = {
+        created_at: 't.created_at', price: 't.price',
+        status: 't.status', match: 'm.match_date'
+      };
+      const orderCol = allowedSort[sortBy] || 't.created_at';
+      const orderDir = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+      const [tickets] = await this.db.query(`
+        SELECT
+          t.id, t.status, t.price, t.created_at, t.purchased_at,
+          t.row_number, t.seat_number,
+          m.id as match_id,
+          CONCAT(m.home_team, ' vs ', m.away_team) as match_name,
+          m.match_date, m.match_time, m.competition,
+          s.id as section_id, s.name as section_name, s.section_type,
+          u.id as purchaser_id, u.first_name, u.last_name, u.email as purchaser_email
+        FROM tickets t
+        LEFT JOIN matches m ON t.match_id = m.id
+        LEFT JOIN sections s ON t.section_id = s.id
+        LEFT JOIN users u ON t.purchaser_id = u.id
+        ${where}
+        ORDER BY ${orderCol} ${orderDir}
+        LIMIT ? OFFSET ?
+      `, [...params, parseInt(limit), offset]);
+
+      const [[{ total }]] = await this.db.query(
+        `SELECT COUNT(*) as total FROM tickets t
+         LEFT JOIN matches m ON t.match_id = m.id
+         LEFT JOIN sections s ON t.section_id = s.id
+         LEFT JOIN users u ON t.purchaser_id = u.id
+         ${where}`,
+        params
+      );
+
+      // KPI summary
+      const [kpi] = await this.db.query(`
+        SELECT
+          COUNT(*) as total_tickets,
+          SUM(status = 'available') as available,
+          SUM(status = 'sold') as sold,
+          SUM(status = 'reserved') as reserved,
+          COALESCE(SUM(CASE WHEN status = 'sold' THEN price ELSE 0 END), 0) as revenue
+        FROM tickets
+      `);
+
+      res.json({
+        success: true,
+        data: {
+          tickets,
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / parseInt(limit)),
+          kpi: kpi[0]
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateTicketStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const allowed = ['available', 'reserved', 'sold'];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${allowed.join(', ')}` });
+      }
+
+      const [[ticket]] = await this.db.query('SELECT id, status FROM tickets WHERE id = ?', [id]);
+      if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found' });
+
+      const clearPurchaser = status === 'available' ? ', purchaser_id = NULL, purchased_at = NULL' : '';
+      await this.db.query(
+        `UPDATE tickets SET status = ?${clearPurchaser}, updated_at = NOW() WHERE id = ?`,
+        [status, id]
+      );
+
+      res.json({ success: true, message: `Ticket #${id} status updated to "${status}"`, data: { id, status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // POST /api/admin/reports/dynamic - Dynamic report generation
   async generateDynamicReport(req, res, next) {
     try {

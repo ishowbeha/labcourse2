@@ -65,6 +65,10 @@ const createAdminRoutes = (db) => {
   router.post('/orders/:id/refund', controller.refundOrder.bind(controller));
   router.delete('/orders/:id', controller.hardDeleteOrder.bind(controller));
 
+  // Ticket Management (admin)
+  router.get('/tickets', controller.getTickets.bind(controller));
+  router.patch('/tickets/:id/status', controller.updateTicketStatus.bind(controller));
+
   return router;
 };
 

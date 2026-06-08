@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Row, Col, Card, Form, Button, Alert, Table, Badge, Modal, Spinner,
@@ -24,6 +24,7 @@ const AdminMatches = () => {
   const [advFilters, setAdvFilters] = useState({});
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('asc');
+  const [stadiums, setStadiums] = useState([]);
 
   const matchSortOptions = [
     { value: 'matchDate', label: 'Match Date' },
@@ -32,7 +33,7 @@ const AdminMatches = () => {
     { value: 'homeTeam', label: 'Home Team' },
   ];
 
-  const matchFilterDefs = [
+  const matchFilterDefs = useMemo(() => [
     { id: 'status', label: 'Status', type: 'select', options: [
       { value: 'scheduled', label: 'Scheduled' },
       { value: 'live', label: 'Live' },
@@ -47,7 +48,7 @@ const AdminMatches = () => {
     { id: 'stadiumId', label: 'Stadium', type: 'select', options:
       stadiums.map(s => ({ value: String(s.id), label: `${s.name} (${s.city})` }))
     },
-  ];
+  ], [stadiums]);
 
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState(null);
@@ -69,7 +70,6 @@ const AdminMatches = () => {
   });
 
   const [selectedMatch, setSelectedMatch] = useState(null);
-  const [stadiums, setStadiums] = useState([]);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
