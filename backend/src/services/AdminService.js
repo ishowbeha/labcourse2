@@ -17,9 +17,9 @@ class AdminService {
   }
 
   // User Management
-  async getAllUsers(page = 1, limit = 10, search = '', role = '') {
+  async getAllUsers(page = 1, limit = 10, search = '', role = '', options = {}) {
     try {
-      return await this.repository.getAllUsers(page, limit, search, role);
+      return await this.repository.getAllUsers(page, limit, search, role, options);
     } catch (error) {
       throw new Error(`Failed to fetch users: ${error.message}`);
     }
@@ -119,9 +119,9 @@ class AdminService {
     }
   }
 
-  async getOrdersWithDetails(page = 1, limit = 10, status = '', search = '') {
+  async getOrdersWithDetails(page = 1, limit = 10, status = '', search = '', options = {}) {
     try {
-      return await this.repository.getOrdersWithDetails(page, limit, status, search);
+      return await this.repository.getOrdersWithDetails(page, limit, status, search, options);
     } catch (error) {
       throw new Error(`Failed to fetch orders: ${error.message}`);
     }

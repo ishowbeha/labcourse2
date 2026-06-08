@@ -157,6 +157,40 @@ class MatchRepository {
         params.push(filters.dateTo);
       }
 
+      // Price range
+      if (filters.priceMin !== undefined && filters.priceMin !== '') {
+        whereClause += ' AND m.base_price >= ?';
+        params.push(parseFloat(filters.priceMin));
+      }
+      if (filters.priceMax !== undefined && filters.priceMax !== '') {
+        whereClause += ' AND m.base_price <= ?';
+        params.push(parseFloat(filters.priceMax));
+      }
+
+      // Stadium ID
+      if (filters.stadiumId !== undefined && filters.stadiumId !== '') {
+        whereClause += ' AND m.stadium_id = ?';
+        params.push(parseInt(filters.stadiumId));
+      }
+
+      // Sorting
+      let orderSql = 'ORDER BY revenue DESC, m.match_date DESC, m.match_time DESC';
+      if (filters.sortBy) {
+        const allowedFields = {
+          matchDate: 'm.match_date, m.match_time',
+          basePrice: 'm.base_price',
+          revenue: 'revenue',
+          homeTeam: 'm.home_team'
+        };
+        const field = allowedFields[filters.sortBy] || 'm.match_date';
+        const dir = (filters.sortDir && filters.sortDir.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+        if (filters.sortBy === 'matchDate') {
+          orderSql = `ORDER BY m.match_date ${dir}, m.match_time ${dir}`;
+        } else {
+          orderSql = `ORDER BY ${field} ${dir}`;
+        }
+      }
+
       // Get total count
       const [countRows] = await this.pool.query(`
         SELECT COUNT(*) as total
@@ -198,7 +232,7 @@ class MatchRepository {
         FROM matches m
         LEFT JOIN stadiums s ON m.stadium_id = s.id
         ${whereClause}
-        ORDER BY revenue DESC, m.match_date DESC, m.match_time DESC
+        ${orderSql}
         LIMIT ? OFFSET ?
       `, [...params, parseInt(limit), parseInt(offset)]);
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Row, Col, Card, Button, Form, Spinner, Alert, Dropdown, ButtonGroup,
@@ -8,6 +8,7 @@ import FootballService from '../services/FootballService';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import { getFlagEmoji } from '../utils/flags';
 import api from '../services/api';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const wcGroups = ['All Groups', 'Group A', 'Group B', 'Group C', 'Group D', 'Group E', 'Group F', 'Group G', 'Group H', 'Group I', 'Group J', 'Group K', 'Group L'];
 
@@ -23,6 +24,32 @@ const Matches = () => {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [apiAvailable, setApiAvailable] = useState(false);
+
+  // Advanced search state
+  const [searchText, setSearchText] = useState('');
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const matchSortOptions = [
+    { value: 'date', label: 'Match Date' },
+    { value: 'price', label: 'Ticket Price' },
+    { value: 'competition', label: 'Competition' },
+    { value: 'homeTeam', label: 'Home Team' },
+  ];
+
+  const matchFilterDefs = [
+    { id: 'status', label: 'Status', type: 'select', options: [
+      { value: 'LIVE', label: '🔴 Live' },
+      { value: 'scheduled', label: 'Scheduled' },
+      { value: 'completed', label: 'Completed' },
+    ]},
+    { id: 'stadium', label: 'Stadium', type: 'text', placeholder: 'Search stadium…' },
+    { id: 'dateFrom', label: 'Date From', type: 'date' },
+    { id: 'dateTo', label: 'Date To', type: 'date' },
+    { id: 'priceMin', label: 'Min Price (€)', type: 'number', placeholder: '0', min: 0 },
+    { id: 'priceMax', label: 'Max Price (€)', type: 'number', placeholder: '500', min: 0 },
+  ];
 
   useEffect(() => {
     const init = async () => {
@@ -102,8 +129,24 @@ const Matches = () => {
     setFilters((prev) => ({ ...prev, [key]: value || undefined }));
   };
 
-  const getDisplayMatches = () => {
-    if (activeTab === 'local') return matches;
+  const handleAdvFilterChange = (id, value) => {
+    setAdvFilters((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleAdvSearch = () => {
+    // search is triggered reactively via useMemo
+  };
+
+  const handleAdvReset = () => {
+    setSearchText('');
+    setAdvFilters({});
+    setSortField('');
+    setSortDir('asc');
+    setFilters({});
+  };
+
+  const getRawMatches = () => {
+    if (activeTab === 'local') return matches.map((m) => ({ ...m, _sortDate: m.matchDate || '', _groupId: '' }));
     if (activeTab === 'api') return apiMatches;
     if (activeTab === 'live') return liveMatches;
 
@@ -173,16 +216,16 @@ const Matches = () => {
       }
     });
 
-    allMapped.sort((a, b) => {
-      if (!a._sortDate) return 1;
-      if (!b._sortDate) return -1;
-      return a._sortDate.localeCompare(b._sortDate);
-    });
+    return allMapped;
+  };
 
-    let filtered = allMapped;
+  const getDisplayMatches = () => {
+    let all = getRawMatches();
+
+    // Legacy competition filter
     const competitionFilter = filters.competition;
     if (competitionFilter) {
-      filtered = filtered.filter((m) => {
+      all = all.filter((m) => {
         const c = (m.competition || '').toLowerCase();
         const f = competitionFilter.toLowerCase();
         return c.includes(f) || c.includes(f.replace(/2026/g, '').trim());
@@ -192,7 +235,7 @@ const Matches = () => {
       const groupMatch = filters.wcGroup.match(/Group ([A-L])/i);
       if (groupMatch) {
         const g = groupMatch[1].toUpperCase();
-        filtered = filtered.filter((m) => {
+        all = all.filter((m) => {
           const gr = (m._groupId || '').toUpperCase();
           return gr.includes(`GROUP ${g}`) || gr.includes(`GROUP_${g}`);
         });
@@ -200,13 +243,69 @@ const Matches = () => {
     }
     if (filters.team) {
       const t = filters.team.toLowerCase();
-      filtered = filtered.filter((m) => {
+      all = all.filter((m) => {
         const h = (m.homeTeam || '').toLowerCase();
         const a = (m.awayTeam || '').toLowerCase();
         return h.includes(t) || a.includes(t);
       });
     }
-    return filtered;
+
+    // Advanced text search
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase();
+      all = all.filter((m) =>
+        (m.homeTeam || '').toLowerCase().includes(q) ||
+        (m.awayTeam || '').toLowerCase().includes(q) ||
+        (m.competition || '').toLowerCase().includes(q) ||
+        (m.stadiumName || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Advanced filters
+    if (advFilters.status) {
+      const s = advFilters.status.toLowerCase();
+      all = all.filter((m) => (m.status || '').toLowerCase() === s || (s === 'live' && (m.source === 'live')));
+    }
+    if (advFilters.stadium) {
+      const sv = advFilters.stadium.toLowerCase();
+      all = all.filter((m) => (m.stadiumName || '').toLowerCase().includes(sv));
+    }
+    if (advFilters.dateFrom) {
+      all = all.filter((m) => m.matchDate && m.matchDate >= advFilters.dateFrom);
+    }
+    if (advFilters.dateTo) {
+      all = all.filter((m) => m.matchDate && m.matchDate <= advFilters.dateTo);
+    }
+    if (advFilters.priceMin !== '' && advFilters.priceMin !== undefined) {
+      all = all.filter((m) => (m.basePrice || 0) >= Number(advFilters.priceMin));
+    }
+    if (advFilters.priceMax !== '' && advFilters.priceMax !== undefined) {
+      all = all.filter((m) => (m.basePrice || 0) <= Number(advFilters.priceMax));
+    }
+
+    // Sort
+    if (sortField) {
+      all = [...all].sort((a, b) => {
+        let aVal, bVal;
+        if (sortField === 'date') { aVal = a.matchDate || ''; bVal = b.matchDate || ''; }
+        else if (sortField === 'price') { aVal = a.basePrice || 0; bVal = b.basePrice || 0; }
+        else if (sortField === 'competition') { aVal = (a.competition || '').toLowerCase(); bVal = (b.competition || '').toLowerCase(); }
+        else if (sortField === 'homeTeam') { aVal = (a.homeTeam || '').toLowerCase(); bVal = (b.homeTeam || '').toLowerCase(); }
+        else { aVal = a._sortDate || ''; bVal = b._sortDate || ''; }
+        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    } else {
+      // Default: sort by date
+      all.sort((a, b) => {
+        if (!a._sortDate) return 1;
+        if (!b._sortDate) return -1;
+        return a._sortDate.localeCompare(b._sortDate);
+      });
+    }
+
+    return all;
   };
 
   const isLive = (match) => match.status === 'LIVE' || match.status === 'live' || match.source === 'live';
@@ -244,7 +343,8 @@ const Matches = () => {
           </Button>
         </div>
 
-        <div className="d-flex flex-wrap justify-content-center gap-3 mb-4 align-items-start">
+        {/* Competition quick-filter */}
+        <div className="d-flex flex-wrap justify-content-center gap-3 mb-3 align-items-start">
           <div className="d-flex flex-wrap gap-2">
             <Form.Select
               value={filters.competition || ''}
@@ -286,20 +386,31 @@ const Matches = () => {
               </Dropdown>
             )}
           </div>
-
-          <Form.Control
-            type="text"
-            placeholder="Search team..."
-            value={filters.team || ''}
-            onChange={(e) => handleFilterChange('team', e.target.value)}
-            style={{ minWidth: '180px', maxWidth: '220px' }}
-          />
-          <Button variant="primary">Search</Button>
           {apiAvailable && (
             <Button variant="success" onClick={handleSync} disabled={syncing}>
               {syncing ? '⏳ Syncing...' : '🔄 Sync Fixtures'}
             </Button>
           )}
+        </div>
+
+        {/* Advanced Search Bar */}
+        <div className="mb-4">
+          <AdvancedSearchBar
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            onSearch={handleAdvSearch}
+            onReset={handleAdvReset}
+            placeholder="Search team, competition, or stadium…"
+            filters={matchFilterDefs}
+            filterValues={advFilters}
+            onFilterChange={handleAdvFilterChange}
+            sortOptions={matchSortOptions}
+            sortValue={sortField}
+            sortDir={sortDir}
+            onSortChange={(field, dir) => { setSortField(field); setSortDir(dir); }}
+            resultCount={getDisplayMatches().length}
+            totalCount={getRawMatches().length}
+          />
         </div>
 
         {loading ? (

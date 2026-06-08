@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container, Row, Col, Card, Button, Modal, Form, Alert, Badge,
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import axios from 'axios';
 import OrderService from '../services/OrderService';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const Stadiums = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -23,6 +24,30 @@ const Stadiums = () => {
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [lastOrderNum, setLastOrderNum] = useState('');
   const [error, setError] = useState('');
+
+  // Advanced search state
+  const [searchText, setSearchText] = useState('');
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const stadiumSortOptions = [
+    { value: 'name', label: 'Name (A–Z)' },
+    { value: 'capacity', label: 'Capacity' },
+    { value: 'opened', label: 'Year Opened' },
+  ];
+
+  const stadiumFilterDefs = [
+    { id: 'country', label: 'Country', type: 'select', options: [
+      { value: 'USA', label: '🇺🇸 USA' },
+      { value: 'Mexico', label: '🇲🇽 Mexico' },
+      { value: 'Canada', label: '🇨🇦 Canada' },
+      { value: 'Albania', label: '🇦🇱 Albania' },
+      { value: 'Kosova', label: '🇽🇰 Kosova' },
+    ]},
+    { id: 'capacityMin', label: 'Min Capacity', type: 'number', placeholder: '0', min: 0 },
+    { id: 'capacityMax', label: 'Max Capacity', type: 'number', placeholder: '100000', min: 0 },
+  ];
 
   // showMapModal / mapStadium removed — View on Map now opens Google Maps directly
 
@@ -172,6 +197,15 @@ const Stadiums = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleAdvFilterChange = (id, value) => setAdvFilters((prev) => ({ ...prev, [id]: value }));
+
+  const handleAdvReset = () => {
+    setSearchText('');
+    setAdvFilters({});
+    setSortField('');
+    setSortDir('asc');
   };
 
   // Complete stadium data — all 26 stadiums with real Google Maps URLs
@@ -592,6 +626,45 @@ const Stadiums = () => {
     }
   ];
 
+  // ── Derived filtered + sorted stadiums ──────────────────────────
+  const filteredStadiums = useMemo(() => {
+    let list = [...stadiums];
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase();
+      list = list.filter((s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.city.toLowerCase().includes(q) ||
+        s.country.toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (advFilters.country) {
+      list = list.filter((s) => s.country === advFilters.country);
+    }
+    if (advFilters.capacityMin !== '' && advFilters.capacityMin !== undefined) {
+      list = list.filter((s) => s.capacity >= Number(advFilters.capacityMin));
+    }
+    if (advFilters.capacityMax !== '' && advFilters.capacityMax !== undefined) {
+      list = list.filter((s) => s.capacity <= Number(advFilters.capacityMax));
+    }
+    if (sortField) {
+      list = [...list].sort((a, b) => {
+        let aVal = sortField === 'name' ? a.name.toLowerCase()
+          : sortField === 'capacity' ? a.capacity
+          : sortField === 'opened' ? a.opened
+          : a.name.toLowerCase();
+        let bVal = sortField === 'name' ? b.name.toLowerCase()
+          : sortField === 'capacity' ? b.capacity
+          : sortField === 'opened' ? b.opened
+          : b.name.toLowerCase();
+        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return list;
+  }, [stadiums, searchText, advFilters, sortField, sortDir]);
+
   const paymentMethods = [
     { id: 'credit-card', name: 'Credit Card', icon: '💳' },
     { id: 'paypal', name: 'PayPal', icon: '🅿️' },
@@ -603,13 +676,38 @@ const Stadiums = () => {
       <LazyNavbar />
 
       <Container className="py-4 py-md-5">
-        <div className="text-center mb-4">
-          <h1 className="h2">🏟️ Stadiums</h1>
+        <div className="text-center mb-3">
+          <h1 className="h2">🏙️ Stadiums</h1>
           <p className="text-muted">Explore our partner stadiums and their seating arrangements</p>
         </div>
 
+        {/* Advanced Search Bar */}
+        <div className="mb-4">
+          <AdvancedSearchBar
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            onSearch={() => {}}
+            onReset={handleAdvReset}
+            placeholder="Search by name, city, country, or description…"
+            filters={stadiumFilterDefs}
+            filterValues={advFilters}
+            onFilterChange={handleAdvFilterChange}
+            sortOptions={stadiumSortOptions}
+            sortValue={sortField}
+            sortDir={sortDir}
+            onSortChange={(f, d) => { setSortField(f); setSortDir(d); }}
+            resultCount={filteredStadiums.length}
+            totalCount={stadiums.length}
+          />
+        </div>
+
         <Row className="g-4">
-          {stadiums.map(stadium => (
+          {filteredStadiums.length === 0 ? (
+            <Col xs={12} className="text-center text-muted py-5">
+              <div style={{ fontSize: 48 }}>🏙️</div>
+              <p className="mt-3">No stadiums match your search. <button className="btn btn-link p-0" onClick={handleAdvReset}>Reset filters</button></p>
+            </Col>
+          ) : filteredStadiums.map(stadium => (
             <Col key={stadium.id} xs={12} md={6} xl={4}>
               <Card className="h-100 shadow-sm border-0 d-flex flex-column">
                 <Card.Body className="d-flex flex-column">

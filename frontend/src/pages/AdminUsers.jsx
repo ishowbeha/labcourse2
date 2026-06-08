@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const AdminUsers = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -17,9 +18,32 @@ const AdminUsers = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [search, setSearch] = useState('');
   const [selectedRole, setSelectedRole] = useState('');
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [rolesLoaded, setRolesLoaded] = useState(false);
+
+  const userSortOptions = [
+    { value: 'firstName', label: 'First Name' },
+    { value: 'email', label: 'Email' },
+    { value: 'createdAt', label: 'Date Registered' },
+    { value: 'isActive', label: 'Status' },
+  ];
+
+  const userFilterDefs = [
+    { id: 'role', label: 'Role', type: 'select',
+      options: roles.map(r => ({ value: r.name, label: r.description || r.name })),
+      placeholder: 'All Roles',
+    },
+    { id: 'isActive', label: 'Status', type: 'select', options: [
+      { value: '1', label: 'Active' },
+      { value: '0', label: 'Inactive' },
+    ]},
+    { id: 'dateFrom', label: 'Registered From', type: 'date' },
+    { id: 'dateTo', label: 'Registered To', type: 'date' },
+  ];
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -38,7 +62,7 @@ const AdminUsers = () => {
     }
     fetchUsers();
     fetchRoles();
-  }, [pagination.page, search, selectedRole]);
+  }, [pagination.page, search, selectedRole, advFilters, sortField, sortDir]);
 
   const fetchUsers = async () => {
     try {
@@ -47,7 +71,11 @@ const AdminUsers = () => {
         page: pagination.page,
         limit: pagination.limit,
         search,
-        role: selectedRole
+        role: advFilters.role || selectedRole,
+        ...(advFilters.isActive !== '' && advFilters.isActive !== undefined ? { isActive: advFilters.isActive } : {}),
+        ...(advFilters.dateFrom ? { dateFrom: advFilters.dateFrom } : {}),
+        ...(advFilters.dateTo ? { dateTo: advFilters.dateTo } : {}),
+        ...(sortField ? { sortBy: sortField, sortDir } : {}),
       });
       console.log('AdminUsers fetchUsers response:', response);
       if (response.success && response.data) {
@@ -97,7 +125,7 @@ const AdminUsers = () => {
   };
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setPagination({ ...pagination, page: 1 });
     fetchUsers();
   };
@@ -105,6 +133,20 @@ const AdminUsers = () => {
   const handleRoleFilter = (e) => {
     setSelectedRole(e.target.value);
     setPagination({ ...pagination, page: 1 });
+  };
+
+  const handleAdvFilterChange = (id, value) => {
+    setAdvFilters((prev) => ({ ...prev, [id]: value }));
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleAdvReset = () => {
+    setSearch('');
+    setSelectedRole('');
+    setAdvFilters({});
+    setSortField('');
+    setSortDir('asc');
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const openCreateModal = () => {
@@ -232,32 +274,29 @@ const AdminUsers = () => {
         {error && <Alert variant="danger">{error}</Alert>}
         {success && <Alert variant="success">{success}</Alert>}
 
-        <Row className="g-3 mb-4 align-items-center">
-          <Col xs={12} lg>
-            <Form onSubmit={handleSearch} className="d-flex gap-2">
-              <Form.Control
-                type="text"
-                placeholder="Search by name or email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <Button type="submit" variant="primary">Search</Button>
-            </Form>
-          </Col>
-          <Col xs={12} sm={6} md={4} lg="auto">
-            <Form.Select value={selectedRole} onChange={handleRoleFilter}>
-              <option value="">All Roles</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.name}>{role.description}</option>
-              ))}
-            </Form.Select>
-          </Col>
-          <Col xs={12} sm={6} md="auto">
-            <Button variant="success" onClick={openCreateModal} className="w-100">
-              + Add User
-            </Button>
-          </Col>
-        </Row>
+        {/* Advanced Search Bar */}
+        <div className="mb-4">
+          <AdvancedSearchBar
+            searchValue={search}
+            onSearchChange={setSearch}
+            onSearch={handleSearch}
+            onReset={handleAdvReset}
+            placeholder="Search by name or email…"
+            filters={userFilterDefs}
+            filterValues={advFilters}
+            onFilterChange={handleAdvFilterChange}
+            sortOptions={userSortOptions}
+            sortValue={sortField}
+            sortDir={sortDir}
+            onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPagination(p => ({...p, page:1})); }}
+            resultCount={pagination.total}
+          />
+        </div>
+        <div className="d-flex justify-content-end mb-3">
+          <Button variant="success" onClick={openCreateModal}>
+            + Add User
+          </Button>
+        </div>
 
         {loading ? (
           <div className="text-center py-5">

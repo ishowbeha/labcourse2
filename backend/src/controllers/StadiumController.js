@@ -11,13 +11,14 @@ class StadiumController {
   // Get all stadiums with pagination and filters
   async getAllStadiums(req, res, next) {
     try {
-      const { page = 1, limit = 10, search = '', city = '', isActive = '' } = req.query;
+      const { page = 1, limit = 10, search = '', city = '', isActive = '', country = '', capacityMin = '', capacityMax = '', sortBy = '', sortDir = '' } = req.query;
       const result = await this.service.getAllStadiums(
         parseInt(page),
         parseInt(limit),
         search,
         city,
-        isActive === '' ? null : parseInt(isActive)
+        isActive === '' ? null : parseInt(isActive),
+        { country, capacityMin, capacityMax, sortBy, sortDir }
       );
       res.json({
         success: true,

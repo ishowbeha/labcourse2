@@ -38,9 +38,9 @@ class AdminRepository {
   }
 
   // User Management
-  async getAllUsers(page = 1, limit = 10, search = '', role = '') {
+  async getAllUsers(page = 1, limit = 10, search = '', role = '', options = {}) {
     const offset = (page - 1) * limit;
-    let whereClause = 'WHERE u.is_active = 1';
+    let whereClause = 'WHERE 1=1';
     const params = [];
 
     if (search) {
@@ -54,6 +54,36 @@ class AdminRepository {
       params.push(role);
     }
 
+    if (options.isActive !== undefined && options.isActive !== '') {
+      whereClause += ' AND u.is_active = ?';
+      params.push(parseInt(options.isActive));
+    }
+
+    if (options.dateFrom) {
+      whereClause += ' AND u.created_at >= ?';
+      params.push(options.dateFrom);
+    }
+
+    if (options.dateTo) {
+      whereClause += ' AND u.created_at <= ?';
+      params.push(options.dateTo + ' 23:59:59');
+    }
+
+    let orderSql = 'ORDER BY u.created_at DESC';
+    if (options.sortBy) {
+      const allowedSortFields = {
+        name: 'u.first_name',
+        email: 'u.email',
+        created_at: 'u.created_at',
+        date: 'u.created_at',
+        isActive: 'u.is_active',
+        status: 'u.is_active'
+      };
+      const field = allowedSortFields[options.sortBy] || 'u.created_at';
+      const dir = (options.sortDir && options.sortDir.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+      orderSql = `ORDER BY ${field} ${dir}`;
+    }
+
     const [users] = await this.pool.query(`
       SELECT DISTINCT u.id, u.first_name, u.last_name, u.email, u.is_active, u.created_at, u.updated_at,
              GROUP_CONCAT(DISTINCT r.name) as roles
@@ -62,6 +92,7 @@ class AdminRepository {
       LEFT JOIN roles r ON ur.role_id = r.id
       ${whereClause}
       GROUP BY u.id
+      ${orderSql}
       LIMIT ? OFFSET ?
     `, [...params, parseInt(limit), parseInt(offset)]);
 
@@ -209,7 +240,7 @@ class AdminRepository {
   }
 
   // Reports - Orders with User Details
-  async getOrdersWithDetails(page = 1, limit = 10, status = '', search = '') {
+  async getOrdersWithDetails(page = 1, limit = 10, status = '', search = '', options = {}) {
     const offset = (page - 1) * limit;
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -223,6 +254,45 @@ class AdminRepository {
       whereClause += ' AND (o.order_number LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR CONCAT(u.first_name, " ", u.last_name) LIKE ?)';
       const searchParam = `%${search}%`;
       params.push(searchParam, searchParam, searchParam, searchParam, searchParam);
+    }
+
+    if (options.dateFrom) {
+      whereClause += ' AND o.created_at >= ?';
+      params.push(options.dateFrom);
+    }
+
+    if (options.dateTo) {
+      whereClause += ' AND o.created_at <= ?';
+      params.push(options.dateTo + ' 23:59:59');
+    }
+
+    if (options.amountMin !== undefined && options.amountMin !== '') {
+      whereClause += ' AND o.total_amount >= ?';
+      params.push(parseFloat(options.amountMin));
+    }
+
+    if (options.amountMax !== undefined && options.amountMax !== '') {
+      whereClause += ' AND o.total_amount <= ?';
+      params.push(parseFloat(options.amountMax));
+    }
+
+    if (options.paymentMethod) {
+      whereClause += ' AND o.payment_method = ?';
+      params.push(options.paymentMethod);
+    }
+
+    let orderSql = 'ORDER BY o.created_at DESC';
+    if (options.sortBy) {
+      const allowedSortFields = {
+        date: 'o.created_at',
+        createdAt: 'o.created_at',
+        amount: 'o.total_amount',
+        totalAmount: 'o.total_amount',
+        status: 'o.status'
+      };
+      const field = allowedSortFields[options.sortBy] || 'o.created_at';
+      const dir = (options.sortDir && options.sortDir.toLowerCase() === 'asc') ? 'ASC' : 'DESC';
+      orderSql = `ORDER BY ${field} ${dir}`;
     }
 
     const [orders] = await this.pool.query(`
@@ -245,12 +315,12 @@ class AdminRepository {
       LEFT JOIN order_items oi ON o.id = oi.order_id
       ${whereClause}
       GROUP BY o.id, o.order_number, o.user_id, o.total_amount, o.status, o.payment_status, o.payment_method, o.customer_email, o.created_at, u.first_name, u.last_name, o.notes, oi.quantity
-      ORDER BY o.created_at DESC
+      ${orderSql}
       LIMIT ? OFFSET ?
     `, [...params, parseInt(limit), parseInt(offset)]);
 
     const [totalRows] = await this.pool.query(
-      `SELECT COUNT(*) as count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause}`,
+      `SELECT COUNT(DISTINCT o.id) as count FROM orders o LEFT JOIN users u ON o.user_id = u.id ${whereClause}`,
       params
     );
 

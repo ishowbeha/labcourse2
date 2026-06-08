@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, Modal } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Modal, Form } from 'react-bootstrap';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import OrderService from '../services/OrderService';
 import axios from 'axios';
 import { jsPDF } from 'jspdf';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -12,6 +13,32 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  // Advanced search state
+  const [searchText, setSearchText] = useState('');
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const orderSortOptions = [
+    { value: 'date', label: 'Date Placed' },
+    { value: 'total', label: 'Total Amount' },
+    { value: 'status', label: 'Status' },
+    { value: 'tickets', label: '# Tickets' },
+  ];
+
+  const orderFilterDefs = [
+    { id: 'status', label: 'Status', type: 'select', options: [
+      { value: 'confirmed', label: 'Confirmed' },
+      { value: 'pending', label: 'Pending' },
+      { value: 'completed', label: 'Completed' },
+      { value: 'cancelled', label: 'Cancelled' },
+    ]},
+    { id: 'dateFrom', label: 'Date From', type: 'date' },
+    { id: 'dateTo', label: 'Date To', type: 'date' },
+    { id: 'amountMin', label: 'Min Amount (€)', type: 'number', placeholder: '0', min: 0 },
+    { id: 'amountMax', label: 'Max Amount (€)', type: 'number', placeholder: '5000', min: 0 },
+  ];
 
   useEffect(() => {
     fetchOrders();
@@ -107,6 +134,65 @@ const Orders = () => {
     setShowDetailsModal(false);
     setSelectedOrder(null);
   };
+
+  const handleAdvFilterChange = (id, value) => setAdvFilters((prev) => ({ ...prev, [id]: value }));
+
+  const handleAdvReset = () => {
+    setSearchText('');
+    setAdvFilters({});
+    setSortField('date');
+    setSortDir('desc');
+  };
+
+  // Client-side filtered + sorted orders
+  const filteredOrders = useMemo(() => {
+    let list = [...orders];
+
+    // Text search
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase();
+      list = list.filter((o) =>
+        (o.orderNumber || '').toLowerCase().includes(q) ||
+        (o.match || '').toLowerCase().includes(q) ||
+        (o.stadium || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Status filter
+    if (advFilters.status) {
+      list = list.filter((o) => o.status === advFilters.status);
+    }
+
+    // Date range
+    if (advFilters.dateFrom) {
+      list = list.filter((o) => o.date && o.date >= advFilters.dateFrom);
+    }
+    if (advFilters.dateTo) {
+      list = list.filter((o) => o.date && o.date <= advFilters.dateTo);
+    }
+
+    // Amount range
+    if (advFilters.amountMin !== '' && advFilters.amountMin !== undefined) {
+      list = list.filter((o) => (o.total || 0) >= Number(advFilters.amountMin));
+    }
+    if (advFilters.amountMax !== '' && advFilters.amountMax !== undefined) {
+      list = list.filter((o) => (o.total || 0) <= Number(advFilters.amountMax));
+    }
+
+    // Sort
+    list = [...list].sort((a, b) => {
+      let aVal, bVal;
+      if (sortField === 'total') { aVal = a.total || 0; bVal = b.total || 0; }
+      else if (sortField === 'status') { aVal = a.status || ''; bVal = b.status || ''; }
+      else if (sortField === 'tickets') { aVal = a.tickets || 0; bVal = b.tickets || 0; }
+      else { aVal = a.date || ''; bVal = b.date || ''; } // date
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [orders, searchText, advFilters, sortField, sortDir]);
 
   const handleDownloadInvoice = (order) => {
     try {
@@ -296,6 +382,26 @@ Payment Method: ${order.paymentMethod}
           <p className="text-muted mb-0">View your order history and track your purchases</p>
         </div>
 
+        {/* Advanced Search */}
+        <div className="mb-4">
+          <AdvancedSearchBar
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            onSearch={() => {}}
+            onReset={handleAdvReset}
+            placeholder="Search by order number or match name…"
+            filters={orderFilterDefs}
+            filterValues={advFilters}
+            onFilterChange={handleAdvFilterChange}
+            sortOptions={orderSortOptions}
+            sortValue={sortField}
+            sortDir={sortDir}
+            onSortChange={(f, d) => { setSortField(f); setSortDir(d); }}
+            resultCount={filteredOrders.length}
+            totalCount={orders.length}
+          />
+        </div>
+
         <Row className="g-3 mb-4">
           <Col xs={12} md={4}>
             <Card className="text-center shadow-sm border-0">
@@ -334,9 +440,16 @@ Payment Method: ${order.paymentMethod}
               Browse Matches
             </Button>
           </Card>
+        ) : filteredOrders.length === 0 ? (
+          <Card className="text-center shadow-sm border-0 p-4">
+            <div className="display-4 mb-3">🔍</div>
+            <h2 className="h5">No Orders Match Your Search</h2>
+            <p className="text-muted mb-3">Try adjusting your filters.</p>
+            <Button variant="outline-secondary" size="sm" onClick={handleAdvReset}>Reset Filters</Button>
+          </Card>
         ) : (
           <div className="d-flex flex-column gap-3">
-            {orders.map(order => (
+            {filteredOrders.map(order => (
               <Card key={order.id} className="shadow-sm border-0">
                 <Card.Body>
                   <div className="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">

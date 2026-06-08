@@ -8,15 +8,15 @@ class StadiumRepository {
   // ==================== STADIUM OPERATIONS ====================
 
   // Get all stadiums with pagination and filters
-  async getAllStadiums(page = 1, limit = 10, search = '', city = '', isActive = null) {
+  async getAllStadiums(page = 1, limit = 10, search = '', city = '', isActive = null, options = {}) {
     const offset = (page - 1) * limit;
     let whereClause = 'WHERE 1=1';
     const params = [];
 
     if (search) {
-      whereClause += ' AND (s.name LIKE ? OR s.city LIKE ? OR s.address LIKE ?)';
+      whereClause += ' AND (s.name LIKE ? OR s.city LIKE ? OR s.address LIKE ? OR s.country LIKE ? OR s.description LIKE ?)';
       const searchParam = `%${search}%`;
-      params.push(searchParam, searchParam, searchParam);
+      params.push(searchParam, searchParam, searchParam, searchParam, searchParam);
     }
 
     if (city) {
@@ -27,6 +27,34 @@ class StadiumRepository {
     if (isActive !== null) {
       whereClause += ' AND s.is_active = ?';
       params.push(isActive);
+    }
+
+    if (options.country) {
+      whereClause += ' AND s.country LIKE ?';
+      params.push(`%${options.country}%`);
+    }
+
+    if (options.capacityMin !== undefined && options.capacityMin !== '') {
+      whereClause += ' AND s.capacity >= ?';
+      params.push(parseInt(options.capacityMin));
+    }
+
+    if (options.capacityMax !== undefined && options.capacityMax !== '') {
+      whereClause += ' AND s.capacity <= ?';
+      params.push(parseInt(options.capacityMax));
+    }
+
+    let orderSql = 'ORDER BY s.created_at DESC';
+    if (options.sortBy) {
+      const allowedSortFields = {
+        name: 's.name',
+        capacity: 's.capacity',
+        city: 's.city',
+        country: 's.country'
+      };
+      const field = allowedSortFields[options.sortBy] || 's.created_at';
+      const dir = (options.sortDir && options.sortDir.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+      orderSql = `ORDER BY ${field} ${dir}`;
     }
 
     // Get total count
@@ -55,7 +83,7 @@ class StadiumRepository {
       LEFT JOIN users u1 ON s.created_by = u1.id
       LEFT JOIN users u2 ON s.updated_by = u2.id
       ${whereClause}
-      ORDER BY s.created_at DESC
+      ${orderSql}
       LIMIT ? OFFSET ?
     `, [...params, parseInt(limit), parseInt(offset)]);
 

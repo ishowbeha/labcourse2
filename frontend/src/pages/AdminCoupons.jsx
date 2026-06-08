@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Form, Table, Badge, Spinner } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const AdminCoupons = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -13,13 +14,77 @@ const AdminCoupons = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ code: '', description: '', discount_type: 'percentage', discount_value: '', max_uses: '100' });
 
-  useEffect(() => { if (!isAdmin()) { navigate('/home'); return; } fetchCoupons(); }, []);
+  // Advanced search state
+  const [searchText, setSearchText] = useState('');
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const couponSortOptions = [
+    { value: 'code', label: 'Code (A–Z)' },
+    { value: 'discount_value', label: 'Discount Value' },
+    { value: 'used_count', label: 'Usage Count' },
+  ];
+
+  const couponFilterDefs = [
+    { id: 'discount_type', label: 'Type', type: 'select', options: [
+      { value: 'percentage', label: '% Percentage' },
+      { value: 'fixed', label: '€ Fixed' },
+    ]},
+    { id: 'is_active', label: 'Status', type: 'select', options: [
+      { value: '1', label: 'Active' },
+      { value: '0', label: 'Inactive' },
+    ]},
+  ];
 
   const fetchCoupons = async () => {
     setLoading(true);
     try { const r = await api.get('/admin/coupons'); setCoupons(r?.data || []); } catch (e) { console.error(e); }
     setLoading(false);
   };
+
+  const handleAdvFilterChange = (id, value) => setAdvFilters((prev) => ({ ...prev, [id]: value }));
+
+  const handleAdvReset = () => {
+    setSearchText('');
+    setAdvFilters({});
+    setSortField('');
+    setSortDir('asc');
+  };
+
+  // Client-side filtered + sorted coupons
+  const filteredCoupons = useMemo(() => {
+    let list = [...coupons];
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase();
+      list = list.filter((c) =>
+        (c.code || '').toLowerCase().includes(q) ||
+        (c.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (advFilters.discount_type) {
+      list = list.filter((c) => c.discount_type === advFilters.discount_type);
+    }
+    if (advFilters.is_active !== '' && advFilters.is_active !== undefined) {
+      list = list.filter((c) => String(c.is_active ? '1' : '0') === advFilters.is_active);
+    }
+    if (sortField) {
+      list = [...list].sort((a, b) => {
+        let aVal = sortField === 'code' ? (a.code || '').toLowerCase()
+          : sortField === 'discount_value' ? Number(a.discount_value || 0)
+          : sortField === 'used_count' ? Number(a.used_count || 0)
+          : (a.code || '').toLowerCase();
+        let bVal = sortField === 'code' ? (b.code || '').toLowerCase()
+          : sortField === 'discount_value' ? Number(b.discount_value || 0)
+          : sortField === 'used_count' ? Number(b.used_count || 0)
+          : (b.code || '').toLowerCase();
+        if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return list;
+  }, [coupons, searchText, advFilters, sortField, sortDir]);
 
   const createCoupon = async () => {
     try { await api.post('/admin/coupons', form); setShowForm(false); setForm({ code: '', description: '', discount_type: 'percentage', discount_value: '', max_uses: '100' }); fetchCoupons(); } catch (e) { try { const m = await e.response?.data?.message || e.message; alert('Error: ' + m); } catch(e2) { alert('Error creating coupon'); } }
@@ -34,16 +99,38 @@ const AdminCoupons = () => {
     try { await api.delete(`/admin/coupons/${id}`); fetchCoupons(); } catch (e) { console.error('Delete failed:', e.message); }
   };
 
+  useEffect(() => { if (!isAdmin()) { navigate('/home'); return; } fetchCoupons(); }, []);
+
   return (
     <div className="min-vh-100 bg-light">
       <LazyAdminNavbar title="🎫 Coupon Management" subtitle="Create and manage discount codes" />
 
       <Container className="py-4">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="h5 text-dark mb-0">All Coupons ({coupons.length})</h2>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h2 className="h5 text-dark mb-0">All Coupons ({filteredCoupons.length}{filteredCoupons.length !== coupons.length ? ` / ${coupons.length}` : ''})</h2>
           <Button variant={showForm ? 'danger' : 'success'} onClick={() => setShowForm(!showForm)}>
             {showForm ? '✕ Cancel' : '+ New Coupon'}
           </Button>
+        </div>
+
+        {/* Advanced Search Bar */}
+        <div className="mb-4">
+          <AdvancedSearchBar
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            onSearch={() => {}}
+            onReset={handleAdvReset}
+            placeholder="Search by code or description…"
+            filters={couponFilterDefs}
+            filterValues={advFilters}
+            onFilterChange={handleAdvFilterChange}
+            sortOptions={couponSortOptions}
+            sortValue={sortField}
+            sortDir={sortDir}
+            onSortChange={(f, d) => { setSortField(f); setSortDir(d); }}
+            resultCount={filteredCoupons.length}
+            totalCount={coupons.length}
+          />
         </div>
 
         {showForm && (
@@ -113,12 +200,16 @@ const AdminCoupons = () => {
             <Spinner animation="border" variant="primary" />
             <p className="text-muted mt-2 mb-0">Loading...</p>
           </div>
-        ) : coupons.length === 0 ? (
+        ) : filteredCoupons.length === 0 ? (
           <Card className="shadow-sm text-center py-5">
             <Card.Body>
-              <div className="display-4 mb-3">🎫</div>
-              <p className="fw-semibold mb-2">No coupons yet</p>
-              <p className="text-muted small mb-0">Create your first discount coupon to start promoting ticket sales.</p>
+              <div className="display-4 mb-3">🎟️</div>
+              <p className="fw-semibold mb-2">{coupons.length === 0 ? 'No coupons yet' : 'No coupons match your search'}</p>
+              <p className="text-muted small mb-0">
+                {coupons.length === 0
+                  ? 'Create your first discount coupon to start promoting ticket sales.'
+                  : <button className="btn btn-link p-0" onClick={handleAdvReset}>Reset filters</button>}
+              </p>
             </Card.Body>
           </Card>
         ) : (
@@ -135,7 +226,7 @@ const AdminCoupons = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {coupons.map(c => (
+                  {filteredCoupons.map(c => (
                     <tr key={c.id}>
                       <td>
                         <strong className="font-monospace fs-6">{c.code}</strong>

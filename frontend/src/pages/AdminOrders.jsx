@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 import axios from 'axios';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const AdminOrders = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -28,20 +29,56 @@ const AdminOrders = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(null);
 
+  // Advanced search state
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const orderSortOptions = [
+    { value: 'createdAt', label: 'Date' },
+    { value: 'totalAmount', label: 'Amount' },
+    { value: 'status', label: 'Status' },
+  ];
+
+  const orderFilterDefs = [
+    { id: 'status', label: 'Status', type: 'select', options: [
+      { value: 'pending', label: 'Pending' },
+      { value: 'confirmed', label: 'Confirmed' },
+      { value: 'completed', label: 'Completed' },
+      { value: 'cancelled', label: 'Cancelled' },
+      { value: 'refunded', label: 'Refunded' },
+    ]},
+    { id: 'paymentMethod', label: 'Payment Method', type: 'select', options: [
+      { value: 'credit-card', label: '💳 Credit Card' },
+      { value: 'paypal', label: '🅿️ PayPal' },
+      { value: 'bank-transfer', label: '🏦 Bank Transfer' },
+    ]},
+    { id: 'dateFrom', label: 'Date From', type: 'date' },
+    { id: 'dateTo', label: 'Date To', type: 'date' },
+    { id: 'amountMin', label: 'Min Amount (€)', type: 'number', placeholder: '0', min: 0 },
+    { id: 'amountMax', label: 'Max Amount (€)', type: 'number', placeholder: '5000', min: 0 },
+  ];
+
   useEffect(() => {
     if (!isAdmin()) {
       navigate('/home');
       return;
     }
     fetchOrders();
-  }, [page, statusFilter]);
+  }, [page, statusFilter, searchQuery, advFilters, sortField, sortDir]);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
       const params = { page, limit: 20 };
-      if (statusFilter) params.status = statusFilter;
+      if (advFilters.status || statusFilter) params.status = advFilters.status || statusFilter;
       if (searchQuery) params.search = searchQuery;
+      if (advFilters.dateFrom) params.dateFrom = advFilters.dateFrom;
+      if (advFilters.dateTo) params.dateTo = advFilters.dateTo;
+      if (advFilters.amountMin) params.amountMin = advFilters.amountMin;
+      if (advFilters.amountMax) params.amountMax = advFilters.amountMax;
+      if (advFilters.paymentMethod) params.paymentMethod = advFilters.paymentMethod;
+      if (sortField) { params.sortBy = sortField; params.sortDir = sortDir; }
 
       const response = await AdminService.getOrders(params);
       if (response.success) {
@@ -57,9 +94,23 @@ const AdminOrders = () => {
   };
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setPage(1);
     fetchOrders();
+  };
+
+  const handleAdvFilterChange = (id, value) => {
+    setAdvFilters((prev) => ({ ...prev, [id]: value }));
+    setPage(1);
+  };
+
+  const handleAdvReset = () => {
+    setSearchQuery('');
+    setStatusFilter('');
+    setAdvFilters({});
+    setSortField('');
+    setSortDir('desc');
+    setPage(1);
   };
 
   const handleViewDetails = async (orderId) => {
@@ -174,47 +225,23 @@ const AdminOrders = () => {
           </Alert>
         )}
 
-        <Card className="shadow-sm mb-4">
-          <Card.Body>
-            <div className="d-flex flex-wrap justify-content-between align-items-center gap-3">
-              <Form onSubmit={handleSearch} className="d-flex flex-wrap align-items-center gap-2 flex-grow-1">
-                <Form.Control
-                  type="text"
-                  placeholder="Search by order #, customer name, email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-grow-1"
-                />
-                <Button type="submit" variant="primary">🔍 Search</Button>
-                {searchQuery && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => { setSearchQuery(''); setPage(1); fetchOrders(); }}
-                  >
-                    ✕ Clear
-                  </Button>
-                )}
-              </Form>
-              <div className="d-flex align-items-center gap-2">
-                <Form.Label className="mb-0 fw-semibold small">Status:</Form.Label>
-                <Form.Select
-                  value={statusFilter}
-                  onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-                  className="w-auto"
-                >
-                  <option value="">All Orders</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="refunded">Refunded</option>
-                </Form.Select>
-              </div>
-              <span className="text-muted small">{orders.length} order(s)</span>
-            </div>
-          </Card.Body>
-        </Card>
+        {/* Advanced Search Bar */}
+        <div className="mb-4">
+          <AdvancedSearchBar
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            onSearch={handleSearch}
+            onReset={handleAdvReset}
+            placeholder="Search by order #, customer name, email…"
+            filters={orderFilterDefs}
+            filterValues={advFilters}
+            onFilterChange={handleAdvFilterChange}
+            sortOptions={orderSortOptions}
+            sortValue={sortField}
+            sortDir={sortDir}
+            onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPage(1); }}
+          />
+        </div>
 
         {loading ? (
           <div className="d-flex flex-column align-items-center justify-content-center py-5 gap-3">

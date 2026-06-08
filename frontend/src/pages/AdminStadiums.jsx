@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 // ─── Tier helpers ────────────────────────────────────────────────────────────
 const getTierInfo = (name = '', multiplier = 1) => {
@@ -178,19 +179,46 @@ const AdminStadiums = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
+  // Advanced search state
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const stadiumSortOptions = [
+    { value: 'name', label: 'Name (A–Z)' },
+    { value: 'capacity', label: 'Capacity' },
+    { value: 'city', label: 'City' },
+  ];
+
+  const stadiumFilterDefs = [
+    { id: 'country', label: 'Country', type: 'text', placeholder: 'e.g. Albania' },
+    { id: 'capacityMin', label: 'Min Capacity', type: 'number', placeholder: '0', min: 0 },
+    { id: 'capacityMax', label: 'Max Capacity', type: 'number', placeholder: '100000', min: 0 },
+    { id: 'isActive', label: 'Status', type: 'select', options: [
+      { value: '1', label: 'Active' },
+      { value: '0', label: 'Inactive' },
+    ]},
+  ];
+
   useEffect(() => {
     if (!isAdmin()) { navigate('/home'); return; }
     fetchStadiums();
     fetchCities();
-  }, [pagination.page, search, selectedCity]);
+  }, [pagination.page, search, selectedCity, advFilters, sortField, sortDir]);
 
   // ── Data fetchers ────────────────────────────────────────────────────────
   const fetchStadiums = async () => {
     try {
       setLoading(true);
-      const response = await AdminService.getStadiums({
-        page: pagination.page, limit: pagination.limit, search, city: selectedCity,
-      });
+      const params = {
+        page: pagination.page, limit: pagination.limit, search, city: advFilters.city || selectedCity,
+        ...(advFilters.country ? { country: advFilters.country } : {}),
+        ...(advFilters.capacityMin ? { capacityMin: advFilters.capacityMin } : {}),
+        ...(advFilters.capacityMax ? { capacityMax: advFilters.capacityMax } : {}),
+        ...(advFilters.isActive !== '' && advFilters.isActive !== undefined ? { isActive: advFilters.isActive } : {}),
+        ...(sortField ? { sortBy: sortField, sortDir } : {}),
+      };
+      const response = await AdminService.getStadiums(params);
       if (response.success && response.data) {
         setStadiums(response.data.stadiums || []);
         setPagination({
@@ -507,30 +535,36 @@ const AdminStadiums = () => {
         ) : (
           /* ══ STADIUMS LIST ════════════════════════════════════════════════ */
           <div>
-            <Row className="g-3 mb-4 align-items-center">
-              <Col xs={12} lg>
-                <Form onSubmit={(e) => { e.preventDefault(); setPagination(p => ({ ...p, page: 1 })); fetchStadiums(); }} className="d-flex gap-2">
-                  <Form.Control
-                    type="text"
-                    placeholder="Search by name, city, or address…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  <Button type="submit" variant="primary">Search</Button>
-                </Form>
-              </Col>
-              <Col xs={12} sm={6} md={4} lg="auto">
-                <Form.Select value={selectedCity} onChange={(e) => { setSelectedCity(e.target.value); setPagination(p => ({ ...p, page: 1 })); }}>
-                  <option value="">All Cities</option>
-                  {cities.map(city => <option key={city} value={city}>{city}</option>)}
-                </Form.Select>
-              </Col>
-              <Col xs={12} sm={6} md="auto">
-                <Button variant="success" onClick={openCreateStadiumModal} className="w-100">
-                  + Add Stadium
-                </Button>
-              </Col>
-            </Row>
+            {/* Advanced Search Bar */}
+            <div className="mb-4">
+              <AdvancedSearchBar
+                searchValue={search}
+                onSearchChange={setSearch}
+                onSearch={(e) => { if (e) e.preventDefault(); setPagination(p => ({ ...p, page: 1 })); fetchStadiums(); }}
+                onReset={() => {
+                  setSearch('');
+                  setSelectedCity('');
+                  setAdvFilters({});
+                  setSortField('');
+                  setSortDir('asc');
+                  setPagination(p => ({ ...p, page: 1 }));
+                }}
+                placeholder="Search by name, city, address…"
+                filters={stadiumFilterDefs}
+                filterValues={advFilters}
+                onFilterChange={(id, value) => { setAdvFilters(prev => ({ ...prev, [id]: value })); setPagination(p => ({...p, page: 1})); }}
+                sortOptions={stadiumSortOptions}
+                sortValue={sortField}
+                sortDir={sortDir}
+                onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPagination(p => ({...p, page: 1})); }}
+                resultCount={pagination.total}
+              />
+            </div>
+            <div className="d-flex justify-content-end mb-3">
+              <Button variant="success" onClick={openCreateStadiumModal}>
+                + Add Stadium
+              </Button>
+            </div>
 
             {loading ? (
               <div className="text-center py-5">

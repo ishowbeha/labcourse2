@@ -9,9 +9,9 @@ class StadiumService {
   // ==================== STADIUM OPERATIONS ====================
 
   // Get all stadiums with pagination and filters
-  async getAllStadiums(page = 1, limit = 10, search = '', city = '', isActive = null) {
+  async getAllStadiums(page = 1, limit = 10, search = '', city = '', isActive = null, options = {}) {
     try {
-      return await this.repository.getAllStadiums(page, limit, search, city, isActive);
+      return await this.repository.getAllStadiums(page, limit, search, city, isActive, options);
     } catch (error) {
       throw new Error(`Failed to fetch stadiums: ${error.message}`);
     }

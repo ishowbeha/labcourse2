@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
 import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
+import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const AdminMatches = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -20,6 +21,33 @@ const AdminMatches = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [advFilters, setAdvFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const matchSortOptions = [
+    { value: 'matchDate', label: 'Match Date' },
+    { value: 'basePrice', label: 'Base Price' },
+    { value: 'revenue', label: 'Revenue' },
+    { value: 'homeTeam', label: 'Home Team' },
+  ];
+
+  const matchFilterDefs = [
+    { id: 'status', label: 'Status', type: 'select', options: [
+      { value: 'scheduled', label: 'Scheduled' },
+      { value: 'live', label: 'Live' },
+      { value: 'completed', label: 'Completed' },
+      { value: 'cancelled', label: 'Cancelled' },
+      { value: 'postponed', label: 'Postponed' },
+    ]},
+    { id: 'dateFrom', label: 'Date From', type: 'date' },
+    { id: 'dateTo', label: 'Date To', type: 'date' },
+    { id: 'priceMin', label: 'Min Price (€)', type: 'number', placeholder: '0', min: 0 },
+    { id: 'priceMax', label: 'Max Price (€)', type: 'number', placeholder: '1000', min: 0 },
+    { id: 'stadiumId', label: 'Stadium', type: 'select', options:
+      stadiums.map(s => ({ value: String(s.id), label: `${s.name} (${s.city})` }))
+    },
+  ];
 
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState(null);
@@ -51,25 +79,30 @@ const AdminMatches = () => {
       return;
     }
     fetchMatches();
-  }, [pagination.page, statusFilter, search, dateFrom, dateTo]);
+  }, [pagination.page, statusFilter, search, dateFrom, dateTo, advFilters, sortField, sortDir]);
 
   useEffect(() => {
-    if (showMatchModal && stadiums.length === 0) {
+    if (isAdmin()) {
       fetchStadiums();
     }
-  }, [showMatchModal]);
+  }, []);
 
   const fetchMatches = async () => {
     try {
       setLoading(true);
-      const response = await AdminService.getAdminMatches({
+      const params = {
         page: pagination.page,
         limit: pagination.limit,
         search,
-        status: statusFilter,
-        dateFrom,
-        dateTo
-      });
+        status: advFilters.status || statusFilter,
+        dateFrom: advFilters.dateFrom || dateFrom,
+        dateTo: advFilters.dateTo || dateTo,
+        ...(advFilters.priceMin ? { priceMin: advFilters.priceMin } : {}),
+        ...(advFilters.priceMax ? { priceMax: advFilters.priceMax } : {}),
+        ...(advFilters.stadiumId ? { stadiumId: advFilters.stadiumId } : {}),
+        ...(sortField ? { sortBy: sortField, sortDir } : {}),
+      };
+      const response = await AdminService.getAdminMatches(params);
       if (response.success && response.data) {
         setMatches(response.data.matches || []);
         setPagination({
@@ -113,7 +146,7 @@ const AdminMatches = () => {
   };
 
   const handleSearch = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSearch(searchInput);
     setPagination({ ...pagination, page: 1 });
   };
@@ -121,6 +154,23 @@ const AdminMatches = () => {
   const handleStatusFilter = (e) => {
     setStatusFilter(e.target.value);
     setPagination({ ...pagination, page: 1 });
+  };
+
+  const handleAdvFilterChange = (id, value) => {
+    setAdvFilters((prev) => ({ ...prev, [id]: value }));
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  };
+
+  const handleAdvReset = () => {
+    setSearchInput('');
+    setSearch('');
+    setAdvFilters({});
+    setStatusFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setSortField('');
+    setSortDir('asc');
+    setPagination((prev) => ({ ...prev, page: 1 }));
   };
 
   const openCreateMatchModal = () => {
@@ -404,48 +454,29 @@ const AdminMatches = () => {
           </div>
         ) : (
           <div>
-            <Row className="g-3 mb-4 align-items-center">
-              <Col xs={12} lg>
-                <Form onSubmit={handleSearch} className="d-flex gap-2">
-                  <Form.Control
-                    type="text"
-                    placeholder="Search by team, competition, stadium or date..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                  />
-                  <Button type="submit" variant="primary">Search</Button>
-                </Form>
-              </Col>
-              <Col xs={6} md={4} lg="auto">
-                <Form.Select value={statusFilter} onChange={handleStatusFilter}>
-                  <option value="">All Statuses</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="live">Live</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="postponed">Postponed</option>
-                </Form.Select>
-              </Col>
-              <Col xs={6} md={4} lg="auto">
-                <Form.Control
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => { setDateFrom(e.target.value); setPagination({ ...pagination, page: 1 }); }}
-                />
-              </Col>
-              <Col xs={6} md={4} lg="auto">
-                <Form.Control
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => { setDateTo(e.target.value); setPagination({ ...pagination, page: 1 }); }}
-                />
-              </Col>
-              <Col xs={6} md="auto">
-                <Button variant="success" onClick={openCreateMatchModal} className="w-100">
-                  + Add Match
-                </Button>
-              </Col>
-            </Row>
+            {/* Advanced Search Bar */}
+            <div className="mb-4">
+              <AdvancedSearchBar
+                searchValue={searchInput}
+                onSearchChange={setSearchInput}
+                onSearch={handleSearch}
+                onReset={handleAdvReset}
+                placeholder="Search by team, competition, stadium…"
+                filters={matchFilterDefs}
+                filterValues={advFilters}
+                onFilterChange={handleAdvFilterChange}
+                sortOptions={matchSortOptions}
+                sortValue={sortField}
+                sortDir={sortDir}
+                onSortChange={(f, d) => { setSortField(f); setSortDir(d); setPagination(p => ({...p, page:1})); }}
+                resultCount={pagination.total}
+              />
+            </div>
+            <div className="d-flex justify-content-end mb-3">
+              <Button variant="success" onClick={openCreateMatchModal}>
+                + Add Match
+              </Button>
+            </div>
 
             {loading ? (
               <div className="text-center py-5">

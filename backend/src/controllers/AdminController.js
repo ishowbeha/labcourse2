@@ -22,12 +22,13 @@ class AdminController {
   // User Management
   async getAllUsers(req, res, next) {
     try {
-      const { page = 1, limit = 10, search = '', role = '' } = req.query;
+      const { page = 1, limit = 10, search = '', role = '', isActive = '', dateFrom = '', dateTo = '', sortBy = '', sortDir = '' } = req.query;
       const result = await this.service.getAllUsers(
         parseInt(page),
         parseInt(limit),
         search,
-        role
+        role,
+        { isActive, dateFrom, dateTo, sortBy, sortDir }
       );
       res.json({
         success: true,
@@ -152,12 +153,13 @@ class AdminController {
   // Reports - Orders
   async getOrders(req, res, next) {
     try {
-      const { page = 1, limit = 10, status = '', search = '' } = req.query;
+      const { page = 1, limit = 10, status = '', search = '', dateFrom = '', dateTo = '', amountMin = '', amountMax = '', paymentMethod = '', sortBy = '', sortDir = '' } = req.query;
       const result = await this.service.getOrdersWithDetails(
         parseInt(page),
         parseInt(limit),
         status,
-        search
+        search,
+        { dateFrom, dateTo, amountMin, amountMax, paymentMethod, sortBy, sortDir }
       );
       res.json({
         success: true,

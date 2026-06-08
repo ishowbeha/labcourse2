@@ -27,9 +27,9 @@ class MatchController {
   // Get paginated admin matches with ticket stats
   async getAdminMatches(req, res) {
     try {
-      const { page, limit, status, search, team, stadium, competition, dateFrom, dateTo } = req.query;
+      const { page, limit, status, search, team, stadium, competition, dateFrom, dateTo, priceMin, priceMax, stadiumId, sortBy, sortDir } = req.query;
       
-      const filters = { page, limit, status, search, team, stadium, competition, dateFrom, dateTo };
+      const filters = { page, limit, status, search, team, stadium, competition, dateFrom, dateTo, priceMin, priceMax, stadiumId, sortBy, sortDir };
       Object.keys(filters).forEach(key => {
         if (filters[key] === undefined || filters[key] === '') {
           delete filters[key];
