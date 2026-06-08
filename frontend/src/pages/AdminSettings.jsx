@@ -250,28 +250,27 @@ const AdminSettings = () => {
     }
   };
 
-  // ── Dark mode live preview ──
-  const handleDarkModeChange = (val) => {
-    update('darkMode', val);
-    applyDarkMode(val);
-  };
-
+  // ── Dark mode — live preview + save to MySQL on Save button ──
   const applyDarkMode = (isDark) => {
     if (isDark) {
       document.documentElement.setAttribute('data-theme', 'dark');
-      document.body.style.backgroundColor = '#1a1a2e';
-      document.body.style.color = '#e2e8f0';
     } else {
       document.documentElement.removeAttribute('data-theme');
-      document.body.style.backgroundColor = '';
-      document.body.style.color = '';
     }
+    document.body.style.backgroundColor = '';
+    document.body.style.color = '';
   };
 
-  // Apply dark mode whenever setting loads from DB
+  const handleDarkModeChange = (val) => {
+    update('darkMode', val);
+    applyDarkMode(val);  // instant live preview
+  };
+
+  // Re-apply theme whenever settings load from DB
   useEffect(() => {
     if (settings) applyDarkMode(settings.darkMode);
   }, [settings?.darkMode]);
+
 
   // ── Quick Actions ──
   const setAction = (key, status) => setActionStatus(prev => ({ ...prev, [key]: status }));

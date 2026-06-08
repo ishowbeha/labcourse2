@@ -65,15 +65,17 @@ const isAdminUser = () => {
 const applyTheme = (settings) => {
   if (settings.dark_mode) {
     document.documentElement.setAttribute('data-theme', 'dark');
-    document.body.style.backgroundColor = '#1a1a2e';
   } else {
     document.documentElement.removeAttribute('data-theme');
-    document.body.style.backgroundColor = '';
   }
+  document.body.style.backgroundColor = '';
+  document.body.style.color = '';
   document.documentElement.style.setProperty('--primary-color', settings.primary_color || '#3498db');
   document.documentElement.style.setProperty('--accent-color', settings.accent_color || '#2ecc71');
   document.documentElement.lang = settings.language || 'en';
 };
+
+
 
 export const useSettingsStore = create((set, get) => ({
   settings: DEFAULT_SETTINGS,

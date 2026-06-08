@@ -26,7 +26,7 @@ export default function AdminNavbar({
           <div className="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
             <Link
               to="/home"
-              className="btn btn-sm btn-outline-success rounded-pill text-nowrap flex-shrink-0"
+              className="btn btn-sm text-nowrap flex-shrink-0" style={{ border: '1px solid rgba(0,230,118,0.5)', color: '#00e676', borderRadius: '20px' }}
             >
               🏠 Home Site
             </Link>
@@ -52,7 +52,7 @@ export default function AdminNavbar({
             <div className="d-none d-lg-flex align-items-center gap-3">
               <div className="text-end">
                 <div className="small fw-semibold">{user?.first_name} {user?.last_name}</div>
-                <div className="text-primary small fw-bold" style={{ letterSpacing: '0.8px', fontSize: '10px' }}>
+                <div style={{ color: '#00e676', fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em' }}>
                   ADMINISTRATOR
                 </div>
               </div>
@@ -81,7 +81,7 @@ export default function AdminNavbar({
           <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary">
             <div>
               <div className="fw-semibold">{user?.first_name} {user?.last_name}</div>
-              <div className="text-primary small fw-bold">ADMINISTRATOR</div>
+              <div style={{ color: '#00e676', fontSize: '10px', fontWeight: 800, letterSpacing: '0.12em' }}>ADMINISTRATOR</div>
             </div>
             <Button variant="outline-light" size="sm" onClick={handleLogout}>
               Logout
@@ -92,8 +92,7 @@ export default function AdminNavbar({
             <Link
               to="/home"
               onClick={() => setMenuOpen(false)}
-              className="text-decoration-none text-success fw-bold p-2 rounded border-start border-success border-3"
-            >
+              className="text-decoration-none fw-bold p-2 rounded border-start border-3" style={{ color: '#00e676', borderColor: '#00e676' }}>
               🏠 Home Site
             </Link>
             {backTo !== false && (

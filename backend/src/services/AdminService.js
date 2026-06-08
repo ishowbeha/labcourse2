@@ -196,9 +196,22 @@ class AdminService {
   async generateDynamicReport({ dateFrom, dateTo, metrics = ['tickets_sold', 'revenue'], groupBy = 'none', filters = {} }) {
     try {
       const selects = [];
-      const joins = [];
+      const selectParams = [];
+      const whereParams = [];
+      const joins = new Set();
       const wheres = [];
-      const params = [];
+
+      // Determine which joins are needed
+      const needMatches = groupBy === 'match' || groupBy === 'stadium' || filters.stadiumId;
+      const needStadiums = groupBy === 'stadium';
+
+      if (needMatches) {
+        joins.add('LEFT JOIN tickets t ON oi.ticket_id = t.id');
+        joins.add('LEFT JOIN matches m ON t.match_id = m.id');
+      }
+      if (needStadiums) {
+        joins.add('LEFT JOIN stadiums s ON m.stadium_id = s.id');
+      }
 
       // Build SELECT columns based on metrics
       if (metrics.includes('tickets_sold')) {
@@ -217,12 +230,24 @@ class AdminService {
         selects.push('SUM(CASE WHEN o.status = "cancelled" THEN 1 ELSE 0 END) as cancellations');
       }
       if (metrics.includes('registrations')) {
-        selects.push('(SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ?) as registrations');
-        params.push(dateFrom || '2020-01-01', dateTo || '2030-01-01');
+        if (groupBy === 'day') {
+          selects.push('(SELECT COUNT(*) FROM users WHERE DATE(created_at) = DATE(o.created_at)) as registrations');
+        } else if (groupBy === 'month') {
+          selects.push('(SELECT COUNT(*) FROM users WHERE DATE_FORMAT(created_at, "%Y-%m") = DATE_FORMAT(o.created_at, "%Y-%m")) as registrations');
+        } else {
+          selects.push('(SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ?) as registrations');
+          selectParams.push(dateFrom || '2020-01-01', (dateTo || '2030-01-01') + ' 23:59:59');
+        }
       }
       if (metrics.includes('logins')) {
-        selects.push('(SELECT COUNT(*) FROM audit_logs WHERE action = "login" AND created_at BETWEEN ? AND ?) as logins');
-        params.push(dateFrom || '2020-01-01', dateTo || '2030-01-01');
+        if (groupBy === 'day') {
+          selects.push('(SELECT COUNT(*) FROM audit_logs WHERE action = "login" AND DATE(created_at) = DATE(o.created_at)) as logins');
+        } else if (groupBy === 'month') {
+          selects.push('(SELECT COUNT(*) FROM audit_logs WHERE action = "login" AND DATE_FORMAT(created_at, "%Y-%m") = DATE_FORMAT(o.created_at, "%Y-%m")) as logins');
+        } else {
+          selects.push('(SELECT COUNT(*) FROM audit_logs WHERE action = "login" AND created_at BETWEEN ? AND ?) as logins');
+          selectParams.push(dateFrom || '2020-01-01', (dateTo || '2030-01-01') + ' 23:59:59');
+        }
       }
 
       // GROUP BY
@@ -230,13 +255,10 @@ class AdminService {
       let selectGroupBy = '';
       if (groupBy === 'match') {
         selectGroupBy = 'CONCAT(m.home_team, " vs ", m.away_team) as label';
-        groupBySql = 'GROUP BY m.id, m.home_team, m.away_team ORDER BY revenue DESC';
-        joins.push('LEFT JOIN matches m ON o.match_id = m.id');
+        groupBySql = 'GROUP BY m.id, m.home_team, m.away_team ORDER BY label ASC';
       } else if (groupBy === 'stadium') {
         selectGroupBy = 's.name as label';
-        groupBySql = 'GROUP BY s.id, s.name ORDER BY revenue DESC';
-        joins.push('LEFT JOIN matches m ON o.match_id = m.id');
-        joins.push('LEFT JOIN stadiums s ON m.stadium_id = s.id');
+        groupBySql = 'GROUP BY s.id, s.name ORDER BY label ASC';
       } else if (groupBy === 'day') {
         selectGroupBy = 'DATE(o.created_at) as label';
         groupBySql = 'GROUP BY DATE(o.created_at) ORDER BY label ASC';
@@ -250,22 +272,21 @@ class AdminService {
       // Date filter
       if (dateFrom) {
         wheres.push('o.created_at >= ?');
-        params.push(dateFrom);
+        whereParams.push(dateFrom);
       }
       if (dateTo) {
         wheres.push('o.created_at <= ?');
-        params.push(dateTo + ' 23:59:59');
+        whereParams.push(dateTo + ' 23:59:59');
       }
 
       // Additional filters
       if (filters.stadiumId) {
         wheres.push('m.stadium_id = ?');
-        params.push(filters.stadiumId);
-        joins.push('LEFT JOIN matches m ON o.match_id = m.id');
+        whereParams.push(filters.stadiumId);
       }
       if (filters.status) {
         wheres.push('o.status = ?');
-        params.push(filters.status);
+        whereParams.push(filters.status);
       }
 
       const whereClause = wheres.length > 0 ? 'WHERE ' + wheres.join(' AND ') : '';
@@ -274,8 +295,8 @@ class AdminService {
         selects.push('COALESCE(SUM(oi.quantity), 0) as tickets_sold', 'COALESCE(SUM(o.total_amount), 0) as revenue');
       }
 
-      // Only run order-based query if we have order metrics
-      const hasOrderMetrics = metrics.some(m => ['tickets_sold', 'revenue', 'orders_count', 'avg_order_value', 'cancellations'].includes(m));
+      // Only run order-based query if we have order metrics or any grouping
+      const hasOrderMetrics = groupBy !== 'none' || metrics.some(m => ['tickets_sold', 'revenue', 'orders_count', 'avg_order_value', 'cancellations'].includes(m));
 
       let rows = [];
       if (hasOrderMetrics) {
@@ -283,15 +304,15 @@ class AdminService {
           SELECT ${selectGroupBy}, ${selects.join(', ')}
           FROM orders o
           LEFT JOIN order_items oi ON o.id = oi.order_id
-          ${joins.filter(j => !j.includes('audit_logs') && !j.includes('users')).join(' ')}
+          ${Array.from(joins).join(' ')}
           ${whereClause}
           ${groupBySql}
         `;
-        [rows] = await this.pool.query(sql, params);
+        [rows] = await this.pool.query(sql, [...selectParams, ...whereParams]);
       } else {
-        // For non-order metrics (registrations, logins), just return the subqueries
+        // For non-order metrics (registrations, logins) with no group by, just return the subqueries
         const sql = `SELECT ${selects.join(', ')} FROM DUAL`;
-        [rows] = await this.pool.query(sql, params);
+        [rows] = await this.pool.query(sql, selectParams);
         rows = rows.map(r => ({ label: 'Total', ...r }));
       }
 

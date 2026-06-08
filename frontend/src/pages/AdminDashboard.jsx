@@ -102,39 +102,48 @@ const AdminDashboard = () => {
     return new Intl.NumberFormat('en-US').format(value || 0);
   };
 
+  // Sporty accent palette — controlled, not rainbow
+  const accentColors = {
+    green:  '#00e676',
+    orange: '#ff6b35',
+    cyan:   '#00b4d8',
+    amber:  '#ffd166',
+    slate:  '#64748b',
+  };
+
   const dashboardItems = [
-    { title: '👥 User Management', description: 'Manage user accounts and roles', link: '/admin/users', borderClass: 'border-primary' },
-    { title: '🏟️ Stadium Management', description: 'Manage stadiums and sections', link: '/admin/stadiums', borderClass: 'border-success' },
-    { title: '⚽ Match Management', description: 'Schedule and manage matches', link: '/admin/matches', borderClass: 'border-danger' },
-    { title: '🎫 Ticket Management', description: 'View and manage all tickets', link: '/admin/tickets', borderClass: 'border-info' },
-    { title: '📋 Order Management', description: 'View and process orders', link: '/admin/orders', borderClass: 'border-warning' },
-    { title: '💳 Payment Management', description: 'Track payments and refunds', link: '/admin/payments', borderClass: 'border-success' },
-    { title: '🎫 Coupon Management', description: 'Manage discount coupons', link: '/admin/coupons', borderClass: 'border-warning' },
-    { title: '⭐ Reviews Management', description: 'Approve and manage user reviews', link: '/admin/reviews', borderClass: 'border-info' },
-    { title: '📊 Reports & Analytics', description: 'View sales and attendance reports', link: '/admin/reports', borderClass: 'border-warning' },
-    { title: '⚙️ System Settings', description: 'Configure system preferences', link: '/admin/settings', borderClass: 'border-secondary' },
+    { title: '👥 User Management',      description: 'Manage user accounts and roles',        link: '/admin/users',     accent: accentColors.cyan   },
+    { title: '🏟️ Stadium Management',   description: 'Manage stadiums and sections',           link: '/admin/stadiums',  accent: accentColors.green  },
+    { title: '⚽ Match Management',      description: 'Schedule and manage matches',            link: '/admin/matches',   accent: accentColors.orange },
+    { title: '🎫 Ticket Management',    description: 'View and manage all tickets',            link: '/admin/tickets',   accent: accentColors.amber  },
+    { title: '📋 Order Management',     description: 'View and process orders',               link: '/admin/orders',    accent: accentColors.cyan   },
+    { title: '💳 Payment Management',   description: 'Track payments and refunds',            link: '/admin/payments',  accent: accentColors.green  },
+    { title: '🎟️ Coupon Management',    description: 'Manage discount coupons',               link: '/admin/coupons',   accent: accentColors.amber  },
+    { title: '⭐ Reviews Management',   description: 'Approve and manage user reviews',       link: '/admin/reviews',   accent: accentColors.orange },
+    { title: '📊 Reports & Analytics',  description: 'View sales and attendance reports',     link: '/admin/reports',   accent: accentColors.cyan   },
+    { title: '⚙️ System Settings',      description: 'Configure system preferences',          link: '/admin/settings',  accent: accentColors.slate  },
   ];
 
   const statCards = [
-    { value: formatNumber(stats?.totalUsers), label: 'Registered Users', borderClass: 'border-primary' },
-    { value: formatNumber(stats?.totalMatches), label: 'Active Matches', borderClass: 'border-success' },
-    { value: formatNumber(stats?.totalTicketsSold || 0), label: 'Tickets Sold', borderClass: 'border-danger' },
-    { value: formatNumber(ticketsAvailable), label: 'Tickets Available', borderClass: 'border-warning' },
-    { value: formatCurrency(stats?.totalRevenue || 0), label: 'Total Revenue', borderClass: 'border-success' },
-    { value: formatNumber(stats?.recentOrders || 0), label: 'Total Orders', borderClass: 'border-info' },
+    { value: formatNumber(stats?.totalUsers),             label: 'Registered Users',   accent: accentColors.cyan   },
+    { value: formatNumber(stats?.totalMatches),           label: 'Active Matches',     accent: accentColors.orange },
+    { value: formatNumber(stats?.totalTicketsSold || 0),  label: 'Tickets Sold',       accent: accentColors.green  },
+    { value: formatNumber(ticketsAvailable),              label: 'Tickets Available',  accent: accentColors.amber  },
+    { value: formatCurrency(stats?.totalRevenue || 0),    label: 'Total Revenue',      accent: accentColors.green  },
+    { value: formatNumber(stats?.recentOrders || 0),      label: 'Total Orders',       accent: accentColors.cyan   },
   ];
 
   if (loading) {
     return (
-      <div className="min-vh-100 bg-light d-flex flex-column align-items-center justify-content-center gap-3">
-        <Spinner animation="border" variant="primary" />
-        <p className="text-muted mb-0">Loading dashboard...</p>
+      <div className="admin-sport-bg d-flex flex-column align-items-center justify-content-center gap-3" style={{ minHeight: '100vh' }}>
+        <div style={{ width: 42, height: 42, border: '3px solid #1c2030', borderTop: '3px solid #00e676', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <p style={{ color: '#6b7280', margin: 0, fontSize: '0.9rem', letterSpacing: '0.05em' }}>Loading dashboard…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-vh-100 bg-light">
+    <div className="admin-sport-bg">
       <LazyAdminNavbar title="🏟️ Admin Dashboard" subtitle={`Welcome back, ${user?.first_name || 'Admin'}!`} backTo={false} />
 
       <Container className="py-4">
@@ -145,31 +154,40 @@ const AdminDashboard = () => {
           </Alert>
         )}
 
+        {/* ── Stat cards ── */}
         <Row className="g-3 mb-4">
           {statCards.map((stat, index) => (
             <Col key={index} xs={12} md={6} lg={4}>
-              <Card className={`h-100 shadow-sm border-start border-4 ${stat.borderClass}`}>
-                <Card.Body className="text-center">
-                  <div className="fs-2 fw-bold text-dark">{stat.value}</div>
-                  <div className="text-muted small">{stat.label}</div>
-                </Card.Body>
-              </Card>
+              <div className="admin-stat-card shadow p-4 h-100">
+                <div className="stat-accent-bar" style={{ background: stat.accent }} />
+                <div style={{ color: stat.accent, fontSize: '1.9rem', fontWeight: 800, lineHeight: 1.1, letterSpacing: '-0.5px' }}>
+                  {stat.value}
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.78rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>
+                  {stat.label}
+                </div>
+              </div>
             </Col>
           ))}
         </Row>
 
-        <h2 className="h5 text-dark mb-3">Management</h2>
+        {/* ── Management section ── */}
+        <p className="admin-section-title mb-3">⚡ Management</p>
 
         <Row className="g-3">
           {dashboardItems.map((item, index) => (
             <Col key={index} xs={12} sm={6} lg={3}>
-              <Link to={item.link} className="text-decoration-none">
-                <Card className={`h-100 shadow-sm border-start border-4 ${item.borderClass}`}>
-                  <Card.Body>
-                    <Card.Title className="h6 text-dark">{item.title}</Card.Title>
-                    <Card.Text className="text-muted small mb-0">{item.description}</Card.Text>
-                  </Card.Body>
-                </Card>
+              <Link to={item.link} className="text-decoration-none d-block h-100">
+                <div className="admin-nav-card h-100 p-3">
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: item.accent, borderRadius: '12px 12px 0 0' }} />
+                  <div className="card-icon mb-2">{item.title.split(' ')[0]}</div>
+                  <div className="text-dark" style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: 4 }}>
+                    {item.title.slice(item.title.indexOf(' ') + 1)}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.76rem', lineHeight: 1.4 }}>
+                    {item.description}
+                  </div>
+                </div>
               </Link>
             </Col>
           ))}

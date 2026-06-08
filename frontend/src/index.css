@@ -1,6 +1,10 @@
 :root {
-  --app-primary: #2c3e50;
-  --app-accent: #3498db;
+  --app-primary: #0f1117;
+  --app-secondary: #1a1d27;
+  --app-accent: #00e676;
+  --app-accent-warm: #ff6b35;
+  --app-accent-blue: #00b4d8;
+  --admin-card-hover: rgba(0, 230, 118, 0.06);
 }
 
 body {
@@ -34,8 +38,88 @@ body {
   animation: pulse 2s infinite;
 }
 
+/* Admin header — always dark (sporty permanent style) */
 .admin-header {
-  background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+  background: linear-gradient(135deg, #0a0c12 0%, #12151f 50%, #0f1117 100%);
+  border-bottom: 2px solid rgba(0, 230, 118, 0.25);
+  color: #ffffff;
+}
+
+
+/* Admin Dashboard background — always light */
+.admin-sport-bg {
+  background: #f4f6f9;
+  min-height: 100vh;
+}
+
+
+.admin-stat-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  border-radius: 14px !important;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.admin-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.06) !important;
+}
+
+.admin-stat-card .stat-accent-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 14px 0 0 14px;
+}
+
+.admin-nav-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  border-radius: 12px !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-nav-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12) !important;
+  border-color: rgba(0,0,0,0.15) !important;
+}
+
+.admin-nav-card .card-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.admin-section-title {
+  color: #6b7280;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+
+.admin-badge-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
 }
 
 .favorite-star {
@@ -96,3 +180,291 @@ body {
 .status-pulse-dot {
   animation: settings-pulse 2s infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SYSTEM-WIDE DARK MODE
+   Controlled by: data-theme="dark" on <html>
+   Set by: settingsStore.applyTheme() on every page load (from MySQL)
+   Toggled live by: AdminSettings → Appearance → Dark Mode
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Smooth transitions on toggle ── */
+body, .card, .card-header, .card-body, .card-footer,
+.modal-content, .offcanvas, .list-group-item,
+input, select, textarea, .form-control, .form-select,
+.table, .navbar, header, .admin-sport-bg,
+.admin-stat-card, .admin-nav-card {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.25s ease !important;
+}
+
+/* ── CSS variables ── */
+[data-theme="dark"] {
+  --dm-bg:           #0f1117;
+  --dm-bg2:          #161923;
+  --dm-bg3:          #1e2433;
+  --dm-border:       rgba(255, 255, 255, 0.1);
+  --dm-text:         #ffffff;
+  --dm-muted:        #94a3b8;
+  --dm-input:        #1c2030;
+  --dm-input-border: #334155;
+  color-scheme: dark;
+}
+
+/* ── Body & root ── */
+[data-theme="dark"] body {
+  background-color: var(--dm-bg) !important;
+  color: var(--dm-text) !important;
+}
+
+/* ── Page wrapper classes used across pages ── */
+[data-theme="dark"] .bg-light,
+[data-theme="dark"] .min-vh-100,
+[data-theme="dark"] .admin-sport-bg {
+  background-color: var(--dm-bg) !important;
+}
+[data-theme="dark"] .admin-sport-bg {
+  background: var(--dm-bg) !important;
+}
+
+/* ── ALL text elements → white ── */
+[data-theme="dark"] h1, [data-theme="dark"] h2,
+[data-theme="dark"] h3, [data-theme="dark"] h4,
+[data-theme="dark"] h5, [data-theme="dark"] h6 { color: #ffffff !important; }
+
+[data-theme="dark"] p,
+[data-theme="dark"] span,
+[data-theme="dark"] li,
+[data-theme="dark"] label,
+[data-theme="dark"] strong,
+[data-theme="dark"] small,
+[data-theme="dark"] td,
+[data-theme="dark"] th,
+[data-theme="dark"] dt,
+[data-theme="dark"] dd,
+[data-theme="dark"] legend,
+[data-theme="dark"] blockquote { color: #ffffff !important; }
+
+/* Bootstrap text utilities */
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .text-black,
+[data-theme="dark"] .text-body,
+[data-theme="dark"] .text-secondary { color: #ffffff !important; }
+
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .text-secondary-emphasis { color: var(--dm-muted) !important; }
+
+[data-theme="dark"] .h1, [data-theme="dark"] .h2, [data-theme="dark"] .h3,
+[data-theme="dark"] .h4, [data-theme="dark"] .h5, [data-theme="dark"] .h6,
+[data-theme="dark"] .lead,
+[data-theme="dark"] .fw-bold,
+[data-theme="dark"] .fw-semibold,
+[data-theme="dark"] .fw-medium { color: #ffffff !important; }
+
+/* ── Cards ── */
+[data-theme="dark"] .card {
+  background-color: var(--dm-bg2) !important;
+  border-color: var(--dm-border) !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .card-footer {
+  background-color: var(--dm-bg3) !important;
+  border-color: var(--dm-border) !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .card-body  { background-color: var(--dm-bg2) !important; }
+[data-theme="dark"] .card-title,
+[data-theme="dark"] .card-text  { color: #ffffff !important; }
+[data-theme="dark"] .shadow-sm  { box-shadow: 0 2px 16px rgba(0,0,0,0.5) !important; }
+
+/* ── Admin sport cards (dashboard) ── */
+[data-theme="dark"] .admin-stat-card {
+  background: linear-gradient(145deg, #161923, #1c2030) !important;
+  border-color: var(--dm-border) !important;
+}
+[data-theme="dark"] .admin-nav-card {
+  background: linear-gradient(145deg, #161923, #1c2030) !important;
+  border-color: var(--dm-border) !important;
+}
+[data-theme="dark"] .admin-nav-card:hover {
+  border-color: rgba(0, 230, 118, 0.35) !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5) !important;
+}
+[data-theme="dark"] .admin-section-title { color: #94a3b8 !important; }
+
+/* ── Nav header: already dark, just ensure button contrast ── */
+[data-theme="dark"] .admin-header .btn-outline-light {
+  color: #ffffff !important;
+  border-color: rgba(255,255,255,0.5) !important;
+  background: transparent !important;
+}
+[data-theme="dark"] .admin-header .btn-outline-light:hover {
+  background: rgba(255,255,255,0.12) !important;
+  color: #ffffff !important;
+}
+/* Home Site button (green accent) stays readable */
+[data-theme="dark"] .admin-header a[style] { color: #00e676 !important; }
+
+/* ── Modals ── */
+[data-theme="dark"] .modal-content {
+  background-color: var(--dm-bg2) !important;
+  border-color: var(--dm-border) !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+  background-color: var(--dm-bg3) !important;
+  border-color: var(--dm-border) !important;
+}
+[data-theme="dark"] .modal-title { color: #ffffff !important; }
+[data-theme="dark"] .btn-close { filter: invert(1); }
+
+/* ── Offcanvas ── */
+[data-theme="dark"] .offcanvas,
+[data-theme="dark"] .offcanvas-body {
+  background-color: #0f1117 !important;
+  color: #ffffff !important;
+}
+
+/* ── Navbar ── */
+[data-theme="dark"] .navbar { background-color: #0a0c12 !important; }
+
+/* ── Tables ── */
+[data-theme="dark"] .table {
+  --bs-table-bg:          var(--dm-bg2);
+  --bs-table-striped-bg:  var(--dm-bg3);
+  --bs-table-hover-bg:    rgba(255,255,255,0.05);
+  --bs-table-border-color: var(--dm-border);
+  color: #ffffff !important;
+}
+[data-theme="dark"] .table thead th {
+  background-color: var(--dm-bg3) !important;
+  color: var(--dm-muted) !important;
+  border-color: var(--dm-border) !important;
+}
+[data-theme="dark"] .table tbody td,
+[data-theme="dark"] .table tbody tr { color: #ffffff !important; }
+
+/* ── Form controls ── */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea,
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+  background-color: var(--dm-input) !important;
+  color: #ffffff !important;
+  border-color: var(--dm-input-border) !important;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: var(--dm-muted) !important; }
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus {
+  background-color: var(--dm-bg3) !important;
+  border-color: #00e676 !important;
+  box-shadow: 0 0 0 3px rgba(0, 230, 118, 0.2) !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .input-group-text {
+  background-color: var(--dm-bg3) !important;
+  color: var(--dm-muted) !important;
+  border-color: var(--dm-input-border) !important;
+}
+[data-theme="dark"] .form-check-label { color: #ffffff !important; }
+
+/* ── Dropdowns ── */
+[data-theme="dark"] .dropdown-menu {
+  background-color: var(--dm-bg2) !important;
+  border-color: var(--dm-border) !important;
+}
+[data-theme="dark"] .dropdown-item          { color: #ffffff !important; }
+[data-theme="dark"] .dropdown-item:hover    { background-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .dropdown-divider       { border-color: var(--dm-border) !important; }
+
+/* ── List groups ── */
+[data-theme="dark"] .list-group-item {
+  background-color: var(--dm-bg2) !important;
+  border-color: var(--dm-border) !important;
+  color: #ffffff !important;
+}
+
+/* ── Alerts ── */
+[data-theme="dark"] .alert-warning {
+  background-color: rgba(255,193,7,0.15) !important;
+  border-color: rgba(255,193,7,0.4) !important;
+  color: #ffd166 !important;
+}
+[data-theme="dark"] .alert-info {
+  background-color: rgba(0,180,216,0.15) !important;
+  border-color: rgba(0,180,216,0.4) !important;
+  color: #90e0ef !important;
+}
+[data-theme="dark"] .alert-danger {
+  background-color: rgba(231,76,60,0.15) !important;
+  border-color: rgba(231,76,60,0.4) !important;
+  color: #ff8a7a !important;
+}
+[data-theme="dark"] .alert-success {
+  background-color: rgba(0,230,118,0.12) !important;
+  border-color: rgba(0,230,118,0.4) !important;
+  color: #00e676 !important;
+}
+
+/* ── Borders / dividers ── */
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-bottom,
+[data-theme="dark"] .border-top { border-color: var(--dm-border) !important; }
+[data-theme="dark"] hr { border-color: var(--dm-border) !important; opacity: 0.5; }
+
+/* ── Buttons ── */
+[data-theme="dark"] .btn-outline-secondary {
+  color: #cbd5e1 !important;
+  border-color: #475569 !important;
+}
+[data-theme="dark"] .btn-outline-secondary:hover {
+  background-color: rgba(255,255,255,0.1) !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .btn-outline-primary {
+  color: #63b3ed !important;
+  border-color: #63b3ed !important;
+}
+[data-theme="dark"] .btn-outline-danger {
+  color: #fc8181 !important;
+  border-color: #fc8181 !important;
+}
+
+/* ── Pagination ── */
+[data-theme="dark"] .page-link {
+  background-color: var(--dm-bg2) !important;
+  border-color: var(--dm-border) !important;
+  color: #ffffff !important;
+}
+[data-theme="dark"] .page-item.active .page-link {
+  background-color: #00e676 !important;
+  border-color: #00e676 !important;
+  color: #0f1117 !important;
+}
+[data-theme="dark"] .page-item.disabled .page-link {
+  background-color: var(--dm-bg3) !important;
+  color: var(--dm-muted) !important;
+}
+
+/* ── Badges ── */
+[data-theme="dark"] .badge.bg-light  { background-color: var(--dm-bg3) !important; color: #ffffff !important; }
+[data-theme="dark"] .badge.text-dark { color: #ffffff !important; }
+
+/* ── Links ── */
+[data-theme="dark"] a:not(.btn):not(.nav-link) {
+  color: #63b3ed !important;
+}
+[data-theme="dark"] a:not(.btn):not(.nav-link):hover {
+  color: #90cdf4 !important;
+}
+
+/* ── Spinner ── */
+[data-theme="dark"] .spinner-border {
+  border-color: rgba(255,255,255,0.15);
+  border-top-color: #00e676;
+}
+
+

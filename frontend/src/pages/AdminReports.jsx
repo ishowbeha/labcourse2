@@ -24,13 +24,15 @@ const AdminReports = () => {
   const [activityLogs, setActivityLogs] = useState([]);
   const [filterAction, setFilterAction] = useState('');
   const [selectedLog, setSelectedLog] = useState(null);
+  const [stadiums, setStadiums] = useState([]);
   const [dynamicReport, setDynamicReport] = useState(null);
   const [drLoading, setDrLoading] = useState(false);
+  const [drError, setDrError] = useState(null);
   const [drForm, setDrForm] = useState({
     dateFrom: '', dateTo: '',
     metrics: ['tickets_sold', 'revenue'],
     groupBy: 'none',
-    filters: { status: '' }
+    filters: { status: '', stadiumId: '' }
   });
 
   useEffect(() => {
@@ -48,8 +50,8 @@ const AdminReports = () => {
           const existing = OrderService.getOrders();
           const existingNums = new Set(existing.map(o => o.orderNumber));
           const backendOrders = res.data.data.orders
-            .filter(o => !existingNums.has(o.order_number))
-            .map(o => ({
+             .filter(o => !existingNums.has(o.order_number))
+             .map(o => ({
               id: o.id, orderNumber: o.order_number,
               date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : '',
               match: typeof o.match_name === 'string' ? o.match_name.replace(/^Match:\s*/i, '') : 'Match',
@@ -69,14 +71,16 @@ const AdminReports = () => {
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const [salesRes, revenueRes, topRes] = await Promise.all([
+      const [salesRes, revenueRes, topRes, stadiumsRes] = await Promise.all([
         AdminService.getTicketSalesByMatch(),
         AdminService.getRevenueAnalytics('monthly'),
-        AdminService.getTopSellingMatches(10)
+        AdminService.getTopSellingMatches(10),
+        AdminService.getStadiums({ limit: 100 })
       ]);
       if (salesRes.success) setTicketSales(salesRes.data || []);
       if (revenueRes.success) setRevenueData(revenueRes.data || []);
       if (topRes.success) setTopMatches(topRes.data || []);
+      if (stadiumsRes.success) setStadiums(stadiumsRes.data.stadiums || []);
       try {
         const activityRes = await api.get('/reports/activity-logs?limit=100');
         if (activityRes.data?.logs) setActivityLogs(activityRes.data.logs);
@@ -385,6 +389,8 @@ const AdminReports = () => {
                 <Card.Body>
                   <Card.Title className="h5 mb-4">🔧 Dynamic Report Generator</Card.Title>
 
+                  {drError && <Alert variant="danger">{drError}</Alert>}
+
                   <Row className="g-3 mb-3">
                     <Col md={6}>
                       <Form.Group>
@@ -435,7 +441,7 @@ const AdminReports = () => {
                   </Form.Group>
 
                   <Row className="g-3 mb-4">
-                    <Col md={6}>
+                    <Col md={4}>
                       <Form.Group>
                         <Form.Label className="small fw-semibold">Group By</Form.Label>
                         <Form.Select value={drForm.groupBy} onChange={(e) => setDrForm({...drForm, groupBy: e.target.value})}>
@@ -447,7 +453,7 @@ const AdminReports = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
-                    <Col md={6}>
+                    <Col md={4}>
                       <Form.Group>
                         <Form.Label className="small fw-semibold">Status</Form.Label>
                         <Form.Select
@@ -461,6 +467,20 @@ const AdminReports = () => {
                         </Form.Select>
                       </Form.Group>
                     </Col>
+                    <Col md={4}>
+                      <Form.Group>
+                        <Form.Label className="small fw-semibold">Stadium</Form.Label>
+                        <Form.Select
+                          value={drForm.filters.stadiumId || ''}
+                          onChange={(e) => setDrForm({...drForm, filters: {...drForm.filters, stadiumId: e.target.value}})}
+                        >
+                          <option value="">All Stadiums</option>
+                          {stadiums.map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.city})</option>
+                          ))}
+                        </Form.Select>
+                      </Form.Group>
+                    </Col>
                   </Row>
 
                   <Button
@@ -468,7 +488,14 @@ const AdminReports = () => {
                     className="w-100 mb-4 fw-bold"
                     onClick={async () => {
                       setDrLoading(true);
-                      try { const res = await api.post('/admin/reports/dynamic', drForm); setDynamicReport(res.data || res); } catch (e) { console.error(e); }
+                      setDrError(null);
+                      try {
+                        const res = await api.post('/admin/reports/dynamic', drForm);
+                        setDynamicReport(res.data || res);
+                      } catch (e) {
+                        console.error(e);
+                        setDrError(e.response?.data?.message || e.message || 'Failed to generate report');
+                      }
                       setDrLoading(false);
                     }}
                     disabled={drLoading}
@@ -482,7 +509,29 @@ const AdminReports = () => {
                   </Button>
 
                   {dynamicReport && (() => {
-                    const localData = localOrders.filter(o => o.status === 'confirmed' || o.status === 'completed');
+                    const localData = localOrders.filter(o => {
+                      // Status filter
+                      if (drForm.filters.status) {
+                        if (o.status !== drForm.filters.status) return false;
+                      } else {
+                        // default: only count success orders if no status is specified
+                        if (o.status !== 'confirmed' && o.status !== 'completed' && o.status !== 'paid') return false;
+                      }
+                      
+                      // Date range filters
+                      if (drForm.dateFrom && o.date && o.date < drForm.dateFrom) return false;
+                      if (drForm.dateTo && o.date && o.date > drForm.dateTo) return false;
+
+                      // Stadium filter
+                      if (drForm.filters.stadiumId) {
+                        const targetStadium = stadiums.find(s => String(s.id) === String(drForm.filters.stadiumId));
+                        if (targetStadium) {
+                          if (o.stadium && o.stadium !== targetStadium.name) return false;
+                        }
+                      }
+                      return true;
+                    });
+
                     const mergedRows = (dynamicReport.rows || []).map(r => ({ ...r }));
                     let mergedSummary = { ...(dynamicReport.summary || {}) };
 
@@ -500,20 +549,47 @@ const AdminReports = () => {
                         } else {
                           mergedRows.push({ label: 'Total', tickets_sold: localTickets, revenue: localRev, orders_count: localOrdersCount });
                         }
-                        if (dynamicReport.metrics?.includes('tickets_sold')) mergedSummary.totalTickets = (mergedSummary.totalTickets || 0) + localTickets;
-                        if (dynamicReport.metrics?.includes('revenue')) mergedSummary.totalRevenue = (mergedSummary.totalRevenue || 0) + localRev;
-                        if (dynamicReport.metrics?.includes('orders_count')) mergedSummary.totalOrders = (mergedSummary.totalOrders || 0) + localOrdersCount;
                       } else {
-                        mergedRows.push({
-                          label: 'Local Orders (browser)',
-                          tickets_sold: dynamicReport.metrics?.includes('tickets_sold') ? localTickets : undefined,
-                          revenue: dynamicReport.metrics?.includes('revenue') ? localRev : undefined,
-                          orders_count: dynamicReport.metrics?.includes('orders_count') ? localOrdersCount : undefined
+                        // Group local orders by the selected key
+                        localData.forEach(o => {
+                          let label = 'Local Orders (browser)';
+                          if (drForm.groupBy === 'match') {
+                            label = o.match || 'Unknown Match';
+                          } else if (drForm.groupBy === 'day') {
+                            label = o.date || 'Unknown Date';
+                          } else if (drForm.groupBy === 'month') {
+                            label = o.date ? o.date.substring(0, 7) : 'Unknown Month';
+                          } else if (drForm.groupBy === 'stadium') {
+                            label = o.stadium || 'Unknown Stadium';
+                          }
+
+                          let row = mergedRows.find(r => r.label === label);
+                          if (!row) {
+                            row = { label };
+                            if (dynamicReport.metrics?.includes('tickets_sold')) row.tickets_sold = 0;
+                            if (dynamicReport.metrics?.includes('revenue')) row.revenue = 0;
+                            if (dynamicReport.metrics?.includes('orders_count')) row.orders_count = 0;
+                            mergedRows.push(row);
+                          }
+                          if (row.tickets_sold !== undefined) row.tickets_sold += o.tickets || 0;
+                          if (row.revenue !== undefined) row.revenue += o.total || 0;
+                          if (row.orders_count !== undefined) row.orders_count += 1;
                         });
-                        if (dynamicReport.metrics?.includes('tickets_sold')) mergedSummary.totalTickets = (mergedSummary.totalTickets || 0) + localTickets;
-                        if (dynamicReport.metrics?.includes('revenue')) mergedSummary.totalRevenue = (mergedSummary.totalRevenue || 0) + localRev;
-                        if (dynamicReport.metrics?.includes('orders_count')) mergedSummary.totalOrders = (mergedSummary.totalOrders || 0) + localOrdersCount;
                       }
+
+                      // Update overall summary
+                      if (dynamicReport.metrics?.includes('tickets_sold')) mergedSummary.totalTickets = (mergedSummary.totalTickets || 0) + localTickets;
+                      if (dynamicReport.metrics?.includes('revenue')) mergedSummary.totalRevenue = (mergedSummary.totalRevenue || 0) + localRev;
+                      if (dynamicReport.metrics?.includes('orders_count')) mergedSummary.totalOrders = (mergedSummary.totalOrders || 0) + localOrdersCount;
+                    }
+
+                    // Calculate average order value for combined rows
+                    if (dynamicReport.metrics?.includes('avg_order_value')) {
+                      mergedRows.forEach(row => {
+                        const orders = row.orders_count || 0;
+                        const rev = row.revenue || 0;
+                        row.avg_order_value = orders > 0 ? rev / orders : 0;
+                      });
                     }
 
                     return (
@@ -595,7 +671,18 @@ const AdminReports = () => {
                             className="mt-3"
                             onClick={() => {
                               const headers = dynamicReport.metrics;
-                              const csv = [['Group', ...headers].join(','), ...mergedRows.map(r => [r.label || 'Total', ...headers.map(h => r[h] || 0)].join(','))].join('\n');
+                              const escapeCSV = (val) => {
+                                if (val === undefined || val === null) return '';
+                                const str = String(val);
+                                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                                  return `"${str.replace(/"/g, '""')}"`;
+                                }
+                                return str;
+                              };
+                              const csv = [
+                                ['Group', ...headers].map(escapeCSV).join(','),
+                                ...mergedRows.map(r => [r.label || 'Total', ...headers.map(h => r[h] || 0)].map(escapeCSV).join(','))
+                              ].join('\n');
                               const blob = new Blob([csv], { type: 'text/csv' });
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement('a'); a.href = url; a.download = 'report.csv'; a.click();

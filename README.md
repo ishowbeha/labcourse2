@@ -94,6 +94,8 @@ Go to: **http://localhost:5173**
 
 ### 📡 API Endpoints
 
+For complete API testing and documentation, import the [postman_collection.json](file:///c:/Users/pulse/Documents/GitHub/labcourse2/postman_collection.json) collection file directly into Postman.
+
 #### Authentication
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - User login
@@ -106,14 +108,18 @@ Go to: **http://localhost:5173**
 #### Health Check
 - `GET /api/health` - Server health check
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema & ERD
+
+The relational database contains **24 tables** designed in **Third Normal Form (3NF)** with full FKs, indexes, and audit trails.
+
+- 📊 **ERD Diagram**: View the complete Entity-Relationship Diagram and NoSQL integration details in [DATABASE_DIAGRAM.md](file:///c:/Users/pulse/Documents/GitHub/labcourse2/DATABASE_DIAGRAM.md).
 
 The system includes tables for:
 - **Users & Authentication** - users, roles, user_roles, permissions, role_permissions, refresh_tokens
 - **Stadium Management** - stadiums, sections, matches
 - **Ticket System** - tickets, orders, order_items
 - **Payments** - payments
-- **System** - notifications, settings, audit_logs
+- **System** - notifications, settings, audit_logs, files, support_tickets, reviews, coupons, favorites, addresses, event_logs, api_logs
 
 ## 🛠️ Technology Stack
 

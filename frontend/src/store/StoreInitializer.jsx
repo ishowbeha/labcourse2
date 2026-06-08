@@ -17,6 +17,7 @@ export default function StoreInitializer() {
     initAuth();
   }, [initAuth]);
 
+
   useEffect(() => {
     if (loading) return;
     loadSettings();
