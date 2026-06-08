@@ -1,4 +1,5 @@
 const OrderService = require('../services/OrderService');
+const Stripe = require('stripe');
 
 class OrderController {
   constructor(db) {
@@ -177,6 +178,50 @@ class OrderController {
       next(error);
     }
   }
+
+  // ── Stripe: create a PaymentIntent ──────────────────────────────────────────
+  async createPaymentIntent(req, res, next) {
+    try {
+      const userId = req.user?.userId || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+
+      const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+      if (!stripeSecretKey || stripeSecretKey.startsWith('sk_test_REPLACE')) {
+        return res.status(500).json({
+          success: false,
+          message: 'Stripe is not configured yet. Please add your STRIPE_SECRET_KEY to the backend .env file.'
+        });
+      }
+
+      const stripe = Stripe(stripeSecretKey);
+
+      const { amount, currency = 'eur', metadata = {} } = req.body;
+      if (!amount || isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'A valid amount (in cents) is required' });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount), // amount in cents
+        currency,
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          userId: String(userId),
+          ...metadata,
+        },
+      });
+
+      res.json({
+        success: true,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      });
+    } catch (error) {
+      console.error('Stripe PaymentIntent error:', error.message);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }
 
-module.exports = OrderController;
+module.exports = OrderController;

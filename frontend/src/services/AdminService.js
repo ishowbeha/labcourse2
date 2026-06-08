@@ -187,8 +187,8 @@ const AdminService = {
   },
 
   // Refund order (soft-delete with notification to user)
-  refundOrder: async (id) => {
-    const response = await api.post(`/admin/orders/${id}/refund`);
+  refundOrder: async (id, reason = '') => {
+    const response = await api.post(`/admin/orders/${id}/refund`, { reason });
     return response;
   },
 

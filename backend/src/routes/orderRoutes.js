@@ -6,10 +6,22 @@ const createOrderRoutes = (pool) => {
   const router = express.Router();
   const controller = new OrderController(pool);
 
-  // All order routes require authentication
+  // Public: expose Stripe publishable key to the frontend
+  router.get('/stripe-config', (req, res) => {
+    const pk = process.env.STRIPE_PUBLISHABLE_KEY || '';
+    if (!pk || pk.startsWith('pk_test_REPLACE')) {
+      return res.status(500).json({ success: false, message: 'Stripe publishable key not configured.' });
+    }
+    res.json({ success: true, publishableKey: pk });
+  });
+
+  // All routes below require authentication
   router.use(authenticate);
 
-  // Purchase tickets
+  // Stripe: create a PaymentIntent (amount in cents sent by frontend)
+  router.post('/create-payment-intent', (req, res, next) => controller.createPaymentIntent(req, res, next));
+
+  // Purchase tickets (legacy)
   router.post('/purchase', (req, res, next) => controller.purchaseTickets(req, res, next));
   router.post('/simple-purchase', (req, res, next) => controller.saveSimpleOrder(req, res, next));
 
@@ -19,4 +31,4 @@ const createOrderRoutes = (pool) => {
   return router;
 };
 
-module.exports = createOrderRoutes;
+module.exports = createOrderRoutes;

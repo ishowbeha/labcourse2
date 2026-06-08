@@ -431,7 +431,7 @@ class AdminRepository {
   }
 
   // Refund/soft-delete order: mark as refunded, free tickets, notify user
-  async refundOrder(id) {
+  async refundOrder(id, reason = '') {
     // Get order info first (user_id and any ticket IDs)
     const [orders] = await this.pool.query(
       'SELECT id, user_id, total_amount, order_number FROM orders WHERE id = ?',
@@ -458,9 +458,10 @@ class AdminRepository {
     }
 
     // Soft-delete: mark order as refunded instead of hard-deleting
+    const refundNote = reason ? ` | Refund reason: ${reason}` : '';
     await this.pool.query(
-      "UPDATE orders SET status = 'refunded', updated_at = NOW() WHERE id = ?",
-      [id]
+      "UPDATE orders SET status = 'refunded', notes = CONCAT(IFNULL(notes,''), ?), updated_at = NOW() WHERE id = ?",
+      [refundNote, id]
     );
 
     return {

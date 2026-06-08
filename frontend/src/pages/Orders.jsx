@@ -33,6 +33,7 @@ const Orders = () => {
       { value: 'pending', label: 'Pending' },
       { value: 'completed', label: 'Completed' },
       { value: 'cancelled', label: 'Cancelled' },
+      { value: 'refunded', label: 'Refunded' },
     ]},
     { id: 'dateFrom', label: 'Date From', type: 'date' },
     { id: 'dateTo', label: 'Date To', type: 'date' },
@@ -115,6 +116,7 @@ const Orders = () => {
       case 'pending': return 'warning';
       case 'completed': return 'info';
       case 'cancelled': return 'danger';
+      case 'refunded': return 'secondary';
       default: return 'secondary';
     }
   };

@@ -13,6 +13,7 @@ import {
   AdminDashboard,
   AdminMatches,
   AdminOrders,
+  AdminPayments,
   AdminReports,
   AdminReviews,
   AdminSettings,
@@ -54,7 +55,7 @@ export default function AppRoutes() {
         <Route path="/admin/matches" element={<AdminRoute><AdminMatches /></AdminRoute>} />
         <Route path="/admin/tickets" element={<AdminRoute><AdminPlaceholder title="Ticket Management" /></AdminRoute>} />
         <Route path="/admin/orders" element={<AdminRoute><AdminOrders /></AdminRoute>} />
-        <Route path="/admin/payments" element={<AdminRoute><AdminPlaceholder title="Payment Management" /></AdminRoute>} />
+        <Route path="/admin/payments" element={<AdminRoute><AdminPayments /></AdminRoute>} />
         <Route path="/admin/coupons" element={<AdminRoute><AdminCoupons /></AdminRoute>} />
         <Route path="/admin/reviews" element={<AdminRoute><AdminReviews /></AdminRoute>} />
         <Route path="/admin/reports" element={<AdminRoute><AdminReports /></AdminRoute>} />

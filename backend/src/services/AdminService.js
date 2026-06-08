@@ -168,9 +168,9 @@ class AdminService {
     }
   }
 
-  async refundOrder(id) {
+  async refundOrder(id, reason = '') {
     try {
-      const result = await this.repository.refundOrder(id);
+      const result = await this.repository.refundOrder(id, reason);
       if (!result) {
         throw new Error('Order not found');
       }

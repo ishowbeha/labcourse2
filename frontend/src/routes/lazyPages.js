@@ -18,6 +18,7 @@ export const AdminUsers = lazy(() => import(/* webpackChunkName: "admin-users" *
 export const AdminStadiums = lazy(() => import(/* webpackChunkName: "admin-stadiums" */ '../pages/AdminStadiums'));
 export const AdminMatches = lazy(() => import(/* webpackChunkName: "admin-matches" */ '../pages/AdminMatches'));
 export const AdminOrders = lazy(() => import(/* webpackChunkName: "admin-orders" */ '../pages/AdminOrders'));
+export const AdminPayments = lazy(() => import(/* webpackChunkName: "admin-payments" */ '../pages/AdminPayments'));
 export const AdminCoupons = lazy(() => import(/* webpackChunkName: "admin-coupons" */ '../pages/AdminCoupons'));
 export const AdminReviews = lazy(() => import(/* webpackChunkName: "admin-reviews" */ '../pages/AdminReviews'));
 export const AdminReports = lazy(() => import(/* webpackChunkName: "admin-reports" */ '../pages/AdminReports'));

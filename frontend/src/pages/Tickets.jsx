@@ -1,19 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Alert, Form, Spinner, Badge, ProgressBar } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Alert, Spinner, Badge, ProgressBar } from 'react-bootstrap';
+import { loadStripe } from '@stripe/stripe-js';
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { useSettings } from '../context/SettingsContext';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import OrderService from '../services/OrderService';
 import axios from 'axios';
 import { getFlagEmoji } from '../utils/flags';
 
-// ─── Seat Availability Helpers ──────────────────────────────────────────────
+// ─── Seat Availability Helpers ───────────────────────────────────────────────
 
-/**
- * Deterministically generate a random number of taken seats for a section
- * based on matchId + sectionId so it stays stable across re-renders.
- * Returns a number between 1 and 10 (inclusive).
- */
 const seedHash = (str) => {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
@@ -24,13 +26,9 @@ const seedHash = (str) => {
 
 const getTakenCount = (matchId, sectionId) => {
   const hash = seedHash(`${matchId}-${sectionId}`);
-  return (hash % 10) + 1; // 1–10
+  return (hash % 10) + 1;
 };
 
-/**
- * Generate a stable set of taken seat indices for a section.
- * Seat indices are 0-based within the reservable pool.
- */
 const getTakenSeatIndices = (matchId, sectionId, reservableCount) => {
   const count = getTakenCount(matchId, sectionId);
   const hash = seedHash(`seats-${matchId}-${sectionId}`);
@@ -51,7 +49,7 @@ const getSectionStyle = (sectionId) => {
   return { badge: 'secondary', ring: '#7f8c8d', bg: '#f0f0f0', icon: '🎟️' };
 };
 
-// ─── Seat Grid Component ─────────────────────────────────────────────────────
+// ─── Seat Grid Component ──────────────────────────────────────────────────────
 const SeatGrid = ({ matchId, section, selectedSeats, onToggleSeat }) => {
   const reservableCount = section.reservable;
   const takenSet = useMemo(
@@ -153,7 +151,246 @@ const SeatGrid = ({ matchId, section, selectedSeats, onToggleSeat }) => {
   );
 };
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Stripe Card Element Styles ───────────────────────────────────────────────
+const CARD_ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      fontSize: '16px',
+      color: '#212529',
+      fontFamily: '"Inter", "Helvetica Neue", Helvetica, sans-serif',
+      '::placeholder': { color: '#adb5bd' },
+      iconColor: '#635bff',
+    },
+    invalid: { color: '#e74c3c', iconColor: '#e74c3c' },
+  },
+  hidePostalCode: false,
+};
+
+// ─── Stripe Payment Form (inner – needs Elements context) ─────────────────────
+const StripePaymentForm = ({
+  grandTotal,
+  onPaymentSuccess,
+  onPaymentError,
+  match,
+  selectedSectionData,
+  selectedQuantity,
+  selectedSeats,
+  couponCode,
+  couponDiscount,
+  appliedCoupon,
+  familyDiscount,
+  totalPrice,
+  fees,
+  setCouponCode,
+  setCouponMsg,
+  setCouponDiscount,
+  setAppliedCoupon,
+  couponMsg,
+  onBack,
+}) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [cardError, setCardError] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+
+  const finalAmount = Math.max(0, grandTotal - couponDiscount - familyDiscount);
+
+  const handlePay = async () => {
+    if (!stripe || !elements) return;
+
+    setCardError('');
+    setPurchasing(true);
+
+    try {
+      // 1. Create PaymentIntent on backend
+      const token = localStorage.getItem('token');
+      const piRes = await axios.post(
+        '/api/orders/create-payment-intent',
+        {
+          amount: Math.round(finalAmount * 100), // convert € to cents
+          currency: 'eur',
+          metadata: {
+            match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
+            section: selectedSectionData?.name || '',
+            quantity: String(selectedQuantity),
+          },
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true }
+      );
+
+      if (!piRes.data?.success) {
+        throw new Error(piRes.data?.message || 'Could not create payment intent');
+      }
+
+      const { clientSecret } = piRes.data;
+
+      // 2. Confirm the card payment with Stripe.js
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement),
+        },
+      });
+
+      if (stripeError) {
+        throw new Error(stripeError.message);
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        onPaymentSuccess(paymentIntent, finalAmount);
+      } else {
+        throw new Error(`Payment status: ${paymentIntent.status}. Please try again.`);
+      }
+    } catch (err) {
+      console.error('Payment error:', err);
+      setCardError(err.message || 'Payment failed. Please try again.');
+      onPaymentError(err.message || 'Payment failed.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  return (
+    <div>
+      {/* Stripe badge */}
+      <div className="d-flex align-items-center gap-2 mb-3">
+        <span style={{
+          background: 'linear-gradient(135deg, #635bff, #8c7ef7)',
+          color: '#fff',
+          borderRadius: 8,
+          padding: '4px 12px',
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: 0.5,
+        }}>
+          🔒 Secured by Stripe
+        </span>
+        <span className="small text-muted">Your card info is encrypted</span>
+      </div>
+
+      {/* Card Element */}
+      <div
+        style={{
+          border: '1.5px solid #dee2e6',
+          borderRadius: 10,
+          padding: '14px 16px',
+          background: '#fff',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+          marginBottom: 16,
+          transition: 'border-color 0.2s',
+        }}
+      >
+        <CardElement options={CARD_ELEMENT_OPTIONS} onChange={() => setCardError('')} />
+      </div>
+
+      {cardError && (
+        <Alert variant="danger" className="py-2 small">{cardError}</Alert>
+      )}
+
+      {/* Promo code */}
+      <div className="bg-light rounded p-3 mb-4">
+        <h4 className="h6 text-dark fw-semibold mb-2">🎟️ Promo Code</h4>
+        <div className="d-flex gap-2">
+          <input
+            className="form-control font-monospace"
+            value={couponCode}
+            onChange={(e) => {
+              setCouponCode(e.target.value.toUpperCase());
+              setCouponMsg('');
+              setCouponDiscount(0);
+              setAppliedCoupon(null);
+            }}
+            placeholder="Enter code"
+          />
+          <button
+            className={`btn ${appliedCoupon ? 'btn-success' : 'btn-primary'}`}
+            onClick={async () => {
+              if (!couponCode) return;
+              try {
+                const token = localStorage.getItem('token');
+                const rRes = await axios.post(
+                  '/api/admin/coupons/validate',
+                  { code: couponCode, orderTotal: grandTotal - familyDiscount },
+                  { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true }
+                );
+                const r = rRes.data;
+                if (r.success) {
+                  setCouponDiscount(r.data.discount);
+                  setAppliedCoupon(r.data);
+                  setCouponMsg(`✅ ${r.data.description || 'Discount applied!'}`);
+                } else {
+                  setCouponMsg('❌ ' + (r.message || 'Invalid code'));
+                  setCouponDiscount(0);
+                  setAppliedCoupon(null);
+                }
+              } catch {
+                setCouponMsg('❌ Failed to validate');
+                setCouponDiscount(0);
+                setAppliedCoupon(null);
+              }
+            }}
+          >
+            {appliedCoupon ? 'Applied' : 'Apply'}
+          </button>
+        </div>
+        {couponMsg && (
+          <p className={`small mt-2 mb-0 ${couponMsg.includes('✅') ? 'text-success' : 'text-danger'}`}>
+            {couponMsg}
+          </p>
+        )}
+      </div>
+
+      {/* Price breakdown */}
+      <div className="bg-light rounded p-3 mb-4">
+        <div className="d-flex justify-content-between mb-2">
+          <span>Subtotal</span>
+          <span>€{totalPrice}</span>
+        </div>
+        <div className="d-flex justify-content-between mb-2">
+          <span>Booking Fee (5%)</span>
+          <span>€{fees}</span>
+        </div>
+        {familyDiscount > 0 && (
+          <div className="d-flex justify-content-between text-success mb-2">
+            <span>Family Pack Discount (25%)</span>
+            <span className="fw-semibold">-€{Number(familyDiscount).toFixed(2)}</span>
+          </div>
+        )}
+        {couponDiscount > 0 && (
+          <div className="d-flex justify-content-between text-success mb-2">
+            <span>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
+            <span className="fw-semibold">-€{Number(couponDiscount).toFixed(2)}</span>
+          </div>
+        )}
+        <div className="d-flex justify-content-between fw-bold border-top pt-3 mt-2 fs-5">
+          <span>Total</span>
+          <span>€{finalAmount.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="d-flex gap-2">
+        <Button variant="outline-dark" onClick={onBack}>← Back</Button>
+        <Button
+          variant="success"
+          className="flex-grow-1"
+          onClick={handlePay}
+          disabled={!stripe || purchasing}
+          style={{
+            background: purchasing ? undefined : 'linear-gradient(135deg, #635bff, #8c7ef7)',
+            border: 'none',
+            fontWeight: 700,
+            fontSize: 16,
+          }}
+        >
+          {purchasing
+            ? <><Spinner animation="border" size="sm" className="me-2" />Processing…</>
+            : `🔒 Pay €${finalAmount.toFixed(2)} with Stripe`}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 const Tickets = () => {
   const { maxTicketsPerOrder } = useSettings();
   const navigate = useNavigate();
@@ -165,14 +402,8 @@ const Tickets = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
-  const [selectedSeats, setSelectedSeats] = useState([]); // seat indices selected by user
+  const [selectedSeats, setSelectedSeats] = useState([]);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState('');
@@ -182,6 +413,8 @@ const Tickets = () => {
   const [lastOrderNum, setLastOrderNum] = useState('');
   const [finalPaidAmount, setFinalPaidAmount] = useState(0);
   const [showSeatPicker, setShowSeatPicker] = useState(false);
+  const [stripePromise, setStripePromise] = useState(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
 
   const getMatchVipPrice = (matchData) => {
     if (!matchData) return 150;
@@ -222,8 +455,6 @@ const Tickets = () => {
 
   const vipPrice = match ? getMatchVipPrice(match) : 150;
 
-  // Sections sorted from HIGHEST price to LOWEST (VIP → Normal)
-  // VIP sections: 20 reservable seats | Other sections: 50 reservable seats
   const sections = [
     { id: 'vip-north', name: 'VIP North', price: vipPrice, capacity: 500, reservable: 20, tier: 'vip' },
     { id: 'vip-south', name: 'VIP South', price: vipPrice, capacity: 500, reservable: 20, tier: 'vip' },
@@ -231,13 +462,7 @@ const Tickets = () => {
     { id: 'west-stand', name: 'West Stand', price: 60, capacity: 2000, reservable: 50, tier: 'premium' },
     { id: 'north-stand', name: 'North Stand', price: 40, capacity: 3000, reservable: 50, tier: 'standard' },
     { id: 'south-stand', name: 'South Stand', price: 40, capacity: 3000, reservable: 50, tier: 'standard' },
-  ].sort((a, b) => b.price - a.price); // highest → lowest
-
-  const paymentMethods = [
-    { id: 'credit-card', name: 'Credit Card', icon: '💳' },
-    { id: 'paypal', name: 'PayPal', icon: '🅿️' },
-    { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
-  ];
+  ].sort((a, b) => b.price - a.price);
 
   // Clear selected seats when section changes
   useEffect(() => {
@@ -253,6 +478,25 @@ const Tickets = () => {
     }
     fetchMatch();
   }, [matchId]);
+
+  // Load Stripe publishable key from backend when entering step 2
+  useEffect(() => {
+    if (step === 2 && !stripePromise) {
+      setStripeLoading(true);
+      axios.get('/api/orders/stripe-config')
+        .then((res) => {
+          if (res.data?.success && res.data?.publishableKey) {
+            setStripePromise(loadStripe(res.data.publishableKey));
+          } else {
+            setError('Stripe is not configured. Please add your Stripe keys to the backend .env file.');
+          }
+        })
+        .catch(() => {
+          setError('Could not load Stripe configuration. Make sure the backend is running and Stripe keys are set.');
+        })
+        .finally(() => setStripeLoading(false));
+    }
+  }, [step]);
 
   const passedMatch = location.state?.match;
 
@@ -320,154 +564,118 @@ const Tickets = () => {
     }
   };
 
-  // Toggle a seat in/out of selectedSeats, respecting quantity limit
   const handleToggleSeat = (seatIdx) => {
     setSelectedSeats((prev) => {
       if (prev.includes(seatIdx)) {
         return prev.filter((s) => s !== seatIdx);
       }
       if (prev.length >= selectedQuantity) {
-        // Replace oldest selection with new one
         return [...prev.slice(1), seatIdx];
       }
       return [...prev, seatIdx];
     });
   };
 
-  // When quantity changes, trim selected seats if needed
   useEffect(() => {
     setSelectedSeats((prev) => prev.slice(0, selectedQuantity));
   }, [selectedQuantity]);
 
-  const handlePurchase = async () => {
-    if (!selectedSection) {
-      setError('Please select a section');
-      return;
-    }
-    if (!paymentMethod) {
-      setError('Please select a payment method');
-      return;
-    }
-    if (paymentMethod === 'credit-card' && (!cardNumber || !cardName || !cardExpiry || !cardCvc)) {
-      setError('Please fill in all card details');
-      return;
-    }
+  // Called by StripePaymentForm when Stripe confirms payment
+  const handlePaymentSuccess = async (paymentIntent, finalAmount) => {
+    const selectedSectionData = sections.find((s) => s.id === selectedSection);
+    const totalPrice = selectedSectionData.price * selectedQuantity;
+    const fees = Math.round(totalPrice * 0.05);
 
-    setPurchasing(true);
-    setError('');
+    const seatLabels = selectedSeats.length > 0
+      ? selectedSeats.map((i) => `${selectedSectionData.name} – Seat ${i + 1}`)
+      : Array(selectedQuantity).fill(`${selectedSectionData.name}`);
+
+    let orderNumber = '';
+    let apiPurchaseSucceeded = false;
+
+    const noteDetails = [];
+    if (appliedCoupon?.code) noteDetails.push(`Coupon: ${appliedCoupon.code}`);
+    noteDetails.push(`Subtotal: ${totalPrice}`);
+    noteDetails.push(`Fees: ${fees}`);
+    noteDetails.push(`Stripe PI: ${paymentIntent.id}`);
+    if (selectedSeats.length > 0) noteDetails.push(`Seats: ${selectedSeats.map((i) => i + 1).join(', ')}`);
+    const notesStr = noteDetails.join(' | ');
 
     try {
-      const selectedSectionData = sections.find((s) => s.id === selectedSection);
-      const totalPrice = selectedSectionData.price * selectedQuantity;
-      const fees = Math.round(totalPrice * 0.05);
-      const isFamilyPack =
-        selectedQuantity === 4 &&
-        selectedSectionData &&
-        (selectedSectionData.id === 'vip-north' || selectedSectionData.id === 'vip-south');
-      const familyDiscount = isFamilyPack ? totalPrice * 0.25 : 0;
-      const discountAmount = couponDiscount;
-      const grandTotalAfterDiscount = Math.max(0, totalPrice + fees - discountAmount - familyDiscount);
-      const pmName = paymentMethods.find((p) => p.id === paymentMethod)?.name || paymentMethod;
-
-      // Build seat labels from selected indices
-      const seatLabels = selectedSeats.length > 0
-        ? selectedSeats.map((i) => `${selectedSectionData.name} – Seat ${i + 1}`)
-        : Array(selectedQuantity).fill(`${selectedSectionData.name}`);
-
-      let orderNumber = '';
-      let apiPurchaseSucceeded = false;
-
-      const noteDetails = [];
-      if (appliedCoupon?.code) noteDetails.push(`Coupon: ${appliedCoupon.code}`);
-      if (familyDiscount > 0) noteDetails.push(`Family Pack Discount (25%)`);
-      noteDetails.push(`Subtotal: ${totalPrice}`);
-      noteDetails.push(`Fees: ${fees}`);
-      noteDetails.push(`Discount: ${discountAmount + familyDiscount}`);
-      if (selectedSeats.length > 0) noteDetails.push(`Seats: ${selectedSeats.map((i) => i + 1).join(', ')}`);
-      const notesStr = noteDetails.join(' | ');
-
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.post(
-          '/api/orders/simple-purchase',
-          {
-            matchName: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
-            sectionName: selectedSectionData?.name || selectedSection,
-            quantity: selectedQuantity,
-            totalAmount: grandTotalAfterDiscount,
-            paymentMethod: paymentMethod,
-            notes: notesStr,
-            status: 'confirmed',
-          },
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            withCredentials: true,
-          }
-        );
-        const data = response.data;
-        if (data?.success && data?.data?.orderNumber) {
-          orderNumber = data.data.orderNumber;
-          apiPurchaseSucceeded = true;
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        '/api/orders/simple-purchase',
+        {
+          matchName: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
+          sectionName: selectedSectionData?.name || selectedSection,
+          quantity: selectedQuantity,
+          totalAmount: finalAmount,
+          paymentMethod: 'stripe',
+          notes: notesStr,
+          status: 'confirmed',
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
         }
-      } catch (apiErr) {
-        console.warn('Backend simple-purchase failed:', apiErr);
+      );
+      const data = response.data;
+      if (data?.success && data?.data?.orderNumber) {
+        orderNumber = data.data.orderNumber;
+        apiPurchaseSucceeded = true;
       }
-
-      if (!apiPurchaseSucceeded) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        orderNumber = OrderService.generateOrderNumber();
-      }
-
-      const order = {
-        id: Date.now() + Math.random(),
-        orderNumber,
-        date: new Date().toISOString().split('T')[0],
-        match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
-        matchDate: match?.matchDate || 'TBD',
-        matchTime: match?.matchTime || '',
-        stadium: match?.stadiumName || 'TBD',
-        competition: match?.competition || 'Match',
-        tickets: selectedQuantity,
-        seats: seatLabels,
-        subtotal: totalPrice,
-        fees: fees,
-        discount: discountAmount + familyDiscount,
-        couponCode: appliedCoupon?.code || null,
-        total: grandTotalAfterDiscount,
-        status: 'confirmed',
-        paymentMethod: pmName,
-        notes: notesStr,
-      };
-      OrderService.saveOrder(order);
-
-      setLastOrderNum(orderNumber);
-      setFinalPaidAmount(grandTotalAfterDiscount);
-
-      try {
-        const token = localStorage.getItem('token');
-        await axios.post(
-          '/api/logs/activity',
-          {
-            action: 'purchase',
-            description: `Bought ticket for ${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
-            resourceType: 'ticket',
-            resourceId: orderNumber,
-            metadata: { match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`, quantity: selectedQuantity },
-          },
-          {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            withCredentials: true,
-          }
-        );
-      } catch (e) {}
-
-      setPurchaseSuccess(true);
-    } catch (err) {
-      console.error('Purchase failed:', err);
-      setError(err.message || 'Purchase failed. Please try again.');
-    } finally {
-      setPurchasing(false);
+    } catch (apiErr) {
+      console.warn('Backend simple-purchase failed:', apiErr);
     }
+
+    if (!apiPurchaseSucceeded) {
+      orderNumber = OrderService.generateOrderNumber();
+    }
+
+    const order = {
+      id: Date.now() + Math.random(),
+      orderNumber,
+      date: new Date().toISOString().split('T')[0],
+      match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
+      matchDate: match?.matchDate || 'TBD',
+      matchTime: match?.matchTime || '',
+      stadium: match?.stadiumName || 'TBD',
+      competition: match?.competition || 'Match',
+      tickets: selectedQuantity,
+      seats: seatLabels,
+      subtotal: totalPrice,
+      fees,
+      discount: couponDiscount,
+      couponCode: appliedCoupon?.code || null,
+      total: finalAmount,
+      status: 'confirmed',
+      paymentMethod: 'Stripe',
+      notes: notesStr,
+    };
+    OrderService.saveOrder(order);
+
+    setLastOrderNum(orderNumber);
+    setFinalPaidAmount(finalAmount);
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        '/api/logs/activity',
+        {
+          action: 'purchase',
+          description: `Bought ticket for ${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`,
+          resourceType: 'ticket',
+          resourceId: orderNumber,
+          metadata: { match: `${match?.homeTeam || ''} vs ${match?.awayTeam || ''}`, quantity: selectedQuantity },
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
+        }
+      );
+    } catch (e) {}
+
+    setPurchaseSuccess(true);
   };
 
   const formatDate = (dateStr) => {
@@ -478,17 +686,6 @@ const Tickets = () => {
       month: 'long',
       year: 'numeric',
     });
-  };
-
-  const formatCardNumber = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
-  };
-
-  const formatExpiry = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
   };
 
   const pageWrapper = (content) => (
@@ -546,7 +743,7 @@ const Tickets = () => {
             </p>
           )}
           <p className="small text-success mb-0">
-            Paid via: {paymentMethods.find((p) => p.id === paymentMethod)?.name || paymentMethod}
+            🔒 Paid securely via Stripe
           </p>
         </div>
         <div className="d-flex flex-wrap gap-3 justify-content-center mt-4">
@@ -573,11 +770,9 @@ const Tickets = () => {
 
   const steps = [
     { id: 1, label: 'Section & Seats' },
-    { id: 2, label: 'Payment Method' },
-    { id: 3, label: 'Confirm & Pay' },
+    { id: 2, label: 'Pay with Stripe' },
   ];
 
-  // Get taken count for summary display
   const currentSectionTakenCount = selectedSectionData && matchId
     ? getTakenCount(matchId, selectedSectionData.id)
     : 0;
@@ -597,7 +792,7 @@ const Tickets = () => {
           <div key={s.id} className="text-center">
             <Button
               variant={step >= s.id ? 'dark' : 'secondary'}
-              className="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center"
+              className="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center p-0 lh-1"
               disabled
               tabIndex={-1}
             >
@@ -633,7 +828,7 @@ const Tickets = () => {
             </Card.Body>
           </Card>
 
-          {/* Section selection – sorted highest to lowest price */}
+          {/* Section selection */}
           <div className="mb-4">
             <h2 className="h5 text-dark mb-1">Select Section</h2>
             <p className="small text-muted mb-3">Sections are listed from highest to lowest price</p>
@@ -647,7 +842,7 @@ const Tickets = () => {
                 return (
                   <Col key={section.id} xs={12} sm={6} md={4}>
                     <Card
-                      className={`text-center h-100 cursor-pointer position-relative`}
+                      className="text-center h-100 cursor-pointer position-relative"
                       style={{
                         border: isSelected ? `2.5px solid ${style.ring}` : '1.5px solid #dee2e6',
                         background: isSelected ? style.bg : '#fff',
@@ -707,7 +902,7 @@ const Tickets = () => {
             </Row>
           </div>
 
-          {/* Seat Picker (visible after selecting a section) */}
+          {/* Seat Picker */}
           {selectedSection && selectedSectionData && (
             <Card className="shadow-sm border-0 mb-4">
               <Card.Body>
@@ -802,239 +997,76 @@ const Tickets = () => {
         </>
       )}
 
-      {/* ── STEP 2: Payment Method ── */}
+      {/* ── STEP 2: Stripe Payment ── */}
       {step === 2 && (
-        <div className="mb-4">
-          <h2 className="h5 text-dark mb-3">Select Payment Method</h2>
-
-          <div className="d-flex flex-column gap-2 mb-4">
-            {paymentMethods.map((pm) => (
-              <Card
-                key={pm.id}
-                className={`${paymentMethod === pm.id ? 'border-primary border-2 bg-light' : 'border'} cursor-pointer`}
-                onClick={() => {
-                  setPaymentMethod(pm.id);
-                  if (pm.id !== 'credit-card') {
-                    setCardNumber('');
-                    setCardName('');
-                    setCardExpiry('');
-                    setCardCvc('');
-                  }
-                }}
-                role="button"
-              >
-                <Card.Body className="d-flex align-items-center gap-3 position-relative">
-                  <span className="fs-3">{pm.icon}</span>
-                  <span className="fw-semibold">{pm.name}</span>
-                  {paymentMethod === pm.id && (
-                    <span className="position-absolute end-0 me-3 text-success fw-bold fs-5">✓</span>
-                  )}
-                </Card.Body>
-              </Card>
-            ))}
-          </div>
-
-          {paymentMethod === 'credit-card' && (
-            <Card className="shadow-sm border-0 mb-4">
-              <Card.Body>
-                <h3 className="h6 text-dark mb-3">Card Details</h3>
-                <Form.Group className="mb-3">
-                  <Form.Label>Card Number</Form.Label>
-                  <Form.Control
-                    placeholder="1234 5678 9012 3456"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                  />
-                </Form.Group>
-                <Form.Group className="mb-3">
-                  <Form.Label>Cardholder Name</Form.Label>
-                  <Form.Control
-                    placeholder="John Doe"
-                    value={cardName}
-                    onChange={(e) => setCardName(e.target.value)}
-                  />
-                </Form.Group>
-                <Row className="g-3">
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Expiry Date</Form.Label>
-                      <Form.Control
-                        placeholder="MM/YY"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>CVC</Form.Label>
-                      <Form.Control
-                        placeholder="123"
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))}
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-          )}
-
-          <div className="d-flex gap-2">
-            <Button variant="outline-dark" onClick={() => setStep(1)}>← Back</Button>
-            <Button
-              variant="primary"
-              className="flex-grow-1"
-              disabled={!paymentMethod}
-              onClick={() => setStep(3)}
-            >
-              Review Order →
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── STEP 3: Confirm & Pay ── */}
-      {step === 3 && (
         <Card className="shadow-sm border-0 mb-4">
           <Card.Body>
-            <h2 className="h5 text-dark mb-4">Order Summary</h2>
+            <h2 className="h5 text-dark mb-1">Pay with Stripe</h2>
+            <p className="small text-muted mb-4">Enter your card details to complete your purchase</p>
 
-            <div className="border-bottom pb-3 mb-3">
-              <h4 className="h6 text-dark mb-2">🎫 Match</h4>
-              <div className="d-flex justify-content-between">{match?.homeTeam} vs {match?.awayTeam}</div>
-              <div className="text-muted small">{formatDate(match?.matchDate)}</div>
-              <div className="text-muted small">{match?.stadiumName || 'TBD'}</div>
-            </div>
-
-            <div className="border-bottom pb-3 mb-3">
-              <h4 className="h6 text-dark mb-2">🪑 Seating</h4>
-              {selectedSectionData && (
-                <>
-                  <div className="d-flex justify-content-between">
-                    <span>{selectedSectionData.name}</span>
-                    <span>€{selectedSectionData.price} × {selectedQuantity}</span>
-                  </div>
-                  {selectedSeats.length > 0 && (
-                    <div className="text-muted small mt-1">
-                      Seats: {selectedSeats.map((i) => `#${i + 1}`).join(', ')}
-                    </div>
-                  )}
-                  <div className="text-muted small mt-1">
-                    ℹ️ {currentSectionTakenCount} seat{currentSectionTakenCount !== 1 ? 's' : ''} already reserved in this section
-                  </div>
-                </>
+            {/* Order info summary at top of payment step */}
+            <div className="bg-light rounded p-3 mb-4">
+              <div className="d-flex justify-content-between small">
+                <span className="fw-semibold">{match?.homeTeam} vs {match?.awayTeam}</span>
+                <span>{formatDate(match?.matchDate)}</span>
+              </div>
+              <div className="d-flex justify-content-between small text-muted mt-1">
+                <span>{selectedSectionData?.name} × {selectedQuantity}</span>
+                <span>{match?.stadiumName || 'TBD'}</span>
+              </div>
+              {currentSectionTakenCount > 0 && (
+                <div className="small text-muted mt-1">
+                  ℹ️ {currentSectionTakenCount} seat{currentSectionTakenCount !== 1 ? 's' : ''} already reserved in this section
+                </div>
               )}
             </div>
 
-            <div className="border-bottom pb-3 mb-3">
-              <h4 className="h6 text-dark mb-2">💳 Payment</h4>
-              <div className="d-flex justify-content-between">
-                <span>Method</span>
-                <span>
-                  {paymentMethods.find((p) => p.id === paymentMethod)?.icon}{' '}
-                  {paymentMethods.find((p) => p.id === paymentMethod)?.name}
-                </span>
+            {stripeLoading ? (
+              <div className="text-center py-4">
+                <Spinner animation="border" size="sm" className="me-2" />
+                Loading Stripe...
               </div>
-            </div>
-
-            {/* Promo code */}
-            <div className="bg-light rounded p-3 mb-4">
-              <h4 className="h6 text-dark fw-semibold mb-2">🎟️ Promo Code</h4>
-              <div className="d-flex gap-2">
-                <Form.Control
-                  value={couponCode}
-                  onChange={(e) => {
-                    setCouponCode(e.target.value.toUpperCase());
-                    setCouponMsg('');
-                    setCouponDiscount(0);
-                    setAppliedCoupon(null);
-                  }}
-                  placeholder="Enter code"
-                  className="font-monospace"
+            ) : stripePromise ? (
+              <Elements stripe={stripePromise}>
+                <StripePaymentForm
+                  grandTotal={grandTotal}
+                  onPaymentSuccess={handlePaymentSuccess}
+                  onPaymentError={(msg) => setError(msg)}
+                  match={match}
+                  selectedSectionData={selectedSectionData}
+                  selectedQuantity={selectedQuantity}
+                  selectedSeats={selectedSeats}
+                  couponCode={couponCode}
+                  couponDiscount={couponDiscount}
+                  appliedCoupon={appliedCoupon}
+                  familyDiscount={familyDiscount}
+                  totalPrice={totalPrice}
+                  fees={fees}
+                  setCouponCode={setCouponCode}
+                  setCouponMsg={setCouponMsg}
+                  setCouponDiscount={setCouponDiscount}
+                  setAppliedCoupon={setAppliedCoupon}
+                  couponMsg={couponMsg}
+                  onBack={() => setStep(1)}
                 />
-                <Button
-                  variant={couponDiscount ? 'success' : 'primary'}
-                  onClick={async () => {
-                    if (!couponCode) return;
-                    try {
-                      const token = localStorage.getItem('token');
-                      const rResponse = await axios.post(
-                        '/api/admin/coupons/validate',
-                        { code: couponCode, orderTotal: grandTotal - familyDiscount },
-                        {
-                          headers: token ? { Authorization: `Bearer ${token}` } : {},
-                          withCredentials: true,
-                        }
-                      );
-                      const r = rResponse.data;
-                      if (r.success) {
-                        setCouponDiscount(r.data.discount);
-                        setAppliedCoupon(r.data);
-                        setCouponMsg(`✅ ${r.data.description || 'Discount applied!'}`);
-                      } else {
-                        setCouponMsg('❌ ' + (r.message || 'Invalid code'));
-                        setCouponDiscount(0);
-                        setAppliedCoupon(null);
-                      }
-                    } catch (e) {
-                      setCouponMsg('❌ Failed to validate');
-                      setCouponDiscount(0);
-                      setAppliedCoupon(null);
-                    }
-                  }}
-                >
-                  {appliedCoupon ? 'Applied' : 'Apply'}
-                </Button>
+              </Elements>
+            ) : (
+              <div>
+                <Alert variant="warning">
+                  <strong>⚠️ Stripe not configured yet.</strong>
+                  <br />
+                  Sign in to <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noreferrer">Stripe Dashboard</a>,
+                  copy your <strong>Secret Key</strong> and <strong>Publishable Key</strong>, then paste them into{' '}
+                  <code>backend/.env</code>:
+                  <pre className="mt-2 mb-0 small bg-white p-2 rounded border">
+{`STRIPE_SECRET_KEY=sk_test_...your_key_here...
+STRIPE_PUBLISHABLE_KEY=pk_test_...your_key_here...`}
+                  </pre>
+                  Restart the backend server after saving.
+                </Alert>
+                <Button variant="outline-dark" onClick={() => setStep(1)}>← Back</Button>
               </div>
-              {couponMsg && (
-                <p className={`small mt-2 mb-0 ${couponMsg.includes('✅') ? 'text-success' : 'text-danger'}`}>
-                  {couponMsg}
-                </p>
-              )}
-            </div>
-
-            {/* Price breakdown */}
-            <div className="bg-light rounded p-3 mb-4">
-              <div className="d-flex justify-content-between mb-2">
-                <span>Subtotal</span>
-                <span>€{totalPrice}</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Booking Fee (5%)</span>
-                <span>€{fees}</span>
-              </div>
-              {familyDiscount > 0 && (
-                <div className="d-flex justify-content-between text-success mb-2">
-                  <span>Family Pack Discount (25%)</span>
-                  <span className="fw-semibold">-€{Number(familyDiscount).toFixed(2)}</span>
-                </div>
-              )}
-              {couponDiscount > 0 && (
-                <div className="d-flex justify-content-between text-success mb-2">
-                  <span>Discount {appliedCoupon?.code ? `(${appliedCoupon.code})` : ''}</span>
-                  <span className="fw-semibold">-€{Number(couponDiscount).toFixed(2)}</span>
-                </div>
-              )}
-              <div className="d-flex justify-content-between fw-bold border-top pt-3 mt-2 fs-5">
-                <span>Total</span>
-                <span>€{Math.max(0, grandTotal - couponDiscount - familyDiscount).toFixed(2)}</span>
-              </div>
-            </div>
-
-            <div className="d-flex gap-2">
-              <Button variant="outline-dark" onClick={() => setStep(2)}>← Back</Button>
-              <Button
-                variant="success"
-                className="flex-grow-1"
-                onClick={handlePurchase}
-                disabled={purchasing}
-              >
-                {purchasing
-                  ? '⏳ Processing Payment...'
-                  : `✅ Pay €${Math.max(0, grandTotal - couponDiscount - familyDiscount).toFixed(2)}`}
-              </Button>
-            </div>
+            )}
           </Card.Body>
         </Card>
       )}
