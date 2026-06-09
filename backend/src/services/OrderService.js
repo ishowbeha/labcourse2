@@ -116,18 +116,59 @@ class OrderService {
     // Parse match info from notes for orders without ticket join data
     const parseMatchFromNotes = (notes) => {
       if (!notes) return null;
-      const matchRegex = notes.match(/Match:\s*([^-]+?)(?:\s*-\s*|$)/);
-      if (matchRegex && matchRegex[1]) {
-        return matchRegex[1].trim();
+      
+      // Extract the Match: portion from notes
+      const matchPart = notes.match(/Match:\s*(.+?)(?:\s*\|\s*Section:|$)/);
+      if (!matchPart || !matchPart[1]) return null;
+      
+      let rawMatch = matchPart[1].trim();
+      
+      // Try to separate "VIP Experience - " prefix from the actual match name
+      const vipPrefixMatch = rawMatch.match(/^(VIP\s+(?:Match\s+)?Experience\s*-\s*)(.+)$/i);
+      if (vipPrefixMatch && vipPrefixMatch[2]) {
+        rawMatch = vipPrefixMatch[2].trim();
       }
-      return null;
+      
+      // If after removing VIP prefix, check if section is appended (old format: "TeamA vs TeamB - VIP Seating")
+      // Section names that commonly follow: VIP, Premium, Standard, East, West, North, South
+      const sectionSuffixMatch = rawMatch.match(/^(.*?)\s*-\s*(VIP\s+(?:Seating|Lounge)|(?:VIP|Premium|Standard)\s+(?:Stand|Section|North|South|East|West)|VIP\s+.*?)$/i);
+      if (sectionSuffixMatch && sectionSuffixMatch[1]) {
+        rawMatch = sectionSuffixMatch[1].trim();
+      }
+      
+      return rawMatch || null;
     };
 
     // Parse section from notes
     const parseSectionFromNotes = (notes) => {
       if (!notes) return null;
+      
+      // Try new format first: "| Section: [section]"
+      const newFormatSection = notes.match(/\|\s*Section:\s*(.+?)(?:\s*\||$)/);
+      if (newFormatSection && newFormatSection[1]) {
+        return newFormatSection[1].trim();
+      }
+      
+      // For old format, find "VIP Seating & Lounge" or similar at the end
+      const vipLoungeMatch = notes.match(/-\s*(VIP\s+Seating\s*&\s*Lounge)/i);
+      if (vipLoungeMatch && vipLoungeMatch[1]) {
+        return vipLoungeMatch[1].trim();
+      }
+      
+      // Try to find section name by looking for text after "Match:" part that looks like section
+      const matchPart = notes.match(/Match:\s*(.+?)(?:\s*\|\s*Section:|$)/);
+      if (matchPart && matchPart[1]) {
+        const rawMatch = matchPart[1].trim();
+        // Look for section suffix: " - VIP Seating" or " - East Stand" etc
+        const sectionSuffixMatch = rawMatch.match(/-\s*(VIP\s+(?:Seating|Lounge)|(?:VIP|Premium|Standard)\s+(?:Stand|Section|North|South|East|West).*?)$/i);
+        if (sectionSuffixMatch && sectionSuffixMatch[1]) {
+          return sectionSuffixMatch[1].trim();
+        }
+      }
+      
+      // Last resort: try old generic format
       const sectionRegex = notes.match(/-\s*(.+)$/);
-      if (sectionRegex && sectionRegex[1] && !sectionRegex[1].startsWith('Coupon')) {
+      if (sectionRegex && sectionRegex[1] && !sectionRegex[1].startsWith('Coupon') && !sectionRegex[1].startsWith('Match') && !sectionRegex[1].includes('Experience')) {
         return sectionRegex[1].trim();
       }
       return null;
@@ -165,6 +206,22 @@ class OrderService {
           sectionNames = parsedSection;
         }
         ticketCount = order.items_quantity_sum || 0;
+
+        // Parse additional metadata from notes (for simple-purchase orders)
+        if (order.notes) {
+          const dateMatch = order.notes.match(/\bMatchDate:\s*(.+?)(?:\s*\||$)/);
+          if (dateMatch && dateMatch[1]) {
+            matchDate = dateMatch[1].trim();
+          }
+          const stadiumMatch = order.notes.match(/\bStadium:\s*(.+?)(?:\s*\||$)/);
+          if (stadiumMatch && stadiumMatch[1]) {
+            stadiumName = stadiumMatch[1].trim();
+          }
+          const compMatch = order.notes.match(/\bCompetition:\s*(.+?)(?:\s*\||$)/);
+          if (compMatch && compMatch[1]) {
+            competition = compMatch[1].trim();
+          }
+        }
       }
 
       return {

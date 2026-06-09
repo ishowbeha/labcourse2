@@ -30,12 +30,20 @@ class AuthController {
       const { email, password } = req.body;
       const result = await this.authService.login(email, password);
       
-      // Set refreshToken as httpOnly cookie
+      // Set refreshToken as httpOnly cookie (prevents XSS access)
+      // Also set a non-httpOnly flag cookie so frontend can detect login state
       res.cookie('refreshToken', result.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+      });
+      // Non-httpOnly flag so frontend can check if logged in
+      res.cookie('isLoggedIn', 'true', {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
       
       // Remove refreshToken from response body (it's in the cookie)
@@ -64,16 +72,18 @@ class AuthController {
         await this.authService.logout(refreshToken);
       }
       
-      // Clear the refreshToken cookie
+      // Clear both cookies
       res.clearCookie('refreshToken');
+      res.clearCookie('isLoggedIn');
       
       res.json({
         success: true,
         message: 'Logged out successfully'
       });
     } catch (error) {
-      // Still clear cookie even if there's an error
+      // Still clear cookies even if there's an error
       res.clearCookie('refreshToken');
+      res.clearCookie('isLoggedIn');
       res.status(400).json({
         success: false,
         message: error.message
@@ -102,6 +112,13 @@ class AuthController {
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+      });
+      // Non-httpOnly flag so frontend can check if logged in
+      res.cookie('isLoggedIn', 'true', {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
       
       // Remove refreshToken from response body (it's in the cookie)

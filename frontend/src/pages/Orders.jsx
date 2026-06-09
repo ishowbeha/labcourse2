@@ -76,17 +76,39 @@ const Orders = () => {
             if (couponMatch) couponCode = couponMatch[1].trim();
           }
 
+          const matchName = o.match_name || `${o.home_team || ''} vs ${o.away_team || ''}` || null;
+
+          // Smarter defaults: if match has " vs " (contains teams), infer competition as World Cup
+          const hasTeams = matchName && matchName.includes(' vs ');
+          const isVip = o.notes && o.notes.includes('VIP');
+
+          let inferredCompetition = 'FIFA World Cup 2026';
+          let inferredStadium = 'TBD';
+          let inferredDate = 'N/A';
+          let inferredSeats = [];
+
+          if (isVip) {
+            inferredCompetition = 'VIP Experience';
+            inferredStadium = 'VIP Lounge & Seating';
+            inferredDate = 'VIP Event Date';
+            inferredSeats = ['VIP Seating & Lounge'];
+          } else if (hasTeams) {
+            inferredCompetition = 'FIFA World Cup 2026';
+            inferredStadium = o.stadium_name || 'International Stadium';
+            inferredDate = o.match_date || 'Date TBD';
+          }
+
           return {
             id: o.id,
             orderNumber: o.order_number,
             date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : 'N/A',
-            match: o.match_name || `${o.home_team || ''} vs ${o.away_team || ''}` || 'Unknown Match',
-            matchDate: o.match_date || 'N/A',
+            match: matchName || 'World Cup Match',
+            matchDate: o.match_date || inferredDate,
             matchTime: o.match_time || '',
-            competition: o.competition || 'Match',
-            stadium: o.stadium_name || 'TBD',
+            competition: o.competition || inferredCompetition,
+            stadium: o.stadium_name || inferredStadium,
             tickets: o.ticket_count || o.items_count || 0,
-            seats: o.section_names ? o.section_names.split(', ') : [],
+            seats: o.section_names ? o.section_names.split(', ') : inferredSeats,
             subtotal: subtotal,
             fees: fees,
             discount: discount,

@@ -133,7 +133,7 @@ class OrderController {
       const unitPrice = totalAmount ? totalAmount / parseInt(quantity) : 50;
       const total = totalAmount || (quantity * 50);
 
-      const combinedNotes = (notes ? notes + ' | ' : '') + 'Match: ' + matchName + (sectionName ? ' - ' + sectionName : '');
+      const combinedNotes = (notes ? notes + ' | ' : '') + 'Match: ' + matchName + (sectionName ? ' | Section: ' + sectionName : '');
       const [result] = await this.db.query(
         'INSERT INTO orders (user_id, order_number, status, total_amount, payment_method, notes, customer_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
         [userId, orderNumber, 'confirmed', total, paymentMethod || 'simulated', combinedNotes, req.user?.email || '']
@@ -224,4 +224,4 @@ class OrderController {
   }
 }
 
-module.exports = OrderController;
+module.exports = OrderController;

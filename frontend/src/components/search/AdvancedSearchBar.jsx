@@ -231,12 +231,12 @@ const AdvancedSearchBar = ({
               </div>
               <Row className="g-2">
                 {filters.map((filter) => (
-                  <Col key={filter.id} xs={12} sm={6} md={4} lg={3}>
-                    <Form.Group controlId={`filter-${filter.id}`}>
-                      <Form.Label className="small text-muted mb-1">{filter.label}</Form.Label>
-                      {renderFilterField(filter)}
-                    </Form.Group>
-                  </Col>
+                    <Col key={filter.id} xs={12} sm={6} md={4} lg={3}>
+                      <Form.Group>
+                        <Form.Label className="small text-muted mb-1">{filter.label}</Form.Label>
+                        {renderFilterField(filter)}
+                      </Form.Group>
+                    </Col>
                 ))}
               </Row>
               <div className="d-flex gap-2 mt-3">

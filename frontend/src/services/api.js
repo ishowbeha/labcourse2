@@ -74,16 +74,6 @@ api.interceptors.response.use(
           .catch(err => Promise.reject(err));
       }
 
-      // Check if refreshToken cookie exists
-      if (!hasRefreshTokenCookie()) {
-        // No refreshToken cookie, force logout immediately
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-
-      // Note: refreshToken is stored in httpOnly cookie, automatically sent with credentials: true
       originalRequest._retry = true;
       isRefreshing = true;
 
@@ -95,14 +85,11 @@ api.interceptors.response.use(
           { withCredentials: true }
         );
 
-        // Our API returns: { success: true, message: '...', data: { accessToken } }
-        // Note: new refreshToken is set in cookie by backend
-        const responseData = data.data || data;
-        const tokens = responseData.data || responseData;
+        // Navigate through the response structure
+        const responseBody = data.data || data;
+        const newAccessToken = responseBody?.accessToken || data?.data?.accessToken;
         
-        if (responseData.success && tokens.accessToken) {
-          const newAccessToken = tokens.accessToken;
-          
+        if (newAccessToken) {
           // Store new access token
           localStorage.setItem('token', newAccessToken);
 
@@ -116,7 +103,7 @@ api.interceptors.response.use(
           throw new Error('Token refresh failed');
         }
       } catch (refreshError) {
-        // Refresh failed, clear storage and redirect to login
+        // Refresh failed (no refresh cookie or expired), clear storage and redirect to login
         processQueue(refreshError, null);
         localStorage.removeItem('token');
         localStorage.removeItem('user');

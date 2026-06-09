@@ -18,7 +18,10 @@ const refreshAccessToken = async () => {
       {},
       { withCredentials: true }
     );
-    const newAccessToken = response.data?.data?.accessToken;
+    // Handle different response shapes: response.data is already unwrapped by api interceptor
+    // but raw axios returns { data: { success, data: { accessToken } } }
+    const body = response.data?.data || response.data;
+    const newAccessToken = body?.accessToken || response.data?.data?.accessToken;
     if (newAccessToken) {
       localStorage.setItem('token', newAccessToken);
       return newAccessToken;
@@ -34,7 +37,7 @@ const refreshAccessToken = async () => {
 };
 
 export const useAuthStore = create((set, get) => ({
-  user: null,
+  user: JSON.parse(localStorage.getItem('user') || 'null'),
   token: localStorage.getItem('token'),
   loading: true,
 
@@ -45,32 +48,70 @@ export const useAuthStore = create((set, get) => ({
   initAuth: async () => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
+    const hasRefreshCookie = document.cookie.includes('refreshToken=');
 
-    if (storedUser && storedToken) {
+    if (storedToken) {
+      // Try to verify token with a profile request
       const profile = await fetchUserProfile();
       if (profile) {
         const user = profile.data || profile;
+        localStorage.setItem('user', JSON.stringify(user));
         set({ user, token: storedToken });
-      } else {
-        const newToken = await refreshAccessToken();
-        if (newToken) {
-          const newProfile = await fetchUserProfile();
-          if (newProfile) {
-            set({ user: newProfile.data || newProfile, token: newToken });
-          } else {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            set({ user: null, token: null });
-          }
-        } else {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          set({ user: null, token: null });
+        set({ loading: false });
+        return;
+      }
+      // Profile fetch failed (token expired or invalid), try refreshing
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        const newProfile = await fetchUserProfile();
+        if (newProfile) {
+          const user = newProfile.data || newProfile;
+          localStorage.setItem('user', JSON.stringify(user));
+          set({ user, token: newToken });
+          set({ loading: false });
+          return;
+        }
+      }
+      // Both failed - clear auth state
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      set({ user: null, token: null });
+    } else if (hasRefreshCookie) {
+      // No access token but refresh token cookie exists - try to get a new access token
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        const newProfile = await fetchUserProfile();
+        if (newProfile) {
+          const user = newProfile.data || newProfile;
+          localStorage.setItem('user', JSON.stringify(user));
+          set({ user, token: newToken });
         }
       }
     }
 
     set({ loading: false });
+  },
+
+  // Force re-check tokens from localStorage and redirect if missing
+  checkTokens: () => {
+    const currentToken = localStorage.getItem('token');
+    const currentUser = localStorage.getItem('user');
+    const { token, user } = get();
+
+    // If localStorage was cleared but store still has data, sync it
+    if (!currentToken && token) {
+      localStorage.removeItem('user');
+      set({ user: null, token: null });
+      window.location.href = '/login';
+      return false;
+    }
+    if (!currentUser && user) {
+      localStorage.removeItem('token');
+      set({ user: null, token: null });
+      window.location.href = '/login';
+      return false;
+    }
+    return true;
   },
 
   login: async (email, password) => {

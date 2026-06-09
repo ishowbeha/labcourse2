@@ -170,7 +170,10 @@ const Home = () => {
         `VIP Match Experience`,
         `Subtotal: ${originalPrice.toFixed(2)}`,
         `Fees: 0.00`,
-        `Discount: ${discountAmount.toFixed(2)}`
+        `Discount: ${discountAmount.toFixed(2)}`,
+        `MatchDate: ${selectedMatch?.matchDate || 'TBD'}`,
+        `Stadium: ${stadiumName}`,
+        `Competition: ${selectedMatch?.competition || 'FIFA World Cup 2026'}`
       ];
       const notesStr = noteDetails.join(' | ');
 
@@ -180,12 +183,12 @@ const Home = () => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.post('/api/orders/simple-purchase', {
-          matchName: `VIP Experience - ${matchName}`,
+          matchName: matchName,
           sectionName: 'VIP Seating & Lounge',
           quantity: 1,
           totalAmount: finalPrice,
           paymentMethod: paymentMethod,
-          notes: notesStr,
+          notes: 'VIP Experience | ' + notesStr,
           status: 'confirmed'
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},

@@ -5,25 +5,32 @@ import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import PageLoader from '../components/PageLoader';
 
+// Check if user is authenticated by verifying the isLoggedIn cookie exists.
+// This is a non-httpOnly cookie set alongside the httpOnly refreshToken cookie.
+// The access token can be deleted from DevTools, but the isLoggedIn cookie
+// can only be deleted by clearing cookies, which also deletes refreshToken.
+// If isLoggedIn exists, the api.js interceptor will auto-refresh the access token.
+const isLoggedIn = () => document.cookie.includes('isLoggedIn=');
+
 export const ProtectedRoute = ({ children }) => {
-  const { loading, token, user } = useAuth();
+  const { loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!token || !user) return <Navigate to="/login" replace />;
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
   return children;
 };
 
 export const AdminRoute = ({ children }) => {
-  const { loading, token, user, isAdmin } = useAuth();
+  const { loading, isAdmin } = useAuth();
   if (loading) return <PageLoader />;
-  if (!token || !user) return <Navigate to="/login" replace />;
+  if (!isLoggedIn()) return <Navigate to="/login" replace />;
   if (!isAdmin()) return <Navigate to="/home" replace />;
   return children;
 };
 
 export const PublicRoute = ({ children }) => {
-  const { loading, token, user, isAdmin } = useAuth();
+  const { loading, isAdmin } = useAuth();
   if (loading) return <PageLoader />;
-  if (token && user) {
+  if (isLoggedIn()) {
     if (isAdmin()) return <Navigate to="/admin/dashboard" replace />;
     return <Navigate to="/home" replace />;
   }

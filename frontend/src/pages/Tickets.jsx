@@ -599,6 +599,9 @@ const Tickets = () => {
     noteDetails.push(`Fees: ${fees}`);
     noteDetails.push(`Stripe PI: ${paymentIntent.id}`);
     if (selectedSeats.length > 0) noteDetails.push(`Seats: ${selectedSeats.map((i) => i + 1).join(', ')}`);
+    noteDetails.push(`MatchDate: ${match?.matchDate || 'TBD'}`);
+    noteDetails.push(`Stadium: ${match?.stadiumName || 'TBD'}`);
+    noteDetails.push(`Competition: ${match?.competition || 'Match'}`);
     const notesStr = noteDetails.join(' | ');
 
     try {
