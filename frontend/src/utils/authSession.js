@@ -49,3 +49,19 @@ export const revokeServerSession = async () => {
     // Session may already be invalid
   }
 };
+
+/**
+ * Probe the server to confirm the httpOnly refreshToken cookie is still valid.
+ * Returns true if active, false if the cookie was deleted or is expired/revoked.
+ * Does NOT rotate any tokens — safe to call every 30 s.
+ */
+export const checkRefreshToken = async () => {
+  try {
+    await axios.get(`${API_BASE_URL}/auth/check-session`, {
+      withCredentials: true,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};

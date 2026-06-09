@@ -31,13 +31,21 @@ export const useAuthStore = create((set, get) => ({
     if (isLoggingOut) return;
     isLoggingOut = true;
 
-    if (callApi) {
-      await revokeServerSession();
-    }
-    clearAuthStorage();
-    set({ user: null, token: null });
-    if (redirect) {
-      window.location.href = '/login';
+    try {
+      if (callApi) {
+        await revokeServerSession();
+      }
+      clearAuthStorage();
+      set({ user: null, token: null });
+      if (redirect) {
+        window.location.href = '/login';
+      }
+    } finally {
+      // Reset the guard so a failed/non-redirect logout doesn't permanently
+      // block future logout calls in the same session.
+      if (!redirect) {
+        isLoggingOut = false;
+      }
     }
   },
 
@@ -50,22 +58,27 @@ export const useAuthStore = create((set, get) => ({
     const { token, user } = get();
 
     const hadSession = Boolean(token || user);
-    const storageIntact = Boolean(storedToken && storedUser);
-    const sessionValid = storageIntact && sessionCookie;
 
-    if (hadSession && !sessionValid) {
+    // Only force-logout if the isLoggedIn cookie itself is gone
+    // (meaning the server-side session has truly ended).
+    // If the cookie exists but localStorage token is missing, tokenGuard
+    // will restore / refresh it — don't race against that.
+    if (hadSession && !sessionCookie) {
       void get().forceLogout({ redirect: true, callApi: true });
       return false;
     }
 
-    if (sessionValid && (!token || !user)) {
-      set({
-        token: storedToken,
-        user: JSON.parse(storedUser),
-      });
+    if (sessionCookie && (!token || !user)) {
+      // Re-hydrate Zustand from storage if it fell out of sync
+      if (storedToken && storedUser) {
+        set({
+          token: storedToken,
+          user: JSON.parse(storedUser),
+        });
+      }
     }
 
-    return sessionValid;
+    return sessionCookie;
   },
 
   initAuth: async () => {

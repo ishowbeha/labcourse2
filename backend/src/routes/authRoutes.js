@@ -12,6 +12,7 @@ const createAuthRoutes = (db) => {
   router.post('/register', (req, res) => authController.register(req, res));
   router.post('/login', (req, res) => authController.login(req, res));
   router.post('/logout', (req, res) => authController.logout(req, res));
+  router.get('/check-session', (req, res) => authController.checkSession(req, res));
   router.post('/refresh-token', (req, res) => authController.refreshToken(req, res));
 
   // Protected routes (require authentication)

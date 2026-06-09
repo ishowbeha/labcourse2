@@ -91,6 +91,27 @@ class AuthController {
     }
   }
 
+  // Check if the refresh token cookie is still valid (used for session heartbeat)
+  async checkSession(req, res) {
+    try {
+      const refreshToken = req.cookies?.refreshToken;
+
+      if (!refreshToken) {
+        return res.status(401).json({ success: false, message: 'No session' });
+      }
+
+      // Verify the JWT is still valid (not expired, not tampered)
+      const result = await this.authService.verifyRefreshTokenCookie(refreshToken);
+      if (!result) {
+        return res.status(401).json({ success: false, message: 'Session invalid' });
+      }
+
+      return res.json({ success: true, message: 'Session active' });
+    } catch (error) {
+      return res.status(401).json({ success: false, message: 'Session invalid' });
+    }
+  }
+
   // Refresh access token
   async refreshToken(req, res) {
     try {

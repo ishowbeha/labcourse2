@@ -248,6 +248,21 @@ class AuthService {
     return this.authRepository.getPermissions();
   }
 
+  // Verify a refresh token cookie without rotating it (used by session heartbeat)
+  async verifyRefreshTokenCookie(refreshToken) {
+    try {
+      const decoded = jwt.verify(refreshToken, this.jwtSecret);
+      if (decoded.type !== 'refresh') return false;
+
+      // Confirm it's still in the DB and not revoked
+      const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      const stored = await this.authRepository.getRefreshToken(tokenHash);
+      return !!stored;
+    } catch {
+      return false;
+    }
+  }
+
   // Generate JWT tokens
   async generateTokens(userId) {
     // Access token (short-lived)

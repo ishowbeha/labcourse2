@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from './authStore';
 import { useSettingsStore } from './settingsStore';
 import { useSocketStore } from './socketStore';
-import { getTokenExpiryMs, refreshAccessToken } from '../utils/authSession';
+import { getTokenExpiryMs, refreshAccessToken, checkRefreshToken } from '../utils/authSession';
 
 export default function StoreInitializer() {
   const loading = useAuthStore((s) => s.loading);
@@ -37,9 +37,24 @@ export default function StoreInitializer() {
     };
     window.addEventListener('storage', onStorage);
 
+    // cookieStore API: fires instantly when a readable cookie changes (Chrome 87+)
+    // Catches isLoggedIn deletion with zero polling delay.
+    let cookieStoreCleanup = null;
+    if (typeof cookieStore !== 'undefined') {
+      const onCookieChange = (event) => {
+        const deleted = event.deleted || [];
+        if (deleted.some((c) => c.name === 'isLoggedIn')) {
+          runCheck();
+        }
+      };
+      cookieStore.addEventListener('change', onCookieChange);
+      cookieStoreCleanup = () => cookieStore.removeEventListener('change', onCookieChange);
+    }
+
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener('storage', onStorage);
+      cookieStoreCleanup?.();
     };
   }, [loading, checkSession]);
 
@@ -70,6 +85,25 @@ export default function StoreInitializer() {
       }
     };
   }, [loading, token, setToken, forceLogout]);
+
+  // Heartbeat: probe the server every 5 s to detect manual refreshToken cookie deletion.
+  // The refreshToken is httpOnly so JS can't read it — only the server can verify it.
+  useEffect(() => {
+    if (loading || !token) return undefined;
+
+    const probe = async () => {
+      const alive = await checkRefreshToken();
+      if (!alive) {
+        // refreshToken cookie was deleted or expired — force logout immediately
+        forceLogout({ redirect: true, callApi: false });
+      }
+    };
+
+    // Run once immediately, then every 500 ms for near-instant detection
+    probe();
+    const heartbeatId = window.setInterval(probe, 500);
+    return () => window.clearInterval(heartbeatId);
+  }, [loading, token, forceLogout]);
 
   useEffect(() => {
     if (loading) return;

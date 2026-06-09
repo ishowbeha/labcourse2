@@ -27,7 +27,7 @@
         return live;
       }
       // Token was deleted! Return cached value if available and cookie exists
-      if (cachedToken && document.cookie.includes('refreshToken=')) {
+      if (cachedToken && document.cookie.includes('isLoggedIn=')) {
         // Restore it to localStorage so other code that reads directly also sees it
         ORIGINAL_SET.call(this, 'token', cachedToken);
         return cachedToken;
@@ -56,7 +56,7 @@
     }
 
     // Check if refresh cookie exists
-    const hasCookie = document.cookie.includes('refreshToken=');
+    const hasCookie = document.cookie.includes('isLoggedIn=');
     if (!hasCookie) {
       // No cookie → actually delete
       cachedToken = null;
