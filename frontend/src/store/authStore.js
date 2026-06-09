@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import api from '../services/api';
+import {
+  clearAuthStorage,
+  hasSessionCookie,
+  refreshAccessToken,
+  revokeServerSession,
+} from '../utils/authSession';
+
+let isLoggingOut = false;
 
 const fetchUserProfile = async () => {
   try {
@@ -8,32 +16,6 @@ const fetchUserProfile = async () => {
     console.error('Failed to fetch user profile:', error);
     return null;
   }
-};
-
-const refreshAccessToken = async () => {
-  try {
-    const axios = (await import('axios')).default;
-    const response = await axios.post(
-      `${import.meta.env.VITE_API_URL || '/api'}/auth/refresh-token`,
-      {},
-      { withCredentials: true }
-    );
-    // Handle different response shapes: response.data is already unwrapped by api interceptor
-    // but raw axios returns { data: { success, data: { accessToken } } }
-    const body = response.data?.data || response.data;
-    const newAccessToken = body?.accessToken || response.data?.data?.accessToken;
-    if (newAccessToken) {
-      localStorage.setItem('token', newAccessToken);
-      return newAccessToken;
-    }
-  } catch (error) {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
-    console.error('Failed to refresh token:', error);
-  }
-  return null;
 };
 
 export const useAuthStore = create((set, get) => ({
@@ -45,73 +27,100 @@ export const useAuthStore = create((set, get) => ({
   setToken: (token) => set({ token }),
   setLoading: (loading) => set({ loading }),
 
+  forceLogout: async ({ redirect = true, callApi = true } = {}) => {
+    if (isLoggingOut) return;
+    isLoggingOut = true;
+
+    if (callApi) {
+      await revokeServerSession();
+    }
+    clearAuthStorage();
+    set({ user: null, token: null });
+    if (redirect) {
+      window.location.href = '/login';
+    }
+  },
+
+  checkSession: () => {
+    if (isLoggingOut) return false;
+
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    const sessionCookie = hasSessionCookie();
+    const { token, user } = get();
+
+    const hadSession = Boolean(token || user);
+    const storageIntact = Boolean(storedToken && storedUser);
+    const sessionValid = storageIntact && sessionCookie;
+
+    if (hadSession && !sessionValid) {
+      void get().forceLogout({ redirect: true, callApi: true });
+      return false;
+    }
+
+    if (sessionValid && (!token || !user)) {
+      set({
+        token: storedToken,
+        user: JSON.parse(storedUser),
+      });
+    }
+
+    return sessionValid;
+  },
+
   initAuth: async () => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
-    const hasRefreshCookie = document.cookie.includes('refreshToken=');
+    const sessionCookie = hasSessionCookie();
 
-    if (storedToken) {
-      // Try to verify token with a profile request
+    if (!sessionCookie) {
+      if (storedToken || storedUser) {
+        clearAuthStorage();
+      }
+      set({ user: null, token: null, loading: false });
+      return;
+    }
+
+    if (storedToken && storedUser) {
       const profile = await fetchUserProfile();
       if (profile) {
         const user = profile.data || profile;
         localStorage.setItem('user', JSON.stringify(user));
-        set({ user, token: storedToken });
-        set({ loading: false });
+        set({ user, token: storedToken, loading: false });
         return;
       }
-      // Profile fetch failed (token expired or invalid), try refreshing
+
       const newToken = await refreshAccessToken();
       if (newToken) {
         const newProfile = await fetchUserProfile();
         if (newProfile) {
           const user = newProfile.data || newProfile;
           localStorage.setItem('user', JSON.stringify(user));
-          set({ user, token: newToken });
-          set({ loading: false });
+          set({ user, token: newToken, loading: false });
           return;
         }
       }
-      // Both failed - clear auth state
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      set({ user: null, token: null });
-    } else if (hasRefreshCookie) {
-      // No access token but refresh token cookie exists - try to get a new access token
+
+      await get().forceLogout({ redirect: false, callApi: true });
+      set({ loading: false });
+      return;
+    }
+
+    if (!storedToken && sessionCookie) {
       const newToken = await refreshAccessToken();
       if (newToken) {
         const newProfile = await fetchUserProfile();
         if (newProfile) {
           const user = newProfile.data || newProfile;
           localStorage.setItem('user', JSON.stringify(user));
-          set({ user, token: newToken });
+          set({ user, token: newToken, loading: false });
+          return;
         }
       }
     }
 
-    set({ loading: false });
-  },
-
-  // Force re-check tokens from localStorage and redirect if missing
-  checkTokens: () => {
-    const currentToken = localStorage.getItem('token');
-    const currentUser = localStorage.getItem('user');
-    const { token, user } = get();
-
-    // If localStorage was cleared but store still has data, sync it
-    if (!currentToken && token) {
-      localStorage.removeItem('user');
-      set({ user: null, token: null });
-      window.location.href = '/login';
-      return false;
-    }
-    if (!currentUser && user) {
-      localStorage.removeItem('token');
-      set({ user: null, token: null });
-      window.location.href = '/login';
-      return false;
-    }
-    return true;
+    clearAuthStorage();
+    set({ user: null, token: null, loading: false });
   },
 
   login: async (email, password) => {
@@ -163,9 +172,9 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  logout: async () => {
+    await revokeServerSession();
+    clearAuthStorage();
     set({ user: null, token: null });
   },
 

@@ -130,6 +130,8 @@ class AuthController {
         data: resultWithoutRefresh
       });
     } catch (error) {
+      res.clearCookie('refreshToken');
+      res.clearCookie('isLoggedIn');
       res.status(401).json({
         success: false,
         message: error.message
