@@ -3,9 +3,35 @@ class AdminRepository {
     this.pool = pool;
   }
 
+  static PAID_ORDER_STATUSES = "('paid', 'confirmed', 'completed')";
+
+  _orderSalesSubquery() {
+    return `
+      SELECT match_id, SUM(quantity) as sold_tickets, SUM(subtotal) as total_revenue
+      FROM (
+        SELECT t.match_id, oi.quantity, oi.subtotal
+        FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        INNER JOIN tickets t ON oi.ticket_id = t.id
+        WHERE o.status IN ${AdminRepository.PAID_ORDER_STATUSES}
+
+        UNION ALL
+
+        SELECT m2.id as match_id, oi.quantity, oi.subtotal
+        FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        INNER JOIN matches m2 ON o.notes LIKE CONCAT('%Match: ', m2.home_team, ' vs ', m2.away_team, '%')
+        WHERE oi.ticket_id IS NULL
+          AND o.status IN ${AdminRepository.PAID_ORDER_STATUSES}
+      ) order_sales
+      GROUP BY match_id
+    `;
+  }
+
   // Dashboard Statistics
   async getDashboardStats() {
     const stats = {};
+    const paidStatuses = AdminRepository.PAID_ORDER_STATUSES;
 
     // Total users
     const [userRows] = await this.pool.query('SELECT COUNT(*) as count FROM users WHERE is_active = 1');
@@ -15,15 +41,21 @@ class AdminRepository {
     const [matchRows] = await this.pool.query("SELECT COUNT(*) as count FROM matches WHERE status IN ('scheduled', 'live')");
     stats.totalMatches = matchRows[0].count;
 
-    // Total tickets sold (from tickets + from simple-purchase orders)
-    const [ticketRows] = await this.pool.query("SELECT COUNT(*) as count FROM tickets WHERE status = 'sold'");
-    const [orderTicketRows] = await this.pool.query(
-      "SELECT COALESCE(SUM(oi.quantity), 0) as count FROM order_items oi INNER JOIN orders o ON oi.order_id = o.id WHERE oi.ticket_id IS NULL AND o.status IN ('paid', 'confirmed', 'completed')"
-    );
-    stats.totalTicketsSold = parseInt(ticketRows[0].count) + parseInt(orderTicketRows[0].count);
+    // Total tickets sold from paid order line items (covers seat-based and simple purchases)
+    const [ticketRows] = await this.pool.query(`
+      SELECT COALESCE(SUM(oi.quantity), 0) as count
+      FROM order_items oi
+      INNER JOIN orders o ON oi.order_id = o.id
+      WHERE o.status IN ${paidStatuses}
+    `);
+    stats.totalTicketsSold = parseInt(ticketRows[0].count, 10);
 
-    // Total revenue (from orders that have paid/confirmed/completed status)
-    const [revenueRows] = await this.pool.query("SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE status IN ('paid', 'confirmed', 'completed')");
+    // Total revenue from completed orders
+    const [revenueRows] = await this.pool.query(`
+      SELECT COALESCE(SUM(total_amount), 0) as total
+      FROM orders
+      WHERE status IN ${paidStatuses}
+    `);
     stats.totalRevenue = revenueRows[0].total;
 
     // Tickets by status
@@ -31,7 +63,12 @@ class AdminRepository {
     stats.ticketsByStatus = ticketsByStatus;
 
     // Recent orders count
-    const [recentRows] = await this.pool.query("SELECT COUNT(*) as count FROM orders WHERE created_at >= NOW() - INTERVAL 7 DAY");
+    const [recentRows] = await this.pool.query(`
+      SELECT COUNT(*) as count
+      FROM orders
+      WHERE status IN ${paidStatuses}
+        AND created_at >= NOW() - INTERVAL 7 DAY
+    `);
     stats.recentOrders = recentRows[0].count;
 
     return stats;
@@ -217,23 +254,23 @@ class AdminRepository {
 
   // Reports - Ticket Sales by Match
   async getTicketSalesByMatch() {
+    const salesSubquery = this._orderSalesSubquery();
     const [rows] = await this.pool.query(`
-      SELECT 
+      SELECT
         m.id,
         m.home_team,
         m.away_team,
         m.match_date,
         m.stadium_id,
         s.name as stadium_name,
-        COUNT(t.id) as total_tickets,
-        SUM(CASE WHEN t.status = 'sold' THEN 1 ELSE 0 END) as sold_tickets,
-        SUM(CASE WHEN t.status = 'sold' THEN t.price ELSE 0 END) as total_revenue,
         m.base_price,
-        m.status as match_status
+        m.status as match_status,
+        (SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id) as total_tickets,
+        COALESCE(sales.sold_tickets, 0) as sold_tickets,
+        COALESCE(sales.total_revenue, 0) as total_revenue
       FROM matches m
       LEFT JOIN stadiums s ON m.stadium_id = s.id
-      LEFT JOIN tickets t ON t.match_id = m.id
-      GROUP BY m.id, m.home_team, m.away_team, m.match_date, m.stadium_id, s.name, m.base_price, m.status
+      LEFT JOIN (${salesSubquery}) sales ON sales.match_id = m.id
       ORDER BY m.match_date DESC
     `);
     return rows;
@@ -309,12 +346,12 @@ class AdminRepository {
         u.first_name,
         u.last_name,
         o.notes as match_name,
-        oi.quantity as ticket_count
+        COALESCE(SUM(oi.quantity), 0) as ticket_count
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       ${whereClause}
-      GROUP BY o.id, o.order_number, o.user_id, o.total_amount, o.status, o.payment_status, o.payment_method, o.customer_email, o.created_at, u.first_name, u.last_name, o.notes, oi.quantity
+      GROUP BY o.id, o.order_number, o.user_id, o.total_amount, o.status, o.payment_status, o.payment_method, o.customer_email, o.created_at, u.first_name, u.last_name, o.notes
       ${orderSql}
       LIMIT ? OFFSET ?
     `, [...params, parseInt(limit), parseInt(offset)]);
@@ -356,7 +393,7 @@ class AdminRepository {
         SUM(total_amount) as revenue,
         AVG(total_amount) as avg_order_value
       FROM orders 
-      WHERE status = 'paid'
+      WHERE status IN ${AdminRepository.PAID_ORDER_STATUSES}
       GROUP BY period
       ORDER BY period DESC
       LIMIT 12
@@ -366,6 +403,7 @@ class AdminRepository {
 
   // Reports - Top Selling Matches
   async getTopSellingMatches(limit = 10) {
+    const salesSubquery = this._orderSalesSubquery();
     const [rows] = await this.pool.query(`
       SELECT 
         m.id,
@@ -373,13 +411,13 @@ class AdminRepository {
         m.away_team,
         m.match_date,
         s.name as stadium_name,
-        COUNT(t.id) as tickets_sold,
-        SUM(t.price) as total_revenue
+        COALESCE(sales.sold_tickets, 0) as tickets_sold,
+        COALESCE(sales.total_revenue, 0) as total_revenue
       FROM matches m
       LEFT JOIN stadiums s ON m.stadium_id = s.id
-      LEFT JOIN tickets t ON t.match_id = m.id AND t.status = 'sold'
-      GROUP BY m.id, m.home_team, m.away_team, m.match_date, s.name
-      ORDER BY tickets_sold DESC
+      INNER JOIN (${salesSubquery}) sales ON sales.match_id = m.id
+      WHERE COALESCE(sales.sold_tickets, 0) > 0
+      ORDER BY tickets_sold DESC, total_revenue DESC
       LIMIT ?
     `, [parseInt(limit)]);
     return rows;

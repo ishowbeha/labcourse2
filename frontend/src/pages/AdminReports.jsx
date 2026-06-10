@@ -5,10 +5,8 @@ import {
 } from 'react-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import AdminService from '../services/AdminService';
-import OrderService from '../services/OrderService';
 import LazyAdminNavbar from '../components/layout/LazyAdminNavbar';
 import api from '../services/api';
-import axios from 'axios';
 
 const AdminReports = () => {
   const { user, logout, isAdmin } = useAuth();
@@ -17,10 +15,9 @@ const AdminReports = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [ticketSales, setTicketSales] = useState([]);
+  const [overviewStats, setOverviewStats] = useState(null);
   const [revenueData, setRevenueData] = useState([]);
   const [topMatches, setTopMatches] = useState([]);
-  const [localOrders, setLocalOrders] = useState([]);
-  const [backendOrderNumbers, setBackendOrderNumbers] = useState(new Set());
   const [error, setError] = useState(null);
   const [activityLogs, setActivityLogs] = useState([]);
   const [filterAction, setFilterAction] = useState('');
@@ -38,47 +35,21 @@ const AdminReports = () => {
 
   useEffect(() => {
     if (!isAdmin()) { navigate('/home'); return; }
-    const local = OrderService.getOrders();
-    setLocalOrders(local);
-    (async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('/api/admin/orders?limit=1000', {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          withCredentials: true
-        });
-        if (res.data?.success && res.data?.data?.orders) {
-          const existing = OrderService.getOrders();
-          const existingNums = new Set(existing.map(o => o.orderNumber));
-          const backendOrders = res.data.data.orders
-             .filter(o => !existingNums.has(o.order_number))
-             .map(o => ({
-              id: o.id, orderNumber: o.order_number,
-              date: o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : '',
-              match: typeof o.match_name === 'string' ? o.match_name.replace(/^Match:\s*/i, '') : 'Match',
-              tickets: o.ticket_count || 1,
-              total: parseFloat(o.total_amount) || 0,
-              status: o.status || 'confirmed',
-              paymentMethod: o.payment_method || 'Credit Card',
-              matchDate: o.created_at
-            }));
-          if (backendOrders.length > 0) setLocalOrders(prev => [...prev, ...backendOrders]);
-        }
-      } catch (e) { console.log('Backend orders:', e.message); }
-    })();
     fetchReports();
   }, []);
 
   const fetchReports = async () => {
     try {
       setLoading(true);
-      const [salesRes, revenueRes, topRes, stadiumsRes] = await Promise.all([
+      const [salesRes, revenueRes, topRes, stadiumsRes, statsRes] = await Promise.all([
         AdminService.getTicketSalesByMatch(),
         AdminService.getRevenueAnalytics('monthly'),
         AdminService.getTopSellingMatches(10),
-        AdminService.getStadiums({ limit: 100 })
+        AdminService.getStadiums({ limit: 100 }),
+        AdminService.getDashboardStats(),
       ]);
       if (salesRes.success) setTicketSales(salesRes.data || []);
+      if (statsRes.success) setOverviewStats(statsRes.data || null);
       if (revenueRes.success) setRevenueData(revenueRes.data || []);
       if (topRes.success) setTopMatches(topRes.data || []);
       if (stadiumsRes.success) setStadiums(stadiumsRes.data.stadiums || []);
@@ -113,24 +84,23 @@ const AdminReports = () => {
 
   if (!isAdmin()) return null;
 
-  const confirmedLocalOrders = localOrders.filter(o => o.status === 'confirmed' || o.status === 'completed');
-  const localTicketsSold = confirmedLocalOrders.reduce((sum, o) => sum + (o.tickets || 0), 0);
-  const localRevenue = confirmedLocalOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const totalTicketsSold = (ticketSales.reduce((sum, m) => sum + (m.sold_tickets || 0), 0)) + localTicketsSold;
-  const totalRevenue = (ticketSales.reduce((sum, m) => sum + (m.total_revenue || 0), 0)) + localRevenue;
+  const totalTicketsSold = overviewStats?.totalTicketsSold
+    ?? ticketSales.reduce((sum, m) => sum + (Number(m.sold_tickets) || 0), 0);
+  const totalRevenue = overviewStats?.totalRevenue
+    ?? ticketSales.reduce((sum, m) => sum + (Number(m.total_revenue) || 0), 0);
 
-  const dbMatchesMap = {};
-  ticketSales.forEach(m => {
-    const key = `${m.home_team || ''} vs ${m.away_team || ''}`;
-    dbMatchesMap[key] = { match: key, date: m.match_date, stadium: m.stadium_name || 'N/A', ticketsSold: m.sold_tickets || 0, totalTickets: m.total_tickets || 0, revenue: m.total_revenue || 0, basePrice: m.base_price || 0, status: m.match_status || 'scheduled' };
-  });
-  confirmedLocalOrders.forEach(o => {
-    const key = o.match || 'Unknown Match';
-    if (dbMatchesMap[key]) { dbMatchesMap[key].ticketsSold += o.tickets || 0; dbMatchesMap[key].revenue += o.total || 0; }
-    else { dbMatchesMap[key] = { match: key, date: o.matchDate || o.date || o.created_at, stadium: o.stadium || 'N/A', ticketsSold: o.tickets || 0, totalTickets: o.tickets || 0, revenue: o.total || 0, basePrice: Math.round((o.total || 0) / (o.tickets || 1)), status: 'confirmed' }; }
-  });
-
-  const allMatches = Object.values(dbMatchesMap).filter(m => m.ticketsSold > 0);
+  const allMatches = ticketSales
+    .filter((m) => (Number(m.sold_tickets) || 0) > 0)
+    .map((m) => ({
+      match: `${m.home_team} vs ${m.away_team}`,
+      date: m.match_date,
+      stadium: m.stadium_name || 'N/A',
+      ticketsSold: Number(m.sold_tickets) || 0,
+      totalTickets: Number(m.total_tickets) || 0,
+      revenue: Number(m.total_revenue) || 0,
+      basePrice: Number(m.base_price) || 0,
+      status: m.match_status || 'scheduled',
+    }));
   const mostProfitable = [...allMatches].sort((a, b) => b.revenue - a.revenue);
   const topSelling = [...allMatches].sort((a, b) => b.ticketsSold - a.ticketsSold);
 
@@ -510,118 +480,38 @@ const AdminReports = () => {
                   </Button>
 
                   {dynamicReport && (() => {
-                    const localData = localOrders.filter(o => {
-                      // Status filter
-                      if (drForm.filters.status) {
-                        if (o.status !== drForm.filters.status) return false;
-                      } else {
-                        // default: only count success orders if no status is specified
-                        if (o.status !== 'confirmed' && o.status !== 'completed' && o.status !== 'paid') return false;
-                      }
-                      
-                      // Date range filters
-                      if (drForm.dateFrom && o.date && o.date < drForm.dateFrom) return false;
-                      if (drForm.dateTo && o.date && o.date > drForm.dateTo) return false;
-
-                      // Stadium filter
-                      if (drForm.filters.stadiumId) {
-                        const targetStadium = stadiums.find(s => String(s.id) === String(drForm.filters.stadiumId));
-                        if (targetStadium) {
-                          if (o.stadium && o.stadium !== targetStadium.name) return false;
-                        }
-                      }
-                      return true;
-                    });
-
-                    const mergedRows = (dynamicReport.rows || []).map(r => ({ ...r }));
-                    let mergedSummary = { ...(dynamicReport.summary || {}) };
-
-                    if (dynamicReport.metrics?.includes('tickets_sold') || dynamicReport.metrics?.includes('revenue') || dynamicReport.metrics?.includes('orders_count')) {
-                      const localTickets = localData.reduce((s, o) => s + (o.tickets || 0), 0);
-                      const localRev = localData.reduce((s, o) => s + (o.total || 0), 0);
-                      const localOrdersCount = localData.length;
-
-                      if (drForm.groupBy === 'none') {
-                        const totalRow = mergedRows.find(r => r.label === 'Total');
-                        if (totalRow) {
-                          totalRow.tickets_sold = (totalRow.tickets_sold || 0) + localTickets;
-                          totalRow.revenue = (totalRow.revenue || 0) + localRev;
-                          totalRow.orders_count = (totalRow.orders_count || 0) + localOrdersCount;
-                        } else {
-                          mergedRows.push({ label: 'Total', tickets_sold: localTickets, revenue: localRev, orders_count: localOrdersCount });
-                        }
-                      } else {
-                        // Group local orders by the selected key
-                        localData.forEach(o => {
-                          let label = 'Local Orders (browser)';
-                          if (drForm.groupBy === 'match') {
-                            label = o.match || 'Unknown Match';
-                          } else if (drForm.groupBy === 'day') {
-                            label = o.date || 'Unknown Date';
-                          } else if (drForm.groupBy === 'month') {
-                            label = o.date ? o.date.substring(0, 7) : 'Unknown Month';
-                          } else if (drForm.groupBy === 'stadium') {
-                            label = o.stadium || 'Unknown Stadium';
-                          }
-
-                          let row = mergedRows.find(r => r.label === label);
-                          if (!row) {
-                            row = { label };
-                            if (dynamicReport.metrics?.includes('tickets_sold')) row.tickets_sold = 0;
-                            if (dynamicReport.metrics?.includes('revenue')) row.revenue = 0;
-                            if (dynamicReport.metrics?.includes('orders_count')) row.orders_count = 0;
-                            mergedRows.push(row);
-                          }
-                          if (row.tickets_sold !== undefined) row.tickets_sold += o.tickets || 0;
-                          if (row.revenue !== undefined) row.revenue += o.total || 0;
-                          if (row.orders_count !== undefined) row.orders_count += 1;
-                        });
-                      }
-
-                      // Update overall summary
-                      if (dynamicReport.metrics?.includes('tickets_sold')) mergedSummary.totalTickets = (mergedSummary.totalTickets || 0) + localTickets;
-                      if (dynamicReport.metrics?.includes('revenue')) mergedSummary.totalRevenue = (mergedSummary.totalRevenue || 0) + localRev;
-                      if (dynamicReport.metrics?.includes('orders_count')) mergedSummary.totalOrders = (mergedSummary.totalOrders || 0) + localOrdersCount;
-                    }
-
-                    // Calculate average order value for combined rows
-                    if (dynamicReport.metrics?.includes('avg_order_value')) {
-                      mergedRows.forEach(row => {
-                        const orders = row.orders_count || 0;
-                        const rev = row.revenue || 0;
-                        row.avg_order_value = orders > 0 ? rev / orders : 0;
-                      });
-                    }
+                    const reportRows = dynamicReport.rows || [];
+                    const reportSummary = dynamicReport.summary || {};
 
                     return (
                       <>
-                        {Object.keys(mergedSummary).length > 0 && (
+                        {Object.keys(reportSummary).length > 0 && (
                           <Row className="g-3 mb-3">
-                            {mergedSummary.totalTickets !== undefined && (
+                            {reportSummary.totalTickets !== undefined && (
                               <Col xs={12} sm={6} md={4}>
                                 <Card className="bg-info bg-opacity-10 text-center">
                                   <Card.Body className="py-3">
-                                    <div className="fs-5 fw-bold">{mergedSummary.totalTickets}</div>
+                                    <div className="fs-5 fw-bold">{reportSummary.totalTickets}</div>
                                     <div className="text-muted small">Total Tickets</div>
                                   </Card.Body>
                                 </Card>
                               </Col>
                             )}
-                            {mergedSummary.totalRevenue !== undefined && (
+                            {reportSummary.totalRevenue !== undefined && (
                               <Col xs={12} sm={6} md={4}>
                                 <Card className="bg-success bg-opacity-10 text-center">
                                   <Card.Body className="py-3">
-                                    <div className="fs-5 fw-bold text-success">€{Number(mergedSummary.totalRevenue).toFixed(2)}</div>
+                                    <div className="fs-5 fw-bold text-success">€{Number(reportSummary.totalRevenue).toFixed(2)}</div>
                                     <div className="text-muted small">Total Revenue</div>
                                   </Card.Body>
                                 </Card>
                               </Col>
                             )}
-                            {mergedSummary.totalOrders !== undefined && (
+                            {reportSummary.totalOrders !== undefined && (
                               <Col xs={12} sm={6} md={4}>
                                 <Card className="bg-warning bg-opacity-10 text-center">
                                   <Card.Body className="py-3">
-                                    <div className="fs-5 fw-bold text-warning">#{mergedSummary.totalOrders}</div>
+                                    <div className="fs-5 fw-bold text-warning">#{reportSummary.totalOrders}</div>
                                     <div className="text-muted small">Total Orders</div>
                                   </Card.Body>
                                 </Card>
@@ -645,7 +535,7 @@ const AdminReports = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {mergedRows.map((row, i) => (
+                              {reportRows.map((row, i) => (
                                 <tr key={i}>
                                   {drForm.groupBy !== 'none' && <td className="fw-semibold">{row.label}</td>}
                                   {dynamicReport.metrics?.includes('tickets_sold') && <td>{row.tickets_sold || 0}</td>}
@@ -657,7 +547,7 @@ const AdminReports = () => {
                                   {dynamicReport.metrics?.includes('logins') && <td>{row.logins || 0}</td>}
                                 </tr>
                               ))}
-                              {mergedRows.length === 0 && (
+                              {reportRows.length === 0 && (
                                 <tr>
                                   <td colSpan="7" className="text-center text-muted py-4">No data</td>
                                 </tr>
@@ -666,7 +556,7 @@ const AdminReports = () => {
                           </Table>
                         </div>
 
-                        {mergedRows.length > 0 && (
+                        {reportRows.length > 0 && (
                           <Button
                             variant="success"
                             className="mt-3"
@@ -682,7 +572,7 @@ const AdminReports = () => {
                               };
                               const csv = [
                                 ['Group', ...headers].map(escapeCSV).join(','),
-                                ...mergedRows.map(r => [r.label || 'Total', ...headers.map(h => r[h] || 0)].map(escapeCSV).join(','))
+                                ...reportRows.map(r => [r.label || 'Total', ...headers.map(h => r[h] || 0)].map(escapeCSV).join(','))
                               ].join('\n');
                               const blob = new Blob([csv], { type: 'text/csv' });
                               const url = URL.createObjectURL(blob);
