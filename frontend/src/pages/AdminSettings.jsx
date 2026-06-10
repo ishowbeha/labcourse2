@@ -405,15 +405,21 @@ const AdminSettings = () => {
         <Container fluid="lg" className="py-3">
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div className="d-flex align-items-center gap-3 flex-wrap">
-              <Link to="/home" className="btn btn-sm btn-outline-light text-secondary-emphasis bg-white bg-opacity-10 border-0">
+              <Link
+                to="/home"
+                className="btn btn-sm text-nowrap flex-shrink-0 admin-header-home-link"
+              >
                 🏠 Home
               </Link>
-              <Link to="/admin/dashboard" className="btn btn-sm btn-outline-light text-secondary-emphasis bg-white bg-opacity-10 border-0">
+              <Link
+                to="/admin/dashboard"
+                className="btn btn-sm btn-outline-light text-nowrap flex-shrink-0"
+              >
                 ← Dashboard
               </Link>
               <div>
                 <h1 className="h4 mb-0 fw-bold">⚙️ System Settings</h1>
-                <p className="small text-secondary mb-0">Saved to MySQL · Configure your platform</p>
+                <p className="small admin-header-subtitle mb-0">Saved to MySQL · Configure your platform</p>
               </div>
             </div>
             <div className="d-flex align-items-center gap-3">
@@ -434,7 +440,7 @@ const AdminSettings = () => {
               <Button
                 key={tab.id}
                 variant="link"
-                className={`text-decoration-none px-3 py-2 border-0 border-bottom border-3 rounded-0 settings-tab ${activeTab === tab.id ? 'text-white fw-bold' : 'text-secondary'}`}
+                className={`text-decoration-none px-3 py-2 border-0 border-bottom border-3 rounded-0 settings-tab ${activeTab === tab.id ? 'text-white fw-bold' : 'admin-header-subtitle'}`}
                 style={{ borderBottomColor: activeTab === tab.id ? tab.color : 'transparent' }}
                 onClick={() => setActiveTab(tab.id)}
               >

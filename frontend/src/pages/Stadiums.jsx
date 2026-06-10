@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import LazyNavbar from '../components/layout/LazyNavbar';
 import axios from 'axios';
 import OrderService from '../services/OrderService';
+import StripeCheckoutForm from '../components/payment/StripeCheckoutForm';
 import AdvancedSearchBar from '../components/search/AdvancedSearchBar';
 
 const Stadiums = () => {
@@ -15,15 +16,13 @@ const Stadiums = () => {
 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [selectedStadium, setSelectedStadium] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [lastOrderNum, setLastOrderNum] = useState('');
   const [error, setError] = useState('');
+
+  const SEASON_PASS_ORIGINAL = 299.99;
+  const SEASON_PASS_DISCOUNT = 100.00;
+  const SEASON_PASS_TOTAL = 199.99;
 
   // Advanced search state
   const [searchText, setSearchText] = useState('');
@@ -51,17 +50,6 @@ const Stadiums = () => {
 
   // showMapModal / mapStadium removed — View on Map now opens Google Maps directly
 
-  const formatCardNumber = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
-  };
-
-  const formatExpiry = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
-  };
-
   const handleViewMap = (stadium) => {
     if (stadium.mapsUrl) {
       window.open(stadium.mapsUrl, '_blank', 'noopener,noreferrer');
@@ -70,67 +58,48 @@ const Stadiums = () => {
 
   const handleBuyPass = (stadium) => {
     setSelectedStadium(stadium);
-    setPaymentMethod('');
-    setCardNumber('');
-    setCardName('');
-    setCardExpiry('');
-    setCardCvc('');
     setError('');
     setPurchaseSuccess(false);
     setShowPurchaseModal(true);
   };
 
-  const handleConfirmPurchase = async () => {
-    if (!paymentMethod) {
-      setError('Please select a payment method');
-      return;
-    }
-    if (paymentMethod === 'credit-card' && (!cardNumber || !cardName || !cardExpiry || !cardCvc)) {
-      setError('Please fill in all card details');
-      return;
-    }
+  const handleSeasonPassPaymentSuccess = async (paymentIntent, finalAmount) => {
+    if (!selectedStadium) return;
 
-    setPurchasing(true);
     setError('');
 
     try {
-      const originalPrice = 299.99;
-      const discountAmount = 100.00;
-      const finalPrice = 199.99;
+      const originalPrice = SEASON_PASS_ORIGINAL;
+      const discountAmount = SEASON_PASS_DISCOUNT;
       const matchName = `Season Pass - ${selectedStadium.name}`;
       const sectionName = 'All Sections (1 Year)';
       const quantity = 1;
-      const pmName = [
-        { id: 'credit-card', name: 'Credit Card' },
-        { id: 'paypal', name: 'PayPal' },
-        { id: 'bank-transfer', name: 'Bank Transfer' }
-      ].find(p => p.id === paymentMethod)?.name || paymentMethod;
 
       const noteDetails = [
-        `Season Stadium Pass`,
+        'Season Stadium Pass',
         `Subtotal: ${originalPrice.toFixed(2)}`,
-        `Fees: 0.00`,
-        `Discount: ${discountAmount.toFixed(2)}`
+        'Fees: 0.00',
+        `Discount: ${discountAmount.toFixed(2)}`,
+        `Stripe PI: ${paymentIntent.id}`,
       ];
       const notesStr = noteDetails.join(' | ');
 
       let orderNumber = '';
       let apiPurchaseSucceeded = false;
 
-      // Save order to backend
       try {
         const token = localStorage.getItem('token');
         const response = await axios.post('/api/orders/simple-purchase', {
-          matchName: matchName,
-          sectionName: sectionName,
-          quantity: quantity,
-          totalAmount: finalPrice,
-          paymentMethod: paymentMethod,
+          matchName,
+          sectionName,
+          quantity,
+          totalAmount: finalAmount,
+          paymentMethod: 'stripe',
           notes: notesStr,
-          status: 'confirmed'
+          status: 'confirmed',
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          withCredentials: true
+          withCredentials: true,
         });
         const data = response.data;
         if (data?.success && data?.data?.orderNumber) {
@@ -142,12 +111,10 @@ const Stadiums = () => {
       }
 
       if (!apiPurchaseSucceeded) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
         orderNumber = OrderService.generateOrderNumber();
       }
 
-      // Save order to localStorage
-      const order = {
+      OrderService.saveOrder({
         id: Date.now() + Math.random(),
         orderNumber,
         date: new Date().toISOString().split('T')[0],
@@ -162,14 +129,12 @@ const Stadiums = () => {
         fees: 0,
         discount: discountAmount,
         couponCode: null,
-        total: finalPrice,
+        total: finalAmount,
         status: 'confirmed',
-        paymentMethod: pmName,
-        notes: notesStr
-      };
-      OrderService.saveOrder(order);
+        paymentMethod: 'Stripe',
+        notes: notesStr,
+      });
 
-      // Log activity
       try {
         const token = localStorage.getItem('token');
         await axios.post('/api/logs/activity', {
@@ -177,10 +142,10 @@ const Stadiums = () => {
           description: `Bought season stadium pass for ${selectedStadium.name}`,
           resourceType: 'pass',
           resourceId: orderNumber,
-          metadata: { stadium: selectedStadium.name }
+          metadata: { stadium: selectedStadium.name, paymentIntentId: paymentIntent.id },
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          withCredentials: true
+          withCredentials: true,
         });
       } catch (e) {}
 
@@ -189,8 +154,6 @@ const Stadiums = () => {
     } catch (err) {
       console.error('Purchase season pass failed:', err);
       setError(err.message || 'Purchase failed. Please try again.');
-    } finally {
-      setPurchasing(false);
     }
   };
 
@@ -665,12 +628,6 @@ const Stadiums = () => {
     return list;
   }, [stadiums, searchText, advFilters, sortField, sortDir]);
 
-  const paymentMethods = [
-    { id: 'credit-card', name: 'Credit Card', icon: '💳' },
-    { id: 'paypal', name: 'PayPal', icon: '🅿️' },
-    { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
-  ];
-
   return (
     <div className="min-vh-100 bg-light">
       <LazyNavbar />
@@ -783,73 +740,35 @@ const Stadiums = () => {
                 </ul>
               </Alert>
 
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Select Payment Method</Form.Label>
-                <div className="d-flex flex-column gap-2">
-                  {paymentMethods.map(pm => (
-                    <Card
-                      key={pm.id}
-                      className={`mb-0 ${paymentMethod === pm.id ? 'border-dark bg-light' : ''}`}
-                      role="button"
-                      onClick={() => setPaymentMethod(pm.id)}
-                    >
-                      <Card.Body className="py-2 d-flex align-items-center gap-2">
-                        <span>{pm.icon}</span>
-                        <span className="fw-semibold small">{pm.name}</span>
-                        {paymentMethod === pm.id && <span className="ms-auto text-success fw-bold">✓</span>}
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              </Form.Group>
-
-              {paymentMethod === 'credit-card' && (
-                <Card className="mb-4">
-                  <Card.Body>
-                    <Form.Group className="mb-3">
-                      <Form.Label className="small fw-semibold">Card Number</Form.Label>
-                      <Form.Control placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                      <Form.Label className="small fw-semibold">Cardholder Name</Form.Label>
-                      <Form.Control placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
-                    </Form.Group>
-                    <Row>
-                      <Col>
-                        <Form.Group className="mb-0">
-                          <Form.Label className="small fw-semibold">Expiry Date</Form.Label>
-                          <Form.Control placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
-                        </Form.Group>
-                      </Col>
-                      <Col>
-                        <Form.Group className="mb-0">
-                          <Form.Label className="small fw-semibold">CVC</Form.Label>
-                          <Form.Control placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
               {error && <Alert variant="danger">{error}</Alert>}
 
-              <Card className="bg-light">
+              <Card className="bg-light mb-4">
                 <Card.Body className="py-2">
                   <div className="d-flex justify-content-between small py-1">
                     <span>Original Price</span>
-                    <span className="text-muted text-decoration-line-through">€299.99</span>
+                    <span className="text-muted text-decoration-line-through">€{SEASON_PASS_ORIGINAL.toFixed(2)}</span>
                   </div>
                   <div className="d-flex justify-content-between small py-1 text-success">
                     <span>Season Pass Discount (33%)</span>
-                    <span className="fw-bold">-€100.00</span>
+                    <span className="fw-bold">-€{SEASON_PASS_DISCOUNT.toFixed(2)}</span>
                   </div>
                   <div className="d-flex justify-content-between pt-2 mt-2 border-top fw-bold">
                     <span>Total Price</span>
-                    <span className="fs-5">€199.99</span>
+                    <span className="fs-5">€{SEASON_PASS_TOTAL.toFixed(2)}</span>
                   </div>
                 </Card.Body>
               </Card>
+
+              <StripeCheckoutForm
+                amount={SEASON_PASS_TOTAL}
+                metadata={{
+                  product: 'season_stadium_pass',
+                  stadium: selectedStadium.name,
+                }}
+                onSuccess={handleSeasonPassPaymentSuccess}
+                onError={setError}
+                payLabel={`🔒 Pay €${SEASON_PASS_TOTAL.toFixed(2)} with Stripe`}
+              />
             </>
           ) : selectedStadium && purchaseSuccess ? (
             <div className="text-center py-3">
@@ -872,9 +791,6 @@ const Stadiums = () => {
         {selectedStadium && !purchaseSuccess && (
           <Modal.Footer>
             <Button variant="outline-secondary" onClick={() => setShowPurchaseModal(false)}>Cancel</Button>
-            <Button variant="success" onClick={handleConfirmPurchase} disabled={purchasing || !paymentMethod}>
-              {purchasing ? '⏳ Processing...' : '✅ Purchase Pass (€199.99)'}
-            </Button>
           </Modal.Footer>
         )}
       </Modal>

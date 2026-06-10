@@ -11,6 +11,7 @@ import FootballService from '../services/FootballService';
 import { getFlagUrl } from '../utils/flags';
 import axios from 'axios';
 import OrderService from '../services/OrderService';
+import StripeCheckoutForm from '../components/payment/StripeCheckoutForm';
 
 const Home = () => {
   const { user, isAdmin, logout } = useAuth();
@@ -21,12 +22,6 @@ const Home = () => {
 
   const [showVipModal, setShowVipModal] = useState(false);
   const [vipMatchId, setVipMatchId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardName, setCardName] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [purchasing, setPurchasing] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [lastOrderNum, setLastOrderNum] = useState('');
   const [error, setError] = useState('');
@@ -56,17 +51,6 @@ const Home = () => {
   useEffect(() => {
     fetchUserOrders();
   }, []);
-
-  const formatCardNumber = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 16);
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
-  };
-
-  const formatExpiry = (value) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length > 2) return digits.slice(0, 2) + '/' + digits.slice(2);
-    return digits;
-  };
 
   const today = new Date();
   const currentYearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -120,17 +104,12 @@ const Home = () => {
   const handleBuyVipExperience = () => {
     fetchUserOrders();
     setVipMatchId(allUpcomingMatches[0]?.id || '');
-    setPaymentMethod('');
-    setCardNumber('');
-    setCardName('');
-    setCardExpiry('');
-    setCardCvc('');
     setError('');
     setPurchaseSuccess(false);
     setShowVipModal(true);
   };
 
-  const handleConfirmVipPurchase = async () => {
+  const handleVipPaymentSuccess = async (paymentIntent, finalAmount) => {
     if (hasVipThisMonth) {
       setError('You have already purchased a VIP Match Experience this calendar month. Limit: 1 per month.');
       return;
@@ -139,41 +118,25 @@ const Home = () => {
       setError('Please select a match');
       return;
     }
-    if (!paymentMethod) {
-      setError('Please select a payment method');
-      return;
-    }
-    if (paymentMethod === 'credit-card' && (!cardNumber || !cardName || !cardExpiry || !cardCvc)) {
-      setError('Please fill in all card details');
-      return;
-    }
 
-    setPurchasing(true);
     setError('');
 
     try {
       const selectedMatch = allUpcomingMatches.find(m => m.id === vipMatchId);
       const matchName = selectedMatch ? `${selectedMatch.homeTeam} vs ${selectedMatch.awayTeam}` : 'World Cup Match';
       const stadiumName = selectedMatch ? selectedMatch.stadiumName : 'Host Stadium';
-
       const originalPrice = selectedMatch ? getMatchVipPrice(selectedMatch) : 150.00;
       const discountAmount = Math.round(originalPrice * 0.28 * 100) / 100;
-      const finalPrice = Math.round((originalPrice - discountAmount) * 100) / 100;
-
-      const pmName = [
-        { id: 'credit-card', name: 'Credit Card' },
-        { id: 'paypal', name: 'PayPal' },
-        { id: 'bank-transfer', name: 'Bank Transfer' }
-      ].find(p => p.id === paymentMethod)?.name || paymentMethod;
 
       const noteDetails = [
-        `VIP Match Experience`,
+        'VIP Match Experience',
         `Subtotal: ${originalPrice.toFixed(2)}`,
-        `Fees: 0.00`,
+        'Fees: 0.00',
         `Discount: ${discountAmount.toFixed(2)}`,
+        `Stripe PI: ${paymentIntent.id}`,
         `MatchDate: ${selectedMatch?.matchDate || 'TBD'}`,
         `Stadium: ${stadiumName}`,
-        `Competition: ${selectedMatch?.competition || 'FIFA World Cup 2026'}`
+        `Competition: ${selectedMatch?.competition || 'FIFA World Cup 2026'}`,
       ];
       const notesStr = noteDetails.join(' | ');
 
@@ -183,16 +146,16 @@ const Home = () => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.post('/api/orders/simple-purchase', {
-          matchName: matchName,
+          matchName,
           sectionName: 'VIP Seating & Lounge',
           quantity: 1,
-          totalAmount: finalPrice,
-          paymentMethod: paymentMethod,
-          notes: 'VIP Experience | ' + notesStr,
-          status: 'confirmed'
+          totalAmount: finalAmount,
+          paymentMethod: 'stripe',
+          notes: `VIP Experience | ${notesStr}`,
+          status: 'confirmed',
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          withCredentials: true
+          withCredentials: true,
         });
         const data = response.data;
         if (data?.success && data?.data?.orderNumber) {
@@ -204,11 +167,10 @@ const Home = () => {
       }
 
       if (!apiPurchaseSucceeded) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
         orderNumber = OrderService.generateOrderNumber();
       }
 
-      const order = {
+      OrderService.saveOrder({
         id: Date.now() + Math.random(),
         orderNumber,
         date: new Date().toISOString().split('T')[0],
@@ -223,12 +185,11 @@ const Home = () => {
         fees: 0,
         discount: discountAmount,
         couponCode: null,
-        total: finalPrice,
+        total: finalAmount,
         status: 'confirmed',
-        paymentMethod: pmName,
-        notes: notesStr
-      };
-      OrderService.saveOrder(order);
+        paymentMethod: 'Stripe',
+        notes: notesStr,
+      });
 
       try {
         const token = localStorage.getItem('token');
@@ -237,10 +198,10 @@ const Home = () => {
           description: `Bought VIP match experience for ${matchName}`,
           resourceType: 'vip_pass',
           resourceId: orderNumber,
-          metadata: { match: matchName }
+          metadata: { match: matchName, paymentIntentId: paymentIntent.id },
         }, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
-          withCredentials: true
+          withCredentials: true,
         });
       } catch (e) {}
 
@@ -250,8 +211,6 @@ const Home = () => {
     } catch (err) {
       console.error('Purchase VIP experience failed:', err);
       setError(err.message || 'Purchase failed. Please try again.');
-    } finally {
-      setPurchasing(false);
     }
   };
 
@@ -429,12 +388,6 @@ const Home = () => {
     { href: '/stadiums', icon: '🏟️', label: 'View Stadiums' },
     { href: '/tickets', icon: '🎫', label: 'My Tickets' },
     { href: '/orders', icon: '📋', label: 'Order History' },
-  ];
-
-  const paymentMethods = [
-    { id: 'credit-card', name: 'Credit Card', icon: '💳' },
-    { id: 'paypal', name: 'PayPal', icon: '🅿️' },
-    { id: 'bank-transfer', name: 'Bank Transfer', icon: '🏦' },
   ];
 
   return (
@@ -635,58 +588,9 @@ const Home = () => {
                 </Alert>
               )}
 
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Select Payment Method</Form.Label>
-                <div className="d-flex flex-column gap-2">
-                  {paymentMethods.map(pm => (
-                    <Card
-                      key={pm.id}
-                      className={`mb-0 ${paymentMethod === pm.id ? 'border-dark bg-light' : ''}`}
-                      role="button"
-                      onClick={() => { if (!hasVipThisMonth) setPaymentMethod(pm.id); }}
-                    >
-                      <Card.Body className="py-2 d-flex align-items-center gap-2">
-                        <span>{pm.icon}</span>
-                        <span className="fw-semibold small">{pm.name}</span>
-                        {paymentMethod === pm.id && <span className="ms-auto text-success fw-bold">✓</span>}
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              </Form.Group>
-
-              {paymentMethod === 'credit-card' && !hasVipThisMonth && (
-                <Card className="mb-4">
-                  <Card.Body>
-                    <Form.Group className="mb-3">
-                      <Form.Label className="small fw-semibold">Card Number</Form.Label>
-                      <Form.Control placeholder="1234 5678 9012 3456" value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} />
-                    </Form.Group>
-                    <Form.Group className="mb-3">
-                      <Form.Label className="small fw-semibold">Cardholder Name</Form.Label>
-                      <Form.Control placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
-                    </Form.Group>
-                    <Row>
-                      <Col>
-                        <Form.Group className="mb-0">
-                          <Form.Label className="small fw-semibold">Expiry Date</Form.Label>
-                          <Form.Control placeholder="MM/YY" value={cardExpiry} onChange={(e) => setCardExpiry(formatExpiry(e.target.value))} />
-                        </Form.Group>
-                      </Col>
-                      <Col>
-                        <Form.Group className="mb-0">
-                          <Form.Label className="small fw-semibold">CVC</Form.Label>
-                          <Form.Control placeholder="123" value={cardCvc} onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 3))} />
-                        </Form.Group>
-                      </Col>
-                    </Row>
-                  </Card.Body>
-                </Card>
-              )}
-
               {error && <Alert variant="danger">{error}</Alert>}
 
-              <Card className="bg-light mb-0">
+              <Card className="bg-light mb-4">
                 <Card.Body className="py-2">
                   <div className="d-flex justify-content-between small py-1">
                     <span>Original Price</span>
@@ -702,6 +606,22 @@ const Home = () => {
                   </div>
                 </Card.Body>
               </Card>
+
+              {!hasVipThisMonth && (
+                <StripeCheckoutForm
+                  amount={currentTotal}
+                  disabled={!vipMatchId || allUpcomingMatches.length === 0}
+                  metadata={{
+                    product: 'vip_match_experience',
+                    match: vipSelectedMatch
+                      ? `${vipSelectedMatch.homeTeam} vs ${vipSelectedMatch.awayTeam}`
+                      : '',
+                  }}
+                  onSuccess={handleVipPaymentSuccess}
+                  onError={setError}
+                  payLabel={`🔒 Pay €${currentTotal.toFixed(2)} with Stripe`}
+                />
+              )}
             </>
           ) : (
             <div className="text-center py-3">
@@ -725,13 +645,6 @@ const Home = () => {
         {!purchaseSuccess && (
           <Modal.Footer>
             <Button variant="outline-secondary" onClick={() => setShowVipModal(false)}>Cancel</Button>
-            <Button
-              variant="success"
-              onClick={handleConfirmVipPurchase}
-              disabled={purchasing || !paymentMethod || hasVipThisMonth}
-            >
-              {purchasing ? '⏳ Processing...' : `✅ Purchase VIP Pass (€${currentTotal.toFixed(2)})`}
-            </Button>
           </Modal.Footer>
         )}
       </Modal>

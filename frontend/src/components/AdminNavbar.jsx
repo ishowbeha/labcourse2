@@ -26,7 +26,7 @@ export default function AdminNavbar({
           <div className="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
             <Link
               to="/home"
-              className="btn btn-sm text-nowrap flex-shrink-0" style={{ border: '1px solid rgba(0,230,118,0.5)', color: '#00e676', borderRadius: '20px' }}
+              className="btn btn-sm text-nowrap flex-shrink-0 admin-header-home-link"
             >
               🏠 Home Site
             </Link>
@@ -42,7 +42,7 @@ export default function AdminNavbar({
 
             <div className="min-w-0 overflow-hidden">
               <h1 className="h5 mb-0 fw-bold text-truncate">{title}</h1>
-              {subtitle && <p className="mb-0 small text-secondary text-truncate">{subtitle}</p>}
+              {subtitle && <p className="mb-0 small admin-header-subtitle text-truncate">{subtitle}</p>}
             </div>
           </div>
 

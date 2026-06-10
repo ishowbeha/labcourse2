@@ -38,11 +38,50 @@ body {
   animation: pulse 2s infinite;
 }
 
-/* Admin header — always dark (sporty permanent style) */
+/* Admin header — always dark, ensure nav text stays readable */
 .admin-header {
   background: linear-gradient(135deg, #0a0c12 0%, #12151f 50%, #0f1117 100%);
   border-bottom: 2px solid rgba(0, 230, 118, 0.25);
   color: #ffffff;
+}
+
+.admin-header .admin-header-subtitle {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.admin-header .admin-header-home-link {
+  border: 1px solid rgba(0, 230, 118, 0.5);
+  color: #00e676 !important;
+  background: transparent;
+  border-radius: 20px;
+}
+
+.admin-header .admin-header-home-link:hover,
+.admin-header .admin-header-home-link:focus {
+  color: #ffffff !important;
+  background: rgba(0, 230, 118, 0.15);
+  border-color: rgba(0, 230, 118, 0.8);
+}
+
+.admin-header .btn-outline-light {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
+  background: transparent;
+}
+
+.admin-header .btn-outline-light:hover,
+.admin-header .btn-outline-light:focus {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.admin-header .settings-tab {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.admin-header .settings-tab.text-white {
+  color: #ffffff !important;
 }
 
 
@@ -110,6 +149,22 @@ body {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* Admin match edit/create modal — keep form scrollable on short viewports */
+.admin-match-modal {
+  margin: 1.75rem auto;
+}
+
+.admin-match-modal .modal-content {
+  max-height: calc(100vh - 3.5rem);
+  overflow: hidden;
+}
+
+.admin-match-modal-body {
+  max-height: calc(100vh - 12rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 

@@ -201,8 +201,8 @@ const AdminMatches = () => {
     setMatchFormData({
       homeTeam: match.homeTeam || '',
       awayTeam: match.awayTeam || '',
-      stadiumId: match.stadiumId || '',
-      matchDate: match.matchDate || '',
+      stadiumId: match.stadiumId ? String(match.stadiumId) : '',
+      matchDate: match.matchDate ? String(match.matchDate).substring(0, 10) : '',
       matchTime: match.matchTime ? match.matchTime.substring(0, 5) : '',
       competition: match.competition || '',
       round: match.round || '',
@@ -360,8 +360,8 @@ const AdminMatches = () => {
       <LazyAdminNavbar title="⚽ Match Management" subtitle="Schedule and manage football matches" />
 
       <Container className="py-4">
-        {error && <Alert variant="danger">{error}</Alert>}
-        {success && <Alert variant="success">{success}</Alert>}
+        {!showMatchModal && error && <Alert variant="danger">{error}</Alert>}
+        {!showMatchModal && success && <Alert variant="success">{success}</Alert>}
 
         {selectedMatch ? (
           <div>
@@ -581,12 +581,20 @@ const AdminMatches = () => {
         )}
       </Container>
 
-      <Modal show={showMatchModal} onHide={closeMatchModal} centered size="lg" scrollable>
+      <Modal
+        show={showMatchModal}
+        onHide={closeMatchModal}
+        size="lg"
+        scrollable
+        dialogClassName="admin-match-modal"
+      >
         <Modal.Header closeButton>
           <Modal.Title>{editingMatch ? 'Edit Match' : 'Create New Match'}</Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleMatchSubmit}>
-          <Modal.Body>
+          <Modal.Body className="admin-match-modal-body">
+            {error && <Alert variant="danger" className="mb-3">{error}</Alert>}
+            {success && <Alert variant="success" className="mb-3">{success}</Alert>}
             <Row>
               <Col sm={6}>
                 <Form.Group className="mb-3">

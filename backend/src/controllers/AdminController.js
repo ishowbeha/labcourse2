@@ -338,7 +338,7 @@ class AdminController {
           m.id as match_id,
           CONCAT(m.home_team, ' vs ', m.away_team) as match_name,
           m.match_date, m.match_time, m.competition,
-          s.id as section_id, s.name as section_name, s.section_type,
+          s.id as section_id, s.name as section_name,
           u.id as purchaser_id, u.first_name, u.last_name, u.email as purchaser_email
         FROM tickets t
         LEFT JOIN matches m ON t.match_id = m.id
