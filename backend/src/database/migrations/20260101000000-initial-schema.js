@@ -745,7 +745,7 @@ module.exports = {
       },
       ticket_id: {
         type: Sequelize.INTEGER.UNSIGNED,
-        allowNull: false,
+        allowNull: true,
         references: { model: 'tickets', key: 'id' }
       },
       unit_price: {

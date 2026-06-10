@@ -215,16 +215,32 @@ class AdminService {
 
       // Build SELECT columns based on metrics
       if (metrics.includes('tickets_sold')) {
-        selects.push('COALESCE(SUM(oi.quantity), 0) as tickets_sold');
+        if (filters.status) {
+          selects.push('COALESCE(SUM(oi.quantity), 0) as tickets_sold');
+        } else {
+          selects.push('COALESCE(SUM(CASE WHEN o.status IN ("paid", "confirmed", "completed") THEN oi.quantity ELSE 0 END), 0) as tickets_sold');
+        }
       }
       if (metrics.includes('revenue')) {
-        selects.push('COALESCE(SUM(o.total_amount), 0) as revenue');
+        if (filters.status) {
+          selects.push('COALESCE(SUM(oi.subtotal), 0) as revenue');
+        } else {
+          selects.push('COALESCE(SUM(CASE WHEN o.status IN ("paid", "confirmed", "completed") THEN oi.subtotal ELSE 0 END), 0) as revenue');
+        }
       }
       if (metrics.includes('orders_count')) {
-        selects.push('COUNT(DISTINCT o.id) as orders_count');
+        if (filters.status) {
+          selects.push('COUNT(DISTINCT o.id) as orders_count');
+        } else {
+          selects.push('COUNT(DISTINCT CASE WHEN o.status IN ("paid", "confirmed", "completed") THEN o.id ELSE NULL END) as orders_count');
+        }
       }
       if (metrics.includes('avg_order_value')) {
-        selects.push('COALESCE(AVG(o.total_amount), 0) as avg_order_value');
+        if (filters.status) {
+          selects.push('COALESCE(SUM(oi.subtotal) / NULLIF(COUNT(DISTINCT o.id), 0), 0) as avg_order_value');
+        } else {
+          selects.push('COALESCE(SUM(CASE WHEN o.status IN ("paid", "confirmed", "completed") THEN oi.subtotal ELSE 0 END) / NULLIF(COUNT(DISTINCT CASE WHEN o.status IN ("paid", "confirmed", "completed") THEN o.id ELSE NULL END), 0), 0) as avg_order_value');
+        }
       }
       if (metrics.includes('cancellations')) {
         selects.push('SUM(CASE WHEN o.status = "cancelled" THEN 1 ELSE 0 END) as cancellations');

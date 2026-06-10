@@ -20,6 +20,7 @@ const AdminReports = () => {
   const [revenueData, setRevenueData] = useState([]);
   const [topMatches, setTopMatches] = useState([]);
   const [localOrders, setLocalOrders] = useState([]);
+  const [backendOrderNumbers, setBackendOrderNumbers] = useState(new Set());
   const [error, setError] = useState(null);
   const [activityLogs, setActivityLogs] = useState([]);
   const [filterAction, setFilterAction] = useState('');

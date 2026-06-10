@@ -89,7 +89,7 @@ const AdminDashboard = () => {
     return null;
   }
 
-  const ticketsAvailable = 0;
+  const ticketsAvailable = stats?.ticketsByStatus?.find(t => t.status === 'available')?.count || 0;
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
