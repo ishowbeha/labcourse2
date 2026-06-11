@@ -71,6 +71,9 @@ const AdminTickets = () => {
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [matchFilter, setMatchFilter] = useState('all');
+  const [matchesList, setMatchesList] = useState([]);
+  const [actionLoading, setActionLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -87,8 +90,84 @@ const AdminTickets = () => {
   }, []);
 
   useEffect(() => {
+    fetchMatchesList();
+  }, []);
+
+  const fetchMatchesList = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get('/api/matches', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        withCredentials: true,
+      });
+      if (res.data?.success) {
+        const list = (res.data.data || []).sort(
+          (a, b) => new Date(a.matchDate || a.match_date) - new Date(b.matchDate || b.match_date)
+        );
+        setMatchesList(list);
+      }
+    } catch (e) {
+      console.warn('Failed to load matches list:', e);
+    }
+  };
+
+  const handleGenerateTickets = async () => {
+    if (matchFilter === 'all') return;
+    setActionLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.post(
+        '/api/admin/tickets/generate',
+        { matchId: parseInt(matchFilter) },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true }
+      );
+      if (res.data?.success) {
+        setSuccess(`✅ ${res.data.message || 'Tickets generated successfully!'}`);
+        fetchTickets();
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError(res.data?.message || 'Failed to generate tickets.');
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Error generating tickets.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleClearUnsoldTickets = async () => {
+    if (matchFilter === 'all') return;
+    if (!window.confirm('Warning: This will delete all UNSOLD (available) tickets for this match from the database. Sold or reserved tickets will remain untouched. Do you want to proceed?')) {
+      return;
+    }
+    setActionLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.delete(
+        `/api/admin/tickets/match/${matchFilter}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true }
+      );
+      if (res.data?.success) {
+        setSuccess(`✅ ${res.data.message || 'Unsold tickets deleted.'}`);
+        fetchTickets();
+        setTimeout(() => setSuccess(''), 5000);
+      } else {
+        setError(res.data?.message || 'Failed to delete tickets.');
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || 'Error deleting tickets.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchTickets();
-  }, [page, statusFilter]);
+  }, [page, statusFilter, matchFilter]);
 
   const fetchTickets = useCallback(async (q = search) => {
     setLoading(true);
@@ -99,6 +178,7 @@ const AdminTickets = () => {
         page,
         limit: PAGE_SIZE,
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+        ...(matchFilter !== 'all' ? { matchId: matchFilter } : {}),
         ...(q.trim() ? { search: q.trim() } : {}),
       });
 
@@ -119,7 +199,7 @@ const AdminTickets = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, search]);
+  }, [page, statusFilter, matchFilter, search]);
 
   const handleSearch = () => {
     setPage(1);
@@ -290,9 +370,23 @@ const AdminTickets = () => {
                 </InputGroup>
                 <Button variant="primary" size="sm" onClick={handleSearch}>Search</Button>
 
+                {/* Match filter */}
+                <Form.Select
+                  style={{ maxWidth: 200 }}
+                  value={matchFilter}
+                  onChange={(e) => { setMatchFilter(e.target.value); setPage(1); }}
+                >
+                  <option value="all">All Matches</option>
+                  {matchesList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.homeTeam} vs {m.awayTeam} ({fmtDate(m.matchDate)})
+                    </option>
+                  ))}
+                </Form.Select>
+
                 {/* Status filter */}
                 <Form.Select
-                  style={{ maxWidth: 160 }}
+                  style={{ maxWidth: 140 }}
                   value={statusFilter}
                   onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
                 >
@@ -301,6 +395,30 @@ const AdminTickets = () => {
                   <option value="sold">🎫 Sold</option>
                   <option value="reserved">⏳ Reserved</option>
                 </Form.Select>
+
+                {matchFilter !== 'all' && kpi.total_tickets > 0 && (
+                  <Button
+                    variant="outline-danger"
+                    size="sm"
+                    onClick={handleClearUnsoldTickets}
+                    disabled={actionLoading}
+                    title="Delete all available tickets for this match"
+                  >
+                    🗑️ Clear Unsold
+                  </Button>
+                )}
+
+                {matchFilter !== 'all' && (
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={handleGenerateTickets}
+                    disabled={actionLoading}
+                    title="Generate missing seat tickets for this match"
+                  >
+                    ⚡ Generate Tickets
+                  </Button>
+                )}
 
                 {/* Export */}
                 <Button variant="outline-success" size="sm" onClick={exportCSV} title="Export to CSV">
@@ -323,6 +441,23 @@ const AdminTickets = () => {
               <Spinner animation="border" variant="primary" />
               <p className="text-muted mt-2 mb-0">Loading tickets…</p>
             </div>
+          ) : matchFilter !== 'all' && kpi.total_tickets === 0 ? (
+            <Card.Body className="text-center py-5">
+              <div style={{ fontSize: 48 }} className="mb-3">🏟️</div>
+              <h3 className="h5 fw-bold text-dark">No Tickets Generated</h3>
+              <p className="text-muted mx-auto mb-4" style={{ maxWidth: 500 }}>
+                There are no seat tickets generated for this match in the database.
+                To allow users to view the seat map and purchase tickets, you need to generate them first based on the stadium sections.
+              </p>
+              <Button
+                variant="primary"
+                onClick={handleGenerateTickets}
+                disabled={actionLoading}
+                className="px-4"
+              >
+                {actionLoading ? <Spinner animation="border" size="sm" className="me-2" /> : '⚡ Generate Tickets Now'}
+              </Button>
+            </Card.Body>
           ) : (
             <>
               <div className="table-responsive">

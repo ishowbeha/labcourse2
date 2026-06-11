@@ -62,6 +62,30 @@ class AdminRepository {
     const [ticketsByStatus] = await this.pool.query('SELECT status, COUNT(*) as count FROM tickets GROUP BY status');
     stats.ticketsByStatus = ticketsByStatus;
 
+    // Total available tickets (capacity minus sold for scheduled/live matches)
+    const [availRows] = await this.pool.query(`
+      SELECT 
+        CAST(COALESCE(SUM(GREATEST(0, CAST(capacity AS SIGNED) - CAST(sold AS SIGNED))), 0) AS SIGNED) as available
+      FROM (
+        SELECT 
+          m.id,
+          (SELECT COALESCE(SUM(s.row_count * s.seats_per_row), 0) FROM sections s WHERE s.stadium_id = m.stadium_id) as capacity,
+          (
+            SELECT COUNT(*) FROM tickets t WHERE t.match_id = m.id AND t.status = 'sold'
+          ) + (
+            SELECT COALESCE(SUM(oi.quantity), 0)
+            FROM order_items oi
+            INNER JOIN orders o ON oi.order_id = o.id
+            WHERE oi.ticket_id IS NULL
+              AND o.status IN ${paidStatuses}
+              AND o.notes LIKE CONCAT('%Match: ', m.home_team, ' vs ', m.away_team, '%')
+          ) as sold
+        FROM matches m
+        WHERE m.status IN ('scheduled', 'live')
+      ) sub
+    `);
+    stats.ticketsAvailable = parseInt(availRows[0].available, 10);
+
     // Recent orders count
     const [recentRows] = await this.pool.query(`
       SELECT COUNT(*) as count

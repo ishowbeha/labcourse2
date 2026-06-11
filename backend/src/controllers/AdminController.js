@@ -359,6 +359,13 @@ class AdminController {
       );
 
       // KPI summary — from the tickets table (seat-based purchases)
+      let kpiWhere = 'WHERE 1=1';
+      const kpiParams = [];
+      if (matchId) {
+        kpiWhere += ' AND match_id = ?';
+        kpiParams.push(parseInt(matchId));
+      }
+
       const [kpiRows] = await this.db.query(`
         SELECT
           CAST(COUNT(*) AS SIGNED) as total_tickets,
@@ -367,18 +374,31 @@ class AdminController {
           CAST(SUM(status = 'reserved') AS SIGNED) as reserved,
           CAST(COALESCE(SUM(CASE WHEN status = 'sold' THEN price ELSE 0 END), 0) AS DECIMAL(12,2)) as revenue
         FROM tickets
-      `);
+        ${kpiWhere}
+      `, kpiParams);
 
       // Also count "simple-purchase" orders (ticket_id IS NULL) — Stripe / simulated flow
+      let simpleWhere = "WHERE oi.ticket_id IS NULL AND o.status IN ('paid', 'confirmed', 'completed')";
+      const simpleParams = [];
+      if (matchId) {
+        const [[matchRow]] = await this.db.query(
+          'SELECT home_team, away_team FROM matches WHERE id = ?',
+          [parseInt(matchId)]
+        );
+        if (matchRow) {
+          simpleWhere += " AND o.notes LIKE ?";
+          simpleParams.push(`%Match: ${matchRow.home_team} vs ${matchRow.away_team}%`);
+        }
+      }
+
       const [simpleRows] = await this.db.query(`
         SELECT
           CAST(COALESCE(SUM(oi.quantity), 0) AS SIGNED) as simple_sold,
           CAST(COALESCE(SUM(oi.subtotal), 0) AS DECIMAL(12,2)) as simple_revenue
         FROM order_items oi
         INNER JOIN orders o ON oi.order_id = o.id
-        WHERE oi.ticket_id IS NULL
-          AND o.status IN ('paid', 'confirmed', 'completed')
-      `);
+        ${simpleWhere}
+      `, simpleParams);
 
       const kpiBase = kpiRows[0];
       const simpleSold  = parseInt(simpleRows[0]?.simple_sold  || 0, 10);
@@ -427,6 +447,122 @@ class AdminController {
       );
 
       res.json({ success: true, message: `Ticket #${id} status updated to "${status}"`, data: { id, status } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async generateTicketsForMatch(req, res, next) {
+    try {
+      const { matchId } = req.body;
+      if (!matchId) {
+        return res.status(400).json({ success: false, message: 'Match ID is required' });
+      }
+
+      // Find match
+      const [[match]] = await this.db.query(
+        'SELECT id, stadium_id, base_price FROM matches WHERE id = ?',
+        [matchId]
+      );
+      if (!match) {
+        return res.status(404).json({ success: false, message: 'Match not found' });
+      }
+
+      // Find all sections for this stadium
+      const [sections] = await this.db.query(
+        'SELECT id, name, row_count, seats_per_row, price_multiplier FROM sections WHERE stadium_id = ?',
+        [match.stadium_id]
+      );
+
+      if (sections.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'The stadium for this match does not have any sections defined. Please configure sections first.'
+        });
+      }
+
+      // Find existing tickets to avoid duplicate seat entry errors
+      const [existingTickets] = await this.db.query(
+        'SELECT section_id, `row_number`, seat_number FROM tickets WHERE match_id = ?',
+        [matchId]
+      );
+      const existingSet = new Set(
+        existingTickets.map(t => `${t.section_id}-${t.row_number}-${t.seat_number}`)
+      );
+
+      const ticketsToInsert = [];
+      for (const section of sections) {
+        const totalSeats = section.row_count * section.seats_per_row;
+        const ticketPrice = Math.round((match.base_price * section.price_multiplier) * 100) / 100;
+
+        for (let seatIdx = 1; seatIdx <= totalSeats; seatIdx++) {
+          const rowNumber = Math.ceil(seatIdx / section.seats_per_row);
+          const seatNumber = ((seatIdx - 1) % section.seats_per_row) + 1;
+          const key = `${section.id}-${rowNumber}-${seatNumber}`;
+
+          if (!existingSet.has(key)) {
+            ticketsToInsert.push([matchId, section.id, rowNumber, seatNumber, ticketPrice, 'available']);
+          }
+        }
+      }
+
+      if (ticketsToInsert.length === 0) {
+        return res.json({
+          success: true,
+          message: 'All tickets for this match are already generated.',
+          generatedCount: 0
+        });
+      }
+
+      // Bulk insert
+      const chunkSize = 500;
+      for (let i = 0; i < ticketsToInsert.length; i += chunkSize) {
+        const chunk = ticketsToInsert.slice(i, i + chunkSize);
+        const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+        const values = chunk.flat();
+        await this.db.query(
+          `INSERT INTO tickets (\`match_id\`, \`section_id\`, \`row_number\`, \`seat_number\`, \`price\`, \`status\`)
+           VALUES ${placeholders}`,
+          values
+        );
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully generated ${ticketsToInsert.length} tickets for the match.`,
+        generatedCount: ticketsToInsert.length
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteTicketsForMatch(req, res, next) {
+    try {
+      const { matchId } = req.params;
+      if (!matchId) {
+        return res.status(400).json({ success: false, message: 'Match ID is required' });
+      }
+
+      // Check if there are sold tickets
+      const [[soldCountRow]] = await this.db.query(
+        "SELECT COUNT(*) as count FROM tickets WHERE match_id = ? AND status = 'sold'",
+        [matchId]
+      );
+      const soldCount = soldCountRow.count;
+
+      // Delete only available tickets
+      const [result] = await this.db.query(
+        "DELETE FROM tickets WHERE match_id = ? AND status = 'available'",
+        [matchId]
+      );
+
+      res.json({
+        success: true,
+        message: `Successfully deleted ${result.affectedRows} available tickets.`,
+        deletedCount: result.affectedRows,
+        soldCount
+      });
     } catch (error) {
       next(error);
     }

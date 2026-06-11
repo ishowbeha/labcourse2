@@ -68,6 +68,8 @@ const createAdminRoutes = (db) => {
   // Ticket Management (admin)
   router.get('/tickets', controller.getTickets.bind(controller));
   router.patch('/tickets/:id/status', controller.updateTicketStatus.bind(controller));
+  router.post('/tickets/generate', controller.generateTicketsForMatch.bind(controller));
+  router.delete('/tickets/match/:matchId', controller.deleteTicketsForMatch.bind(controller));
 
   return router;
 };
