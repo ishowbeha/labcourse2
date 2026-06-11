@@ -1,6 +1,35 @@
 const OrderService = require('../services/OrderService');
 const Stripe = require('stripe');
 
+/**
+ * Returns the correct VIP ticket price for a match.
+ * Mirrors the getMatchVipPrice() logic in Tickets.jsx.
+ */
+function getVipPrice(basePrice, stadiumName = '') {
+  const n = stadiumName.toLowerCase();
+  let multiplier = 1.7;
+  if (n.includes('mercedes-benz'))                              multiplier = 4.5;
+  else if (n.includes('sofi'))                                  multiplier = 4.5;
+  else if (n.includes('gillette') || n.includes('at&t') ||
+           n.includes('nrg')     || n.includes('arrowhead') ||
+           n.includes('metlife') || n.includes('lincoln') ||
+           n.includes('hard rock'))                             multiplier = 4.0;
+  else if (n.includes('levi'))                                  multiplier = 4.2;
+  else if (n.includes('akron')  || n.includes('azteca') ||
+           n.includes('bbva')   || n.includes('bc place'))      multiplier = 3.5;
+  else if (n.includes('bmo field') ||
+           n.includes('national stadium') ||
+           n.includes('air albania'))                           multiplier = 3.0;
+  else if (n.includes('loro') || n.includes('partizani') ||
+           n.includes('fadil'))                                 multiplier = 2.5;
+  else if (n.includes('selman') ||
+           n.includes('sk\u00ebnderbeu') || n.includes('skenderbeu') ||
+           n.includes('gjirokast\u00ebr') || n.includes('gjirokaster')) multiplier = 2.0;
+  else if (n.includes('mitrovica'))                             multiplier = 1.5;
+  else if (n.includes('ferizaj') || n.includes('peja'))         multiplier = 1.3;
+  return Math.min(150, Math.round((basePrice * multiplier) * 100) / 100);
+}
+
 class OrderController {
   constructor(db) {
     this.db = db;
@@ -144,16 +173,20 @@ class OrderController {
       if (teams.length === 2) {
         try {
           const [matchRows] = await this.db.query(
-            `SELECT id, base_price, stadium_id FROM matches 
-             WHERE (home_team LIKE ? AND away_team LIKE ?)
-                OR (away_team LIKE ? AND home_team LIKE ?)`,
+            `SELECT m.id, m.base_price, m.stadium_id,
+                    COALESCE(s.name, '') AS stadium_name
+             FROM matches m
+             LEFT JOIN stadiums s ON s.id = m.stadium_id
+             WHERE (m.home_team LIKE ? AND m.away_team LIKE ?)
+                OR (m.away_team LIKE ? AND m.home_team LIKE ?)`,
             [`%${teams[0].trim()}%`, `%${teams[1].trim()}%`, `%${teams[0].trim()}%`, `%${teams[1].trim()}%`]
           );
 
           if (matchRows.length > 0) {
             matchId = matchRows[0].id;
-            const stadiumId = matchRows[0].stadium_id;
-            const basePrice = matchRows[0].base_price;
+            const stadiumId   = matchRows[0].stadium_id;
+            const basePrice   = matchRows[0].base_price;
+            const stadiumName = matchRows[0].stadium_name || '';
 
             // Clean section name
             let cleanSectionName = sectionName || 'South Stand';
@@ -172,16 +205,20 @@ class OrderController {
             );
 
             let multiplier = 1.0;
+            const isVipSection = cleanSectionName.toLowerCase().includes('vip');
             if (sectionRows.length > 0) {
-              sectionId = sectionRows[0].id;
+              sectionId  = sectionRows[0].id;
               multiplier = sectionRows[0].price_multiplier;
             } else {
+              // VIP sections get multiplier=2.0; others stay 1.0
+              const defaultMultiplier = isVipSection ? 2.0 : 1.0;
               const [secRes] = await this.db.query(
                 `INSERT INTO sections (stadium_id, name, row_count, seats_per_row, price_multiplier, description, created_at, updated_at)
-                 VALUES (?, ?, 10, 30, 1.0, ?, NOW(), NOW())`,
-                [stadiumId, cleanSectionName, cleanSectionName]
+                 VALUES (?, ?, 10, 30, ?, ?, NOW(), NOW())`,
+                [stadiumId, cleanSectionName, defaultMultiplier, cleanSectionName]
               );
-              sectionId = secRes.insertId;
+              sectionId  = secRes.insertId;
+              multiplier = defaultMultiplier;
             }
 
             // Ensure tickets are generated for this match/section
@@ -192,10 +229,13 @@ class OrderController {
 
             if (ticketCountRow[0].count === 0) {
               const tickets = [];
-              const ticketPrice = Math.round((basePrice * multiplier) * 100) / 100;
+              // Use correct VIP price (same formula as Tickets.jsx) for VIP sections
+              const ticketPrice = isVipSection
+                ? getVipPrice(basePrice, stadiumName)
+                : Math.round((basePrice * multiplier) * 100) / 100;
               // 10 rows x 30 seats = 300 seats
               for (let seatIdx = 1; seatIdx <= 300; seatIdx++) {
-                const rowNumber = Math.ceil(seatIdx / 30);
+                const rowNumber  = Math.ceil(seatIdx / 30);
                 const seatNumber = ((seatIdx - 1) % 30) + 1;
                 tickets.push([matchId, sectionId, rowNumber, seatNumber, ticketPrice, 'available']);
               }

@@ -1,5 +1,37 @@
 const AdminService = require('../services/AdminService');
 
+/**
+ * Returns the correct VIP ticket price for a match.
+ * Mirrors the getMatchVipPrice() logic in Tickets.jsx:
+ *   price = min(€150, basePrice × stadiumVipMultiplier)
+ */
+function getVipPrice(basePrice, stadiumName = '') {
+  const n = stadiumName.toLowerCase();
+  let multiplier = 1.7; // default
+  if (n.includes('mercedes-benz'))                              multiplier = 4.5;
+  else if (n.includes('sofi'))                                  multiplier = 4.5;
+  else if (n.includes('gillette') || n.includes('at&t') ||
+           n.includes('nrg')     || n.includes('arrowhead') ||
+           n.includes('metlife') || n.includes('lincoln') ||
+           n.includes('hard rock'))                             multiplier = 4.0;
+  else if (n.includes('levi'))                                  multiplier = 4.2;
+  else if (n.includes('akron')  || n.includes('azteca') ||
+           n.includes('bbva')   || n.includes('bc place'))      multiplier = 3.5;
+  else if (n.includes('bmo field') ||
+           n.includes('national stadium') ||
+           n.includes('air albania'))                           multiplier = 3.0;
+  else if (n.includes('loro') || n.includes('partizani') ||
+           n.includes('fadil'))                                 multiplier = 2.5;
+  else if (n.includes('selman') ||
+           n.includes('sk\u00ebnderbeu') || n.includes('skenderbeu') ||
+           n.includes('gjirokast\u00ebr') || n.includes('gjirokaster')) multiplier = 2.0;
+  else if (n.includes('mitrovica'))                             multiplier = 1.5;
+  else if (n.includes('ferizaj') || n.includes('peja'))         multiplier = 1.3;
+
+  const raw = Math.round((basePrice * multiplier) * 100) / 100;
+  return Math.min(150, raw);
+}
+
 class AdminController {
   constructor(db) {
     this.db = db;
@@ -459,9 +491,13 @@ class AdminController {
         return res.status(400).json({ success: false, message: 'Match ID is required' });
       }
 
-      // Find match
+      // Find match (include stadium name for correct VIP pricing)
       const [[match]] = await this.db.query(
-        'SELECT id, stadium_id, base_price FROM matches WHERE id = ?',
+        `SELECT m.id, m.stadium_id, m.base_price,
+                COALESCE(s.name, '') AS stadium_name
+         FROM matches m
+         LEFT JOIN stadiums s ON s.id = m.stadium_id
+         WHERE m.id = ?`,
         [matchId]
       );
       if (!match) {
@@ -491,12 +527,19 @@ class AdminController {
       );
 
       const ticketsToInsert = [];
+      // Compute correct VIP price once for this match (same formula as Tickets.jsx)
+      const vipCorrectPrice = getVipPrice(match.base_price, match.stadium_name);
+
       for (const section of sections) {
+        const isVip = section.name.toLowerCase().includes('vip');
+        const ticketPrice = isVip
+          ? vipCorrectPrice
+          : Math.round((match.base_price * section.price_multiplier) * 100) / 100;
+
         const totalSeats = section.row_count * section.seats_per_row;
-        const ticketPrice = Math.round((match.base_price * section.price_multiplier) * 100) / 100;
 
         for (let seatIdx = 1; seatIdx <= totalSeats; seatIdx++) {
-          const rowNumber = Math.ceil(seatIdx / section.seats_per_row);
+          const rowNumber  = Math.ceil(seatIdx / section.seats_per_row);
           const seatNumber = ((seatIdx - 1) % section.seats_per_row) + 1;
           const key = `${section.id}-${rowNumber}-${seatNumber}`;
 
@@ -514,18 +557,31 @@ class AdminController {
         });
       }
 
-      // Bulk insert
+      // Bulk insert new tickets
       const chunkSize = 500;
       for (let i = 0; i < ticketsToInsert.length; i += chunkSize) {
-        const chunk = ticketsToInsert.slice(i, i + chunkSize);
+        const chunk        = ticketsToInsert.slice(i, i + chunkSize);
         const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
-        const values = chunk.flat();
+        const values       = chunk.flat();
         await this.db.query(
           `INSERT INTO tickets (\`match_id\`, \`section_id\`, \`row_number\`, \`seat_number\`, \`price\`, \`status\`)
            VALUES ${placeholders}`,
           values
         );
       }
+
+      // ── Heal existing VIP tickets that have the wrong (base-price-only) price ──
+      // This corrects stale records created before this fix was applied.
+      await this.db.query(
+        `UPDATE tickets t
+         INNER JOIN sections s ON s.id = t.section_id
+         SET t.price = ?, t.updated_at = NOW()
+         WHERE t.match_id = ?
+           AND LOWER(s.name) LIKE '%vip%'
+           AND t.status = 'available'
+           AND t.price <> ?`,
+        [vipCorrectPrice, matchId, vipCorrectPrice]
+      );
 
       res.json({
         success: true,

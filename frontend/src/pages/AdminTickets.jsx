@@ -85,6 +85,9 @@ const AdminTickets = () => {
   const [newStatus, setNewStatus] = useState('available');
   const [statusLoading, setStatusLoading] = useState(false);
 
+  // Per-match availability (available tickets count from DB per match)
+  const [matchAvailability, setMatchAvailability] = useState([]);
+
   useEffect(() => {
     if (!isAdmin()) navigate('/home');
   }, []);
@@ -96,15 +99,53 @@ const AdminTickets = () => {
   const fetchMatchesList = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('/api/matches', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        withCredentials: true,
-      });
-      if (res.data?.success) {
-        const list = (res.data.data || []).sort(
+      // Fetch matches + ticket-sales report in parallel
+      const [matchRes, salesRes] = await Promise.all([
+        axios.get('/api/matches', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
+        }),
+        axios.get('/api/admin/reports/ticket-sales', {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          withCredentials: true,
+        }).catch(() => ({ data: { data: [] } })),
+      ]);
+
+      if (matchRes.data?.success) {
+        const list = (matchRes.data.data || []).sort(
           (a, b) => new Date(a.matchDate || a.match_date) - new Date(b.matchDate || b.match_date)
         );
         setMatchesList(list);
+
+        // Build per-match availability from ticket-sales report
+        const salesMap = {};
+        for (const row of (salesRes.data?.data || [])) {
+          salesMap[row.id] = {
+            total: parseInt(row.total_tickets || 0, 10),
+            sold: parseInt(row.sold_tickets || 0, 10),
+          };
+        }
+
+        const availability = list
+          .filter(m => {
+            const s = (m.status || '').toLowerCase();
+            return s === 'scheduled' || s === 'live';
+          })
+          .map(m => {
+            const data = salesMap[m.id] || { total: 0, sold: 0 };
+            return {
+              id: m.id,
+              name: `${m.homeTeam || m.home_team} vs ${m.awayTeam || m.away_team}`,
+              date: m.matchDate || m.match_date,
+              status: m.status,
+              total: data.total,
+              sold: data.sold,
+              available: Math.max(0, data.total - data.sold),
+              pct: data.total > 0 ? Math.round((data.sold / data.total) * 100) : 0,
+            };
+          });
+
+        setMatchAvailability(availability);
       }
     } catch (e) {
       console.warn('Failed to load matches list:', e);
@@ -351,7 +392,92 @@ const AdminTickets = () => {
           </Card>
         )}
 
+        {/* ── Per-Match Availability ── */}
+        {matchAvailability.length > 0 && matchFilter === 'all' && (
+          <Card className="shadow-sm border-0 mb-4">
+            <Card.Header className="bg-white border-bottom p-3 d-flex justify-content-between align-items-center">
+              <h2 className="h6 fw-bold mb-0">📊 Ticket Availability by Match</h2>
+              <span className="small text-muted">{matchAvailability.length} active match{matchAvailability.length !== 1 ? 'es' : ''}</span>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <div className="table-responsive">
+                <table className="table table-hover mb-0 align-middle" style={{ fontSize: 13 }}>
+                  <thead style={{ background: '#f8f9fa' }}>
+                    <tr>
+                      <th className="ps-3">Match</th>
+                      <th>Date</th>
+                      <th className="text-center">Total Seats</th>
+                      <th className="text-center">Sold</th>
+                      <th className="text-center">Available</th>
+                      <th style={{ minWidth: 140 }}>Occupancy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matchAvailability.map((m) => {
+                      const availColor = m.available === 0 ? '#e74c3c' : m.pct >= 80 ? '#f39c12' : '#27ae60';
+                      const barColor  = m.pct >= 80 ? '#e74c3c' : m.pct >= 50 ? '#f39c12' : '#635bff';
+                      return (
+                        <tr key={m.id}>
+                          <td className="ps-3 fw-semibold" style={{ color: '#1a1a2e' }}>{m.name}</td>
+                          <td className="text-muted small">{fmtDate(m.date)}</td>
+                          <td className="text-center">
+                            <span className="fw-semibold">{m.total.toLocaleString()}</span>
+                          </td>
+                          <td className="text-center">
+                            <span style={{ color: '#635bff', fontWeight: 700 }}>{m.sold.toLocaleString()}</span>
+                          </td>
+                          <td className="text-center">
+                            <span style={{
+                              background: `${availColor}18`,
+                              color: availColor,
+                              borderRadius: 20,
+                              padding: '2px 10px',
+                              fontSize: 12,
+                              fontWeight: 700,
+                            }}>
+                              {m.available.toLocaleString()}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="d-flex align-items-center gap-2">
+                              <div style={{ flex: 1, height: 6, borderRadius: 4, background: '#e9ecef', overflow: 'hidden' }}>
+                                <div style={{ width: `${m.pct}%`, background: barColor, height: '100%', transition: 'width 0.5s' }} />
+                              </div>
+                              <span className="small text-muted" style={{ whiteSpace: 'nowrap' }}>{m.pct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot style={{ background: '#f8f9fa' }}>
+                    <tr>
+                      <td className="ps-3 fw-bold text-muted small" colSpan={2}>TOTAL</td>
+                      <td className="text-center fw-bold">{matchAvailability.reduce((s, m) => s + m.total, 0).toLocaleString()}</td>
+                      <td className="text-center fw-bold" style={{ color: '#635bff' }}>{matchAvailability.reduce((s, m) => s + m.sold, 0).toLocaleString()}</td>
+                      <td className="text-center">
+                        <span style={{
+                          background: '#27ae6018',
+                          color: '#27ae60',
+                          borderRadius: 20,
+                          padding: '2px 10px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                        }}>
+                          {matchAvailability.reduce((s, m) => s + m.available, 0).toLocaleString()}
+                        </span>
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </Card.Body>
+          </Card>
+        )}
+
         {/* ── Filters + Table ── */}
+
         <Card className="shadow-sm border-0">
           <Card.Header className="bg-white border-bottom p-3">
             <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between">

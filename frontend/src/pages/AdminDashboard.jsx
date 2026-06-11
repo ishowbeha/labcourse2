@@ -76,35 +76,30 @@ const AdminDashboard = () => {
     setMobileMenuOpen(false);
   };
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
+  const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
+  const closeMobileMenu  = () => setMobileMenuOpen(false);
 
   if (!isAdmin()) {
     navigate('/home');
     return null;
   }
 
+  // Tickets Available = real DB count of available tickets for active matches
+  // (stats.ticketsAvailable) minus tickets sold via orders (stats.totalTicketsSold).
+  // Both come from the DB, so the number is always accurate and decreases when
+  // users purchase tickets.
+  const totalSold        = parseInt(stats?.totalTicketsSold || 0, 10);
   const ticketsAvailable = stats?.ticketsAvailable !== undefined
-    ? stats.ticketsAvailable
-    : (stats?.ticketsByStatus?.find(t => t.status === 'available')?.count || 0);
+    ? Math.max(0, stats.ticketsAvailable - totalSold)
+    : 0;
 
-  const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value || 0);
-  };
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(value || 0);
 
-  const formatNumber = (value) => {
-    return new Intl.NumberFormat('en-US').format(value || 0);
-  };
+  const formatNumber = (value) =>
+    new Intl.NumberFormat('en-US').format(value || 0);
 
-  // Sporty accent palette — controlled, not rainbow
+  // Sporty accent palette
   const accentColors = {
     green:  '#00e676',
     orange: '#ff6b35',
@@ -127,12 +122,12 @@ const AdminDashboard = () => {
   ];
 
   const statCards = [
-    { value: formatNumber(stats?.totalUsers),             label: 'Registered Users',   accent: accentColors.cyan   },
-    { value: formatNumber(stats?.totalMatches),           label: 'Active Matches',     accent: accentColors.orange },
-    { value: formatNumber(stats?.totalTicketsSold || 0),  label: 'Tickets Sold',       accent: accentColors.green  },
-    { value: formatNumber(ticketsAvailable),              label: 'Tickets Available',  accent: accentColors.amber  },
-    { value: formatCurrency(stats?.totalRevenue || 0),    label: 'Total Revenue',      accent: accentColors.green  },
-    { value: formatNumber(stats?.recentOrders || 0),      label: 'Total Orders',       accent: accentColors.cyan   },
+    { value: formatNumber(stats?.totalUsers),            label: 'Registered Users',  accent: accentColors.cyan   },
+    { value: formatNumber(stats?.totalMatches),          label: 'Active Matches',    accent: accentColors.orange },
+    { value: formatNumber(totalSold),                    label: 'Tickets Sold',      accent: accentColors.green  },
+    { value: formatNumber(ticketsAvailable),             label: 'Tickets Available', accent: accentColors.amber  },
+    { value: formatCurrency(stats?.totalRevenue || 0),   label: 'Total Revenue',     accent: accentColors.green  },
+    { value: formatNumber(stats?.recentOrders || 0),     label: 'Total Orders',      accent: accentColors.cyan   },
   ];
 
   if (loading) {
@@ -202,8 +197,8 @@ const AdminDashboard = () => {
 const getStatusColor = (status) => {
   const colors = {
     available: '#2ecc71',
-    reserved: '#f39c12',
-    sold: '#e74c3c',
+    reserved:  '#f39c12',
+    sold:      '#e74c3c',
     cancelled: '#95a5a6'
   };
   return colors[status] || '#95a5a6';
