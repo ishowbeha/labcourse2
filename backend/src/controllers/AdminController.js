@@ -358,16 +358,39 @@ class AdminController {
         params
       );
 
-      // KPI summary
-      const [kpi] = await this.db.query(`
+      // KPI summary — from the tickets table (seat-based purchases)
+      const [kpiRows] = await this.db.query(`
         SELECT
-          COUNT(*) as total_tickets,
-          SUM(status = 'available') as available,
-          SUM(status = 'sold') as sold,
-          SUM(status = 'reserved') as reserved,
-          COALESCE(SUM(CASE WHEN status = 'sold' THEN price ELSE 0 END), 0) as revenue
+          CAST(COUNT(*) AS SIGNED) as total_tickets,
+          CAST(SUM(status = 'available') AS SIGNED) as available,
+          CAST(SUM(status = 'sold') AS SIGNED) as sold,
+          CAST(SUM(status = 'reserved') AS SIGNED) as reserved,
+          CAST(COALESCE(SUM(CASE WHEN status = 'sold' THEN price ELSE 0 END), 0) AS DECIMAL(12,2)) as revenue
         FROM tickets
       `);
+
+      // Also count "simple-purchase" orders (ticket_id IS NULL) — Stripe / simulated flow
+      const [simpleRows] = await this.db.query(`
+        SELECT
+          CAST(COALESCE(SUM(oi.quantity), 0) AS SIGNED) as simple_sold,
+          CAST(COALESCE(SUM(oi.subtotal), 0) AS DECIMAL(12,2)) as simple_revenue
+        FROM order_items oi
+        INNER JOIN orders o ON oi.order_id = o.id
+        WHERE oi.ticket_id IS NULL
+          AND o.status IN ('paid', 'confirmed', 'completed')
+      `);
+
+      const kpiBase = kpiRows[0];
+      const simpleSold  = parseInt(simpleRows[0]?.simple_sold  || 0, 10);
+      const simpleRev   = parseFloat(simpleRows[0]?.simple_revenue || 0);
+
+      const kpi = {
+        total_tickets: parseInt(kpiBase.total_tickets || 0, 10),
+        available:     parseInt(kpiBase.available     || 0, 10),
+        sold:          parseInt(kpiBase.sold           || 0, 10) + simpleSold,
+        reserved:      parseInt(kpiBase.reserved       || 0, 10),
+        revenue:       parseFloat(kpiBase.revenue      || 0)    + simpleRev,
+      };
 
       res.json({
         success: true,
@@ -377,7 +400,7 @@ class AdminController {
           page: parseInt(page),
           limit: parseInt(limit),
           totalPages: Math.ceil(total / parseInt(limit)),
-          kpi: kpi[0]
+          kpi
         }
       });
     } catch (error) {

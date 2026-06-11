@@ -226,13 +226,13 @@ const AdminTickets = () => {
         {/* ── KPI Cards ── */}
         <Row className="g-3 mb-4">
           <Col xs={12} sm={6} xl={3}>
-            <KpiCard icon="🎫" label="Total Tickets" value={(kpi.total_tickets || 0).toLocaleString()} sub="All seat records" accent="#635bff" />
+            <KpiCard icon="🎫" label="Seat Tickets" value={(kpi.total_tickets || 0).toLocaleString()} sub="Total seat records" accent="#635bff" />
           </Col>
           <Col xs={12} sm={6} xl={3}>
             <KpiCard icon="✅" label="Available" value={(kpi.available || 0).toLocaleString()} sub="Ready to purchase" accent="#27ae60" />
           </Col>
           <Col xs={12} sm={6} xl={3}>
-            <KpiCard icon="🛒" label="Sold" value={(kpi.sold || 0).toLocaleString()} sub="Confirmed sales" accent="#3498db" />
+            <KpiCard icon="🛒" label="Sold" value={(kpi.sold || 0).toLocaleString()} sub="Seat + order sales" accent="#3498db" />
           </Col>
           <Col xs={12} sm={6} xl={3}>
             <KpiCard icon="💰" label="Revenue from Sales" value={fmt(kpi.revenue)} sub={`${(kpi.reserved || 0).toLocaleString()} reserved`} accent="#f39c12" />
@@ -240,18 +240,20 @@ const AdminTickets = () => {
         </Row>
 
         {/* ── Occupancy Bar ── */}
-        {kpi.total_tickets > 0 && (
+        {(kpi.total_tickets > 0 || kpi.sold > 0) && (
           <Card className="shadow-sm border-0 mb-4">
             <Card.Body>
               <div className="d-flex justify-content-between align-items-center mb-2">
                 <h2 className="h6 fw-bold mb-0">🏟️ Seat Occupancy Overview</h2>
                 <span className="small text-muted">
-                  {Math.round((kpi.sold / kpi.total_tickets) * 100)}% sold
+                  {kpi.total_tickets > 0
+                    ? `${Math.round((kpi.sold / kpi.total_tickets) * 100)}% sold`
+                    : `${(kpi.sold || 0)} ticket(s) sold via orders`}
                 </span>
               </div>
               <div style={{ height: 10, borderRadius: 8, background: '#e9ecef', overflow: 'hidden', display: 'flex' }}>
-                <div style={{ width: `${(kpi.sold / kpi.total_tickets) * 100}%`, background: '#635bff', transition: 'width 0.5s' }} />
-                <div style={{ width: `${(kpi.reserved / kpi.total_tickets) * 100}%`, background: '#f39c12', transition: 'width 0.5s' }} />
+                <div style={{ width: `${kpi.total_tickets > 0 ? Math.min((kpi.sold / kpi.total_tickets) * 100, 100) : 100}%`, background: '#635bff', transition: 'width 0.5s' }} />
+                <div style={{ width: `${kpi.total_tickets > 0 ? Math.min((kpi.reserved / kpi.total_tickets) * 100, 100) : 0}%`, background: '#f39c12', transition: 'width 0.5s' }} />
               </div>
               <div className="d-flex gap-4 mt-2">
                 {[

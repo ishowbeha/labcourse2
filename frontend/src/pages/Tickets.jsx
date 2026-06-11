@@ -798,6 +798,7 @@ const Tickets = () => {
               className="rounded-circle mx-auto mb-2 d-flex align-items-center justify-content-center p-0 lh-1"
               disabled
               tabIndex={-1}
+              style={{ width: 36, height: 36, fontSize: 14 }}
             >
               {s.id}
             </Button>

@@ -134,20 +134,126 @@ class OrderController {
       const total = totalAmount || (quantity * 50);
 
       const combinedNotes = (notes ? notes + ' | ' : '') + 'Match: ' + matchName + (sectionName ? ' | Section: ' + sectionName : '');
+
+      // Try to parse match and section to find real tickets to link
+      let linkedTickets = [];
+      let matchId = null;
+      let sectionId = null;
+
+      const teams = matchName.split(/\s+vs\s+/i);
+      if (teams.length === 2) {
+        try {
+          const [matchRows] = await this.db.query(
+            `SELECT id, base_price, stadium_id FROM matches 
+             WHERE (home_team LIKE ? AND away_team LIKE ?)
+                OR (away_team LIKE ? AND home_team LIKE ?)`,
+            [`%${teams[0].trim()}%`, `%${teams[1].trim()}%`, `%${teams[0].trim()}%`, `%${teams[1].trim()}%`]
+          );
+
+          if (matchRows.length > 0) {
+            matchId = matchRows[0].id;
+            const stadiumId = matchRows[0].stadium_id;
+            const basePrice = matchRows[0].base_price;
+
+            // Clean section name
+            let cleanSectionName = sectionName || 'South Stand';
+            if (cleanSectionName.toLowerCase().includes('vip')) {
+              if (cleanSectionName.toLowerCase().includes('south')) {
+                cleanSectionName = 'VIP South';
+              } else {
+                cleanSectionName = 'VIP North';
+              }
+            }
+
+            // Get or create section ID
+            const [sectionRows] = await this.db.query(
+              'SELECT id, price_multiplier FROM sections WHERE stadium_id = ? AND name = ?',
+              [stadiumId, cleanSectionName]
+            );
+
+            let multiplier = 1.0;
+            if (sectionRows.length > 0) {
+              sectionId = sectionRows[0].id;
+              multiplier = sectionRows[0].price_multiplier;
+            } else {
+              const [secRes] = await this.db.query(
+                `INSERT INTO sections (stadium_id, name, row_count, seats_per_row, price_multiplier, description, created_at, updated_at)
+                 VALUES (?, ?, 10, 30, 1.0, ?, NOW(), NOW())`,
+                [stadiumId, cleanSectionName, cleanSectionName]
+              );
+              sectionId = secRes.insertId;
+            }
+
+            // Ensure tickets are generated for this match/section
+            const [ticketCountRow] = await this.db.query(
+              'SELECT COUNT(*) as count FROM tickets WHERE match_id = ? AND section_id = ?',
+              [matchId, sectionId]
+            );
+
+            if (ticketCountRow[0].count === 0) {
+              const tickets = [];
+              const ticketPrice = Math.round((basePrice * multiplier) * 100) / 100;
+              // 10 rows x 30 seats = 300 seats
+              for (let seatIdx = 1; seatIdx <= 300; seatIdx++) {
+                const rowNumber = Math.ceil(seatIdx / 30);
+                const seatNumber = ((seatIdx - 1) % 30) + 1;
+                tickets.push([matchId, sectionId, rowNumber, seatNumber, ticketPrice, 'available']);
+              }
+
+              const placeholders = tickets.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+              await this.db.query(
+                `INSERT INTO tickets (\`match_id\`, \`section_id\`, \`row_number\`, \`seat_number\`, \`price\`, \`status\`)
+                 VALUES ${placeholders}`,
+                tickets.flat()
+              );
+            }
+
+            // Fetch available tickets
+            const [availTickets] = await this.db.query(
+              'SELECT id FROM tickets WHERE match_id = ? AND section_id = ? AND status = "available" LIMIT ?',
+              [matchId, sectionId, qty]
+            );
+
+            if (availTickets.length >= qty) {
+              linkedTickets = availTickets;
+            }
+          }
+        } catch (dbErr) {
+          console.warn('Could not automatically link tickets for simple-purchase:', dbErr.message);
+        }
+      }
+
+      // Insert Order
       const [result] = await this.db.query(
         'INSERT INTO orders (user_id, order_number, status, total_amount, payment_method, notes, customer_email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
         [userId, orderNumber, 'confirmed', total, paymentMethod || 'simulated', combinedNotes, req.user?.email || '']
       );
+      const orderId = result.insertId;
 
-      // Store purchase info in order_items (ticket_id is nullable now)
-      await this.db.query(
-        'INSERT INTO order_items (order_id, ticket_id, quantity, unit_price, subtotal, created_by, updated_by, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, NOW(), NOW())',
-        [result.insertId, parseInt(quantity), unitPrice, total, userId, userId]
-      );
+      if (linkedTickets.length >= qty) {
+        // Link individual tickets to individual order items
+        for (let i = 0; i < qty; i++) {
+          const ticketId = linkedTickets[i].id;
+          await this.db.query(
+            'UPDATE tickets SET status = "sold", purchaser_id = ?, purchased_at = NOW() WHERE id = ?',
+            [userId, ticketId]
+          );
+          await this.db.query(
+            'INSERT INTO order_items (order_id, ticket_id, quantity, unit_price, subtotal, created_by, updated_by, created_at, updated_at) VALUES (?, ?, 1, ?, ?, ?, ?, NOW(), NOW())',
+            [orderId, ticketId, unitPrice, unitPrice, userId, userId]
+          );
+        }
+      } else {
+        // Fallback: Store purchase info in order_items with NULL ticket_id
+        await this.db.query(
+          'INSERT INTO order_items (order_id, ticket_id, quantity, unit_price, subtotal, created_by, updated_by, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, NOW(), NOW())',
+          [orderId, qty, unitPrice, total, userId, userId]
+        );
+      }
 
       res.status(201).json({
         success: true,
-        data: { orderId: result.insertId, orderNumber },
+        data: { orderId, orderNumber },
         message: 'Order saved successfully'
       });
     } catch (error) { next(error); }
