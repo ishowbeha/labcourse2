@@ -75,6 +75,98 @@ const startServer = async () => {
     
     console.log('✅ MySQL pool initialized successfully');
     
+    // ── Auto-generate tickets for any matches missing them ──
+    try {
+      const [matchCount] = await pool.query('SELECT COUNT(*) as c FROM matches');
+      const [ticketCount] = await pool.query('SELECT COUNT(*) as c FROM tickets');
+      if (parseInt(matchCount[0].c) > 0 && parseInt(ticketCount[0].c) === 0) {
+        console.log('🎫 No tickets found — auto-generating for all matches...');
+        
+        // Use the standalone generation script's logic directly
+        const [matches] = await pool.query(
+          "SELECT id, stadium_id, base_price FROM matches WHERE status IN ('scheduled', 'live') ORDER BY id"
+        );
+
+        if (matches.length > 0) {
+          const sectionDefs = [
+            { name: 'North Stand',   rows: 3, seatsPerRow: 11, multiplier: 1.0 },
+            { name: 'South Stand',   rows: 3, seatsPerRow: 11, multiplier: 1.0 },
+            { name: 'East Stand',    rows: 3, seatsPerRow: 11, multiplier: 1.0 },
+            { name: 'West Stand',    rows: 3, seatsPerRow: 11, multiplier: 1.0 },
+            { name: 'VIP North',     rows: 3, seatsPerRow: 11, multiplier: 2.0 },
+            { name: 'VIP South',     rows: 3, seatsPerRow: 11, multiplier: 2.0 },
+          ];
+
+          const stadiumMap = {};
+          for (const m of matches) {
+            if (!stadiumMap[m.stadium_id]) stadiumMap[m.stadium_id] = [];
+            stadiumMap[m.stadium_id].push(m);
+          }
+
+          let totalGenerated = 0;
+          for (const [stadiumId, stadiumMatches] of Object.entries(stadiumMap)) {
+            const [existingSections] = await pool.query(
+              'SELECT id, name, row_count, seats_per_row, price_multiplier FROM sections WHERE stadium_id = ?',
+              [stadiumId]
+            );
+            const existingByName = {};
+            for (const s of existingSections) existingByName[s.name] = s;
+
+            const sectionsToUse = [];
+            for (const def of sectionDefs) {
+              let section = existingByName[def.name];
+              if (!section) {
+                const [res] = await pool.query(
+                  `INSERT INTO sections (stadium_id, name, row_count, seats_per_row, price_multiplier, description, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+                  [stadiumId, def.name, def.rows, def.seatsPerRow, def.multiplier, `Auto: ${def.name}`]
+                );
+                section = { id: res.insertId, name: def.name, row_count: def.rows, seats_per_row: def.seatsPerRow, price_multiplier: def.multiplier };
+              }
+              sectionsToUse.push(section);
+            }
+
+            for (const match of stadiumMatches) {
+              for (const section of sectionsToUse) {
+                const [[{exists}]] = await pool.query(
+                  'SELECT COUNT(*) as `exists` FROM tickets WHERE match_id = ? AND section_id = ?',
+                  [match.id, section.id]
+                );
+                if (parseInt(exists) > 0) continue;
+
+                const totalSeats = section.row_count * section.seats_per_row;
+                const isVip = section.name.toLowerCase().includes('vip');
+                const price = isVip
+                  ? Math.min(150, Math.round(match.base_price * section.price_multiplier * 100) / 100)
+                  : Math.round(match.base_price * section.price_multiplier * 100) / 100;
+
+                const tickets = [];
+                for (let seatIdx = 1; seatIdx <= totalSeats; seatIdx++) {
+                  const rowNum = Math.ceil(seatIdx / section.seats_per_row);
+                  const seatNum = ((seatIdx - 1) % section.seats_per_row) + 1;
+                  tickets.push([match.id, section.id, rowNum, seatNum, price, 'available']);
+                }
+                for (let i = 0; i < tickets.length; i += 500) {
+                  const chunk = tickets.slice(i, i + 500);
+                  const ph = chunk.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+                  await pool.query(
+                    'INSERT INTO tickets (`match_id`,`section_id`,`row_number`,`seat_number`,`price`,`status`) VALUES ' + ph,
+                    chunk.flat()
+                  );
+                  totalGenerated += chunk.length;
+                }
+              }
+            }
+          }
+          console.log(`🎫 Auto-generated ${totalGenerated} tickets for ${matches.length} matches`);
+        }
+      } else if (parseInt(ticketCount[0].c) > 0) {
+        console.log(`🎫 ${ticketCount[0].c} tickets already exist in database`);
+      }
+    } catch (autoGenErr) {
+      console.warn('⚠️ Ticket auto-generation skipped:', autoGenErr.message);
+    }
+
     // Initialize MongoDB (for flexible data - logs, analytics)
     await connectMongoDB();
 

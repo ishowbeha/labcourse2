@@ -84,13 +84,11 @@ const AdminDashboard = () => {
     return null;
   }
 
-  // Tickets Available = real DB count of available tickets for active matches
-  // (stats.ticketsAvailable) minus tickets sold via orders (stats.totalTicketsSold).
-  // Both come from the DB, so the number is always accurate and decreases when
-  // users purchase tickets.
   const totalSold        = parseInt(stats?.totalTicketsSold || 0, 10);
+  // ticketsAvailable already comes from the DB counting only status='available' tickets
+  // for scheduled/live matches. No need to subtract totalSold — the DB already excludes sold.
   const ticketsAvailable = stats?.ticketsAvailable !== undefined
-    ? Math.max(0, stats.ticketsAvailable - totalSold)
+    ? Math.max(0, stats.ticketsAvailable)
     : 0;
 
   const formatCurrency = (value) =>
